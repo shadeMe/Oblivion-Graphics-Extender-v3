@@ -1,0 +1,46 @@
+SurfaceypesIDs:
+			 hex flags	fmt			hex size
+	0 HDR-Surface		26	D3DFMT_A16B16G16R16F	100x100	->	256x256
+	1 HDR-Surface		26	D3DFMT_A16B16G16R16F	100x???	->	256x???		<-	sparse-samplemap, ScreenHeight/2
+	2 HDR-Surface		26	D3DFMT_A16B16G16R16F	100x100	->	256x256
+	3 HDR-Surface		26								<-	ScreenSize
+
+	4 ?			22	D3DFMT_A16B16G16R16F					<-	ScreenSize
+	5 ?			26	D3DFMT_R32F						<-	ScreenSize-related
+
+	6 Water-Surface		6	D3DFMT_A32B32G32R32F	100x100	->	256x256		<-	WaterSurfaceResolution 100|80 HiRes.ini
+	7			6				100x100	->	256x256
+	8 Water-Surface		6				80x80	->	128x128
+	9			C	D3DFMT_L16		100x1	->	256x1		<-	WaterSurfaceResolution 100|80 HiRes.ini
+	10			C	D3DFMT_A32B32G32R32F	100x16	->	256x16		<-	WaterSurfaceResolution 100|80 HiRes.ini
+	11			C	D3DFMT_R32F		100x100	->	256x256		<-	WaterSurfaceResolution 100|80 HiRes.ini
+	12			C	D3DFMT_A32B32G32R32F	100x100	->	256x256		<-	WaterSurfaceResolution 100|80 HiRes.ini
+
+	Reflection???
+0xD	13 Water-Surface	2	D3DFMT_A8R8G8B8		100x100	->	256x256		<-	via Water-Pass loop, preceeded by NiCamera-Constructor
+0xE	14			6	D3DFMT_A8R8G8B8		100x100	->	256x256		<-	via Render-Pass loop, preceeded by NiCamera-Constructor
+
+	15 Non FP16 HDR? ...	6				100x100	->	256x256		<-	BlurShaderResolution ini
+	16			6				100x100	->	256x256		<-	BlurShaderResolution ini
+	17			6				80x80	->	128x128
+	18			6				80x80	->	128x128
+	19			6				100x100	->	256x256		<-	BlurShaderResolution ini
+
+	20			46								<-	ScreenSize
+	21			2				100x100	->	256x256
+	22			6				200x200	->	512x512
+	23 Shadowmap		6	D3DFMT_R32F		800x800	->	2048x2048	<-	ShadowMapResolution ini
+	24			10				100x100	->	256x256		<-	via Shadow-Pass
+
+Untracked
+					D3DFMT_L8 x 30
+
+Flags:
+
+	2	0000 0010
+	6	0000 0110
+	C	0000 1100
+	10	0001 0000
+	22	0010 0010
+	26	0010 0110
+	46	0100 0110
