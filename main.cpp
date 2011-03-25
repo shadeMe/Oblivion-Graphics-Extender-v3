@@ -16,6 +16,7 @@
 #include "RenderSurfaceParametersHook.hpp"
 #include "RenderStateManagerHooks.h"
 #include "GlobalSettings.h"
+#include "GUIs_DebugWindow.hpp"
 
 #include <stdlib.h>
 #include "delayimp.h"
@@ -208,14 +209,12 @@ static CommandInfo kShowMemoryDump =
 	Cmd_ShowMemoryDump
 };
 
-#include "apihijack.h"
-#include "apihijack.cpp"
+#include "Hooking/apihijack.h"
+#include "Hooking/apihijack.cpp"
 
-#include "D3D9.hpp"
-#include "D3D9.cpp"
-
-#include "K32.hpp"
-#include "K32.cpp"
+#include "Hooking/D3D9.cpp"
+#include "Hooking/K32.cpp"
+#include "Hooking/U32.cpp"
 
 extern "C" {
 
@@ -266,6 +265,7 @@ bool OBSEPlugin_Query(const OBSEInterface * obse, PluginInfo * info)
 		}
 #endif
 		HookAPICalls(&K32Hook);
+		HookAPICalls(&U32Hook);
 	//	HookAPICalls(&D3DHook);
 	}
 	else
@@ -310,6 +310,7 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 	obse->RegisterCommand(&kCommandInfo_IsShaderEnabled);				// 2114
 	obse->RegisterCommand(&kCommandInfo_DumpFrameScript);			// 2115
 	obse->RegisterCommand(&kCommandInfo_DumpFrameSurfaces);			// 2116
+	obse->RegisterCommand(&kCommandInfo_OpenRendererInterface);			// 2117
 
 // We don't want to hook the construction set.
 
@@ -332,7 +333,7 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 
 			CreateDepthBufferHook();
 			CreateRenderSurfaceHook();
-			//v1_2_416::NiDX9RenderStateEx::HookRenderStateManager();
+		//	v1_2_416::NiDX9RenderStateEx::HookRenderStateManager();
 		}
 		else
 			g_serialization->SetLoadCallback(g_pluginHandle, LoadCallback);

@@ -3,7 +3,9 @@
 #include "nodes\NiDX9Renderer.h"
 #include "Rendering.h"
 #include "OBSEShaderInterface.h"
+#include "D3D9.hpp"
 #include "D3D9Device.hpp"
+#include "GUIs_DebugWindow.hpp"
 
 void NotImplemented(void)
 {
@@ -55,24 +57,31 @@ static bool ForceGraphicsReset_Execute(COMMAND_ARGS)
 }
 static bool PurgeManagedTextures_Execute(COMMAND_ARGS)
 {
-  if(IsEnabled())
-    GetD3DDevice()->EvictManagedResources();
-  *result=0;
-  return true;
+	if(IsEnabled())
+		GetD3DDevice()->EvictManagedResources();
+	*result=0;
+	return true;
 }
 static bool DumpFrameScript_Execute(COMMAND_ARGS)
 {
-  if(IsEnabled())
-    ((OBGEDirect3DDevice9 *)GetD3DDevice())->DumpFrameScript();
-  *result=0;
-  return true;
+	if(IsEnabled())
+		((OBGEDirect3DDevice9 *)GetD3DDevice())->DumpFrameScript();
+	*result=0;
+	return true;
 }
 static bool DumpFrameSurfaces_Execute(COMMAND_ARGS)
 {
-  if(IsEnabled())
-    ((OBGEDirect3DDevice9 *)GetD3DDevice())->DumpFrameSurfaces();
-  *result=0;
-  return true;
+	if(IsEnabled())
+		((OBGEDirect3DDevice9 *)GetD3DDevice())->DumpFrameSurfaces();
+	*result=0;
+	return true;
+}
+static bool OpenRendererInterface_Execute(COMMAND_ARGS)
+{
+	if(IsEnabled())
+		DebugWindow::Create();
+	*result=0;
+	return true;
 }
 
 CommandInfo kCommandInfo_GetAvailableGraphicsMemory =
@@ -133,43 +142,57 @@ CommandInfo kCommandInfo_ForceGraphicsReset =
 };
 CommandInfo kCommandInfo_PurgeManagedTextures =
 {
-  "PurgeManagedTextures",
-  "",
-  0,
-  "Evicts managed resources from vram",
-  0,
-  0,
-  0,
-  PurgeManagedTextures_Execute,
-  0,
-  0,
-  0
+	"PurgeManagedTextures",
+	"",
+	0,
+	"Evicts managed resources from vram",
+	0,
+	0,
+	0,
+	PurgeManagedTextures_Execute,
+	0,
+	0,
+	0
 };
 CommandInfo kCommandInfo_DumpFrameScript =
 {
-  "DumpFrameScript",
-  "",
-  0,
-  "Prints the logged script of the next frame",
-  0,
-  0,
-  0,
-  DumpFrameScript_Execute,
-  0,
-  0,
-  0
+	"DumpFrameScript",
+	"",
+	0,
+	"Prints the logged script of the next frame",
+	0,
+	0,
+	0,
+	DumpFrameScript_Execute,
+	0,
+	0,
+	0
 };
 CommandInfo kCommandInfo_DumpFrameSurfaces =
 {
-  "DumpFrameSurfaces",
-  "",
-  0,
-  "Prints the logged surface-resources",
-  0,
-  0,
-  0,
-  DumpFrameSurfaces_Execute,
-  0,
-  0,
-  0
+	"DumpFrameSurfaces",
+	"",
+	0,
+	"Prints the logged surface-resources",
+	0,
+	0,
+	0,
+	DumpFrameSurfaces_Execute,
+	0,
+	0,
+	0
+};
+CommandInfo kCommandInfo_OpenRendererInterface =
+{
+	"OpenRendererInterface",
+	"",
+	0,
+	"Opens the renderer-interface in another window",
+	0,
+	0,
+	0,
+	OpenRendererInterface_Execute,
+	0,
+	0,
+	0
 };

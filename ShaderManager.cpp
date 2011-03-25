@@ -1,8 +1,7 @@
 #include "ShaderManager.h"
 #include "TextureManager.h"
 #include "GlobalSettings.h"
-#include "D3D9.h"
-#include "D3D9Device.hpp"
+#include "D3D9.hpp"
 
 static global<bool> UseShaderList(true,NULL,"Shaders","bUseShaderList");
 static global<char*> ShaderListFile("data\\shaders\\shaderlist.txt",NULL,"Shaders","sShaderListFile");

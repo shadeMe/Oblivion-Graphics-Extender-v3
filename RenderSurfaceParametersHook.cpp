@@ -2,9 +2,13 @@
 #include "RenderSurfaceParametersHook.hpp"
 #include "windows.h"
 #include "obse_common/SafeWrite.h"
+#include "GlobalSettings.h"
 #include <assert.h>
 
-#include "detours/detours.h"
+#include "Hooking/detours/detours.h"
+
+static global<int> ReflectionMapSize(256, NULL, "ScreenBuffers", "iReflectionMapSize");
+static global<int> RendererWidth(0, "Oblivion.ini", "Display", "iSize W");
 
 /* ------------------------------------------------------------------------------------------------- */
 
@@ -120,7 +124,17 @@ void CreateRenderSurfaceHook(void) {
         }
 
 	/* Reflection Render-Surface Dimension (square) */
-	SafeWrite32(0x0049BFAF, 1400);
+	if ((ReflectionMapSize.data >= 256) &&
+	    (ReflectionMapSize.data <= 2560)) {
+
+		SafeWrite32(0x0049BFAF, ReflectionMapSize.data);
+	}
+	else if ((ReflectionMapSize.data == 0) &&
+	         (RendererWidth.data >= 256) &&
+	         (RendererWidth.data <= 2560)) {
+
+		SafeWrite32(0x0049BFAF, RendererWidth.data);
+	}
 
 	return;
 }

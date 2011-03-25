@@ -1,3 +1,7 @@
+#ifndef	HOOKING_K32_CPP
+#define	HOOKING_K32_CPP
+
+#include "K32.hpp"
 
 // Hook structure.
 enum
@@ -58,3 +62,5 @@ FARPROC WINAPI OBGEGetProcAddress(HMODULE hModule, LPCSTR lpProcName)
 
 	return jmp;
 }
+
+#endif

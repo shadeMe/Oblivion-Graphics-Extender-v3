@@ -1,5 +1,5 @@
 #include <Windows.h>
-#include "detours/detoured.h"
+#include "Hooking/detours/detoured.h"
 
 static HMODULE s_hDll;
 

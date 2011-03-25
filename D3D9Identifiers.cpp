@@ -5,20 +5,6 @@
 #include <assert.h>
 #include "D3D9Identifiers.hpp"
 
-#ifdef	OBGE_LOGGING
-int frame_dmp = 0;
-bool frame_trk = true;
-int frame_num = 0;
-int frame_bge = 0;
-IDebugLog *frame_log = NULL;
-#endif
-
-/* these have to be tracked globally, when the device is recreated they may stay alive, but the map wouldn't */
-std::map <void *, struct renderSurface  *> surfaceRender;
-std::map <void *, struct depthSurface   *> surfaceDepth;
-std::map <void *, struct textureSurface *> surfaceTexture;
-std::map <void *, struct textureMap     *> textureMaps;
-
 /* Shader-tandems:
  *
  * STLEAF000.vso + STLEAF2000.pso
@@ -992,8 +978,8 @@ const char *findUsage(DWORD use) {
   for (int u = 0; u < (sizeof(usageDatabase) / sizeof(usageID)); u++) {
     if (usageDatabase[u].use & use) {
       if (usestr[0] != '\0')
-        strcat(usestr, " ");
-      strcat(usestr, usageDatabase[u].name);
+        strcat_s(usestr, " ");
+      strcat_s(usestr, usageDatabase[u].name);
     }
   }
 

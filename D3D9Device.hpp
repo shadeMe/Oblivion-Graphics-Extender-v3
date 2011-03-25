@@ -5,8 +5,10 @@
 #include <d3d9.h>
 #include <d3dx9.h>
 
-// Tracker
-class OBGEDirect3DDevice9; extern OBGEDirect3DDevice9 *lastOBGEDirect3DDevice9;
+#include "D3D9.hpp"
+#include "D3D9Identifiers.hpp"
+
+/* ----------------------------------------------------------------------------- */
 
 // Hook-Tracker
 enum OBGEPass {
@@ -26,7 +28,62 @@ extern IDirect3DTexture9 *passTexture[OBGEPASS_NUM];
 extern IDirect3DSurface9 *passSurface[OBGEPASS_NUM];
 extern IDirect3DSurface9 *passDepth  [OBGEPASS_NUM];
 
-#include "D3D9Identifiers.hpp"
+/* ------------------------------------------------------------------------------- */
+
+#ifdef	OBGE_LOGGING
+extern int frame_dmp;
+extern bool frame_trk;
+extern int frame_num;
+extern int frame_bge;
+extern IDebugLog *frame_log;
+#endif
+
+/* ------------------------------------------------------------------------------- */
+
+#include <map>
+
+struct textureMap {
+	UINT Width;
+	UINT Height;
+	UINT Levels;
+	DWORD Usage;
+	D3DFORMAT Format;
+};
+
+struct renderSurface {
+	UINT Width;
+	UINT Height;
+	D3DFORMAT Format;
+	D3DMULTISAMPLE_TYPE MultiSample;
+	DWORD MultisampleQuality;
+	BOOL Lockable;
+};
+
+struct depthSurface {
+	UINT Width;
+	UINT Height;
+	D3DFORMAT Format;
+	D3DMULTISAMPLE_TYPE MultiSample;
+	DWORD MultisampleQuality;
+	BOOL Discard;
+};
+
+struct textureSurface {
+	UINT Level;
+
+	struct textureMap *map;
+	IDirect3DTexture9 *tex;
+};
+
+/* these have to be tracked globally, when the device is recreated they may stay alive, but the map wouldn't */
+extern std::map <void *, struct renderSurface  *> surfaceRender;
+extern std::map <void *, struct depthSurface   *> surfaceDepth;
+extern std::map <void *, struct textureSurface *> surfaceTexture;
+extern std::map <void *, struct textureMap     *> textureMaps;
+
+/* ----------------------------------------------------------------------------- */
+// Tracker
+class OBGEDirect3DDevice9; extern OBGEDirect3DDevice9 *lastOBGEDirect3DDevice9;
 
 #if	defined(OBGE_TRACKER_SURFACES) || defined(OBGE_TRACKER_TEXTURES)
 #include "D3D9Texture.hpp"

@@ -5,11 +5,12 @@
 #include <d3d9.h>
 #include <d3dx9.h>
 
-// Function pointer types.
-typedef IDirect3D9* (FAR WINAPI *Direct3DCreate9_t)(UINT sdk_version);
-
-// Function prototypes.
-IDirect3D9* FAR WINAPI OBGEDirect3DCreate9(UINT sdk_version);
+#define	OBGE_LOGGING
+#define	OBGE_HOOKING
+#define	OBGE_PROFILE
+#define	OBGE_TRACKER
+#undef	OBGE_TRACKER_SURFACES		// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
+#undef	OBGE_TRACKER_TEXTURES		// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
 
 // Tracker
 class OBGEDirect3D9; extern OBGEDirect3D9 *lastOBGEDirect3D9;
