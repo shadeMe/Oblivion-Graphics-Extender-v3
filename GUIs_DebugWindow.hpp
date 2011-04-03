@@ -1,12 +1,15 @@
 #ifndef	DEBUG_WINDOW_HPP
 #define	DEBUG_WINDOW_HPP
 
+#ifdef	OBGE_DEVLING
+#include "D3D.hpp"
+
 class DebugWindow
 {
 public:
 	DebugWindow();
 	~DebugWindow();
-	
+
 	static DebugWindow *Create();
 	static DebugWindow *Expunge();
 
@@ -28,4 +31,5 @@ private:
 	HWND	m_editText, m_editText2;
 };
 
+#endif
 #endif

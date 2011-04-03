@@ -62,6 +62,8 @@ static bool PurgeManagedTextures_Execute(COMMAND_ARGS)
 	*result=0;
 	return true;
 }
+
+#ifdef	OBGE_LOGGING
 static bool DumpFrameScript_Execute(COMMAND_ARGS)
 {
 	if(IsEnabled())
@@ -76,6 +78,9 @@ static bool DumpFrameSurfaces_Execute(COMMAND_ARGS)
 	*result=0;
 	return true;
 }
+#endif
+
+#ifdef	OBGE_DEVLING
 static bool OpenRendererInterface_Execute(COMMAND_ARGS)
 {
 	if(IsEnabled())
@@ -83,6 +88,7 @@ static bool OpenRendererInterface_Execute(COMMAND_ARGS)
 	*result=0;
 	return true;
 }
+#endif
 
 CommandInfo kCommandInfo_GetAvailableGraphicsMemory =
 {
@@ -154,6 +160,8 @@ CommandInfo kCommandInfo_PurgeManagedTextures =
 	0,
 	0
 };
+
+#ifdef	OBGE_LOGGING
 CommandInfo kCommandInfo_DumpFrameScript =
 {
 	"DumpFrameScript",
@@ -182,6 +190,9 @@ CommandInfo kCommandInfo_DumpFrameSurfaces =
 	0,
 	0
 };
+#endif
+
+#ifdef	OBGE_DEVLING
 CommandInfo kCommandInfo_OpenRendererInterface =
 {
 	"OpenRendererInterface",
@@ -196,3 +207,4 @@ CommandInfo kCommandInfo_OpenRendererInterface =
 	0,
 	0
 };
+#endif

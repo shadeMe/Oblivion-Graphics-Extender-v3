@@ -5,10 +5,11 @@
 #include <d3d9.h>
 #include <d3dx9.h>
 
-#define	OBGE_LOGGING
-#define	OBGE_HOOKING
-#define	OBGE_PROFILE
-#define	OBGE_TRACKER
+#undef	OBGE_LOGGING
+#undef	OBGE_HOOKING
+#undef	OBGE_DEVLING
+#undef	OBGE_PROFILE
+#define	OBGE_TRACKER		0	// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
 #undef	OBGE_TRACKER_SURFACES		// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
 #undef	OBGE_TRACKER_TEXTURES		// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
 

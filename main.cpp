@@ -308,9 +308,13 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 	obse->RegisterCommand(&kCommandInfo_SetHUDElementRotation);			// 2112
 	obse->RegisterCommand(&kCommandInfo_PurgeManagedTextures);			// 2113
 	obse->RegisterCommand(&kCommandInfo_IsShaderEnabled);				// 2114
+#ifdef	OBGE_LOGGING
 	obse->RegisterCommand(&kCommandInfo_DumpFrameScript);			// 2115
 	obse->RegisterCommand(&kCommandInfo_DumpFrameSurfaces);			// 2116
+#endif
+#ifdef	OBGE_DEVLING
 	obse->RegisterCommand(&kCommandInfo_OpenRendererInterface);			// 2117
+#endif
 
 // We don't want to hook the construction set.
 

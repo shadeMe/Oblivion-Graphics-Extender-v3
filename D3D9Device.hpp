@@ -32,11 +32,14 @@ extern IDirect3DSurface9 *passDepth  [OBGEPASS_NUM];
 
 #ifdef	OBGE_LOGGING
 extern int frame_dmp;
-extern bool frame_trk;
 extern int frame_num;
 extern int frame_bge;
 extern IDebugLog *frame_log;
+#else
+#define	frame_log ((IDebugLog *)NULL)
 #endif
+
+extern bool frame_trk;
 
 /* ------------------------------------------------------------------------------- */
 
@@ -294,15 +297,17 @@ public:
 #endif
 
 			if (frame_log || frame_trk) {
-				struct textureMap *track = new struct textureMap;
+				if (OBGE_TRACKER || (Usage & D3DUSAGE_RENDERTARGET) || (Usage & D3DUSAGE_DEPTHSTENCIL)) {
+					struct textureMap *track = new struct textureMap;
 
-				track->Width = Width;
-				track->Height = Height;
-				track->Levels = Levels;
-				track->Usage = Usage;
-				track->Format = Format;
+					track->Width = Width;
+					track->Height = Height;
+					track->Levels = Levels;
+					track->Usage = Usage;
+					track->Format = Format;
 
-				textureMaps[*ppTexture] = track;
+					textureMaps[*ppTexture] = track;
+				}
 
 #ifndef	OBGE_TRACKER_TEXTURES
 				/* apparently the level-address stays constant, so we can track this already from here */
@@ -317,9 +322,9 @@ public:
 					surfaceTexture[ppSurfaceLevel] = track;
 
 					if (Usage & D3DUSAGE_RENDERTARGET)
-					  _MESSAGE("OD3D9: GetSurfaceLevel[0]: 0x%08x", ppSurfaceLevel);
+					  _MESSAGE("OD3D9: RT GetSurfaceLevel[0]: 0x%08x", ppSurfaceLevel);
 					else if (Usage & D3DUSAGE_DEPTHSTENCIL)
-					  _MESSAGE("OD3D9: GetSurfaceLevel[0]: 0x%08x", ppSurfaceLevel);
+					  _MESSAGE("OD3D9: DS GetSurfaceLevel[0]: 0x%08x", ppSurfaceLevel);
 				}
 #endif
 			}
@@ -1489,8 +1494,10 @@ public:
 public:
 	STDMETHOD(DumpFrameScript)(THIS)
 	{
+#ifdef	OBGE_LOGGING
 		/* log the next 2 frames */
 		frame_dmp = 15;
+#endif
 
 		return D3D_OK;
 	}

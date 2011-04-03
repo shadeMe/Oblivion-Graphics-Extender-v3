@@ -15,11 +15,12 @@ IDirect3DSurface9 *passDepth  [OBGEPASS_NUM];
 
 #ifdef	OBGE_LOGGING
 int frame_dmp = 0;
-bool frame_trk = true;
 int frame_num = 0;
 int frame_bge = 0;
 IDebugLog *frame_log = NULL;
 #endif
+
+bool frame_trk = true;
 
 /* these have to be tracked globally, when the device is recreated they may stay alive, but the map wouldn't */
 std::map <void *, struct renderSurface  *> surfaceRender;

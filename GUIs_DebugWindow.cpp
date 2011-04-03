@@ -1,7 +1,9 @@
-#include "GUIs_DebugWindow.hpp"
 #include "obse/Utilities.h"
 #include "GlobalSettings.h"
 #include <assert.h>
+
+#ifdef	OBGE_DEVLING
+#include "GUIs_DebugWindow.hpp"
 
 static global<bool> DWEnabled(false, NULL, "General", "bEnabledDW");
 static global<bool> FullScreen(0, "Oblivion.ini", "Display", "bFull Screen");
@@ -200,3 +202,4 @@ DebugWindow *DebugWindow::Expunge() {
 
 	return NULL;
 }
+#endif
