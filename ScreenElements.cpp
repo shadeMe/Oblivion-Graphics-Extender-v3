@@ -67,12 +67,16 @@ int		Sprite::GetTexture()
 
 void	Sprite::Render(ID3DXSprite *sprite)
 {
-	TextureManager	*TexMan=TextureManager::GetSingleton();
+	TextureManager *TexMan = TextureManager::GetSingleton();
 
 	if (enabled&&TexMan->IsValidTexture(tex))
 	{
-		sprite->SetTransform(&transform);
-		sprite->Draw(TexMan->GetTexture(tex),0,0,&pos,color);
+		TextureRecord *TexRec = TexMan->GetTexture(tex);
+
+		if (TexRec->IsType(TR_PLANAR)) {
+			sprite->SetTransform(&transform);
+			sprite->Draw((LPDIRECT3DTEXTURE9)TexRec->GetTexture(),0,0,&pos,color);
+		}
 	}
 }
 

@@ -307,26 +307,26 @@ public:
 					track->Format = Format;
 
 					textureMaps[*ppTexture] = track;
-				}
 
 #ifndef	OBGE_TRACKER_TEXTURES
-				/* apparently the level-address stays constant, so we can track this already from here */
-				IDirect3DSurface9* ppSurfaceLevel = NULL;
-				if(SUCCEEDED((*ppTexture)->GetSurfaceLevel(0, &ppSurfaceLevel))) {
-					struct textureSurface *track = new struct textureSurface;
+					/* apparently the level-address stays constant, so we can track this already from here */
+					IDirect3DSurface9* ppSurfaceLevel = NULL;
+					if(SUCCEEDED((*ppTexture)->GetSurfaceLevel(0, &ppSurfaceLevel))) {
+						struct textureSurface *track = new struct textureSurface;
 
-					track->Level = 0;
-					track->map = textureMaps[*ppTexture];
-					track->tex = *ppTexture;
+						track->Level = 0;
+						track->map = textureMaps[*ppTexture];
+						track->tex = *ppTexture;
 
-					surfaceTexture[ppSurfaceLevel] = track;
+						surfaceTexture[ppSurfaceLevel] = track;
 
-					if (Usage & D3DUSAGE_RENDERTARGET)
-					  _MESSAGE("OD3D9: RT GetSurfaceLevel[0]: 0x%08x", ppSurfaceLevel);
-					else if (Usage & D3DUSAGE_DEPTHSTENCIL)
-					  _MESSAGE("OD3D9: DS GetSurfaceLevel[0]: 0x%08x", ppSurfaceLevel);
-				}
+						if (Usage & D3DUSAGE_RENDERTARGET)
+						  _MESSAGE("OD3D9: RT GetSurfaceLevel[0]: 0x%08x", ppSurfaceLevel);
+						else if (Usage & D3DUSAGE_DEPTHSTENCIL)
+						  _MESSAGE("OD3D9: DS GetSurfaceLevel[0]: 0x%08x", ppSurfaceLevel);
+					}
 #endif
+				}
 			}
 		}
 
@@ -529,6 +529,9 @@ public:
 	{
 		/* they are a textures anyway, no need to check dedicated targets */
 		if (currentPass != OBGEPASS_UNKNOWN) {
+		  if (surfaceRender[pRenderTarget])
+		    passSurface[currentPass] = pRenderTarget,
+		      passTexture[currentPass] = NULL;
 		  if (surfaceTexture[pRenderTarget])
 		    if ((passSurface[currentPass] = pRenderTarget))
 		      passTexture[currentPass] = surfaceTexture[pRenderTarget]->tex;
@@ -1237,19 +1240,19 @@ public:
 
 		HRESULT res = m_device->CreateVertexShader(pFunction, ppShader);
 
-#ifdef	OBGE_LOGGING
 		if (frame_log || frame_trk) {
 			UINT len = 0; if (*ppShader) (*ppShader)->GetFunction(NULL, &len);
 			const char *nam = findShader(*ppShader, len, pFunction);
 
+#ifdef	OBGE_LOGGING
 			if (frame_log) {
 				frame_log->Indent();
 				frame_log->FormattedMessage("Length: %d", len);
 				frame_log->FormattedMessage("Name: %s", nam);
 				frame_log->Outdent();
 			}
-		}
 #endif
+		}
 
 		return res;
 	}
@@ -1374,19 +1377,19 @@ public:
 
 		HRESULT res = m_device->CreatePixelShader(pFunction, ppShader);
 
-#ifdef	OBGE_LOGGING
 		if (frame_log || frame_trk) {
 			UINT len = 0; if (*ppShader) (*ppShader)->GetFunction(NULL, &len);
 			const char *nam = findShader(*ppShader, len, pFunction);
 
+#ifdef	OBGE_LOGGING
 			if (frame_log) {
 				frame_log->Indent();
 				frame_log->FormattedMessage("Length: %d", len);
 				frame_log->FormattedMessage("Name: %s", nam);
 				frame_log->Outdent();
 			}
-		}
 #endif
+		}
 
 		return res;
 	}

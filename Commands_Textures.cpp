@@ -13,7 +13,7 @@ static bool LoadTexture_Execute(COMMAND_ARGS)
 	if(!ExtractArgs(EXTRACTARGS, &path, &fromFile)) return true;
 
 	if(IsEnabled())
-		*result = TextureManager::GetSingleton()->LoadTexture(path, fromFile);
+		*result = TextureManager::GetSingleton()->LoadTexture(path, TR_PLANAR, fromFile);
 	else
 		*result=-1;
 

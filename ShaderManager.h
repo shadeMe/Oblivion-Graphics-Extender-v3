@@ -117,7 +117,7 @@ public:
 	bool						SetShaderFloat(int ShaderNum, char *name, float value);
 	bool						SetShaderVector(int ShaderNum, char *name, v1_2_416::NiVector4 *value);
 	bool						SetShaderTexture(int ShaderNum, char *name, int TextureNum);
-	void						PurgeTexture(IDirect3DTexture9 *texture);
+	void						PurgeTexture(IDirect3DBaseTexture9 *texture);
 	bool						GetShaderState(int ShaderNum);
 
 	static ShaderManager*		Singleton;

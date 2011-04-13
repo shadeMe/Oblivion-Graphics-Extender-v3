@@ -9,18 +9,53 @@
 
 #define TEXTUREVERSION 1
 
+typedef enum {
+  TR_PLANAR = 0,
+  TR_CUBIC = 1,
+  TR_VOLUMETRIC = 2
+} TextureRecordType;
+
 class TextureRecord
 {
 public:
 	TextureRecord();
 	~TextureRecord();
 
-	IDirect3DTexture9*		texture;
-	char					Filepath[260];
-	bool					FromFile;
+	void SetTexture(IDirect3DTexture9* tex, const char* fp, bool ff = false);
+	void SetTexture(IDirect3DCubeTexture9* tex, const char* fp, bool ff = false);
+	void SetTexture(IDirect3DVolumeTexture9* tex, const char* fp, bool ff = false);
+
+	IDirect3DBaseTexture9* GetTexture() const;
+
+	bool HasTexture(IDirect3DBaseTexture9* tex) const;
+	bool HasTexture(IDirect3DTexture9* tex) const;
+	bool HasTexture(IDirect3DCubeTexture9* tex) const;
+	bool HasTexture(IDirect3DVolumeTexture9* tex) const;
+	bool HasTexture() const;
+
+	TextureRecordType GetType() const;
+	bool IsType(TextureRecordType type) const;
+
+	const char *GetPath() const;
+	bool IsFromFile() const;
+
+	void Release();
+	void Purge();
+
+private:
+	TextureRecordType type;
+	union {
+	  IDirect3DBaseTexture9*	texture;
+	  IDirect3DTexture9*		textureP;
+	  IDirect3DCubeTexture9*	textureC;
+	  IDirect3DVolumeTexture9*	textureV;
+	};
+
+	char				Filepath[260];
+	bool				FromFile;
 };
 
-class StaticTextureRecord: public TextureRecord
+class StaticTextureRecord : public TextureRecord
 {
 public:
 	StaticTextureRecord();
@@ -29,7 +64,7 @@ public:
 	int AddRef();
 	int Release();
 
-	int						RefCount;
+	int				RefCount;
 };
 
 typedef std::vector<TextureRecord*> TextureList;
@@ -44,20 +79,22 @@ public:
 	static TextureManager*	GetSingleton();
 	static TextureManager*	Singleton;
 
-	void					InitialiseFrameTextures(void);
-	void					DeviceRelease(void);
-	int						LoadTexture(char *Filename,DWORD FromFile);
-	StaticTextureRecord*	LoadStaticTexture(char *Filename);
-	void					NewGame(void);
-	void					LoadGame(OBSESerializationInterface *Interface);
-	void					SaveGame(OBSESerializationInterface *Interface);
-	bool					IsValidTexture(int TextureNum);
-	IDirect3DTexture9*		GetTexture(int TextureNum);
-	void					ReleaseTexture(IDirect3DTexture9* texture);
-	void					FreeTexture(int index);
-	int						FindTexture(IDirect3DTexture9* texture);
+	void				InitialiseFrameTextures(void);
+	void				DeviceRelease(void);
+	int				LoadTexture(char *Filename, TextureRecordType type, DWORD FromFile);
+	StaticTextureRecord*		LoadStaticTexture(char *Filename, TextureRecordType type);
+	void				NewGame(void);
+	void				LoadGame(OBSESerializationInterface *Interface);
+	void				SaveGame(OBSESerializationInterface *Interface);
+	bool				IsValidTexture(int TextureNum);
+	TextureRecord*			GetTexture(int TextureNum);
+	void				FreeTexture(int index);
+	template<class IDirect3DTextureType9>
+	void				ReleaseTexture(IDirect3DTextureType9* texture);
+	template<class IDirect3DTextureType9>
+	int				FindTexture(IDirect3DTextureType9* texture);
 
-	TextureList				Textures;
+	TextureList			Textures;
 	StaticTextureList		StaticTextures;
 
 	IDirect3DTexture9*		thisframeTex;						
@@ -69,12 +106,12 @@ public:
 	IDirect3DTexture9*		lastframeTex;
 	IDirect3DSurface9*		lastframeSurf;
 	
-	bool					HasDepth;
+	bool				HasDepth;
 	
 	IDirect3DTexture9*		depth;
 	IDirect3DSurface9*		depthSurface;
 	IDirect3DTexture9*		depthRAWZ;
 	
-	bool					RAWZflag;
+	bool				RAWZflag;
 };
 

@@ -8,17 +8,102 @@ static global<int> BufferTexturesNumBits(8,NULL,"ScreenBuffers","iBufferTextures
 
 TextureRecord::TextureRecord()
 {
-	texture=NULL;
-	Filepath[0]=0;
+  type = TR_PLANAR;
+  texture = NULL;
+  Filepath[0]=0;
 }
 
 TextureRecord::~TextureRecord()
 {
-	if(texture)
-	{
-		while(texture->Release()){}
-	}
-	texture=NULL;
+  Release();
+}
+
+void TextureRecord::SetTexture(IDirect3DTexture9* tex, const char* fp, bool ff) {
+  this->type = TR_PLANAR;
+  this->textureP = tex;
+  strcpy_s(this->Filepath, 256, fp);
+  this->FromFile = (FromFile != 0);
+}
+
+void TextureRecord::SetTexture(IDirect3DCubeTexture9* tex, const char* fp, bool ff) {
+  this->type = TR_CUBIC;
+  this->textureC = tex;
+  strcpy_s(this->Filepath, 256, fp);
+  this->FromFile = (FromFile != 0);
+}
+
+void TextureRecord::SetTexture(IDirect3DVolumeTexture9* tex, const char* fp, bool ff) {
+  this->type = TR_VOLUMETRIC;
+  this->textureV = tex;
+  strcpy_s(this->Filepath, 256, fp);
+  this->FromFile = (FromFile != 0);
+}
+
+IDirect3DBaseTexture9* TextureRecord::GetTexture() const {
+  return this->texture;
+}
+
+TextureRecordType TextureRecord::GetType() const {
+  return this->type;
+}
+
+bool TextureRecord::IsType(TextureRecordType type) const {
+  return (this->type == type);
+}
+
+bool TextureRecord::HasTexture(IDirect3DBaseTexture9* tex) const {
+  return (this->texture == tex);
+}
+
+bool TextureRecord::HasTexture(IDirect3DTexture9* tex) const {
+  return this->IsType(TR_PLANAR) && (this->textureP == tex);
+}
+
+bool TextureRecord::HasTexture(IDirect3DCubeTexture9* tex) const {
+  return this->IsType(TR_CUBIC) && (this->textureC == tex);
+}
+
+bool TextureRecord::HasTexture(IDirect3DVolumeTexture9* tex) const {
+  return this->IsType(TR_VOLUMETRIC) && (this->textureV == tex);
+}
+
+bool TextureRecord::HasTexture() const {
+  return (this->texture != NULL);
+}
+
+const char *TextureRecord::GetPath() const {
+  return this->Filepath;
+}
+
+bool TextureRecord::IsFromFile() const {
+  return this->FromFile;
+}
+
+void TextureRecord::Purge() {
+  if (this->IsType(TR_PLANAR))
+    ShaderManager::GetSingleton()->PurgeTexture(this->textureP);
+  else if (this->IsType(TR_CUBIC))
+    ShaderManager::GetSingleton()->PurgeTexture(this->textureC);
+  else if (this->IsType(TR_VOLUMETRIC))
+    ShaderManager::GetSingleton()->PurgeTexture(this->textureV);
+}
+
+void TextureRecord::Release() {
+  if(this->IsType(TR_PLANAR)) {
+    if(textureP)
+      while(textureP->Release()){}
+  }
+  else if(this->IsType(TR_CUBIC)) {
+    if(textureC)
+      while(textureC->Release()){}
+  }
+  else if (this->IsType(TR_VOLUMETRIC)) {
+    if(textureV)
+      while(textureV->Release()){}
+  }
+
+  this->texture = NULL;
+  this->Filepath[0] = '\0';
 }
 
 StaticTextureRecord::StaticTextureRecord()
@@ -102,7 +187,7 @@ void	TextureManager::InitialiseFrameTextures()
 
 	_MESSAGE("Creating shader textures.");
 	_MESSAGE("Width = %i, Height = %i",Width,Height);
-	
+
 	if(BufferTexturesNumBits.data==32)
 	{
 		hr=GetD3DDevice()->CreateTexture(Width,Height,1,D3DUSAGE_RENDERTARGET,D3DFMT_A32B32G32R32F,D3DPOOL_DEFAULT,&thisframeTex,0);
@@ -166,7 +251,7 @@ void	TextureManager::DeviceRelease()
 		thisframeSurf->Release();
 		thisframeSurf=NULL;
 	}
-	
+
 	if (thisframeTex)
 	{
 		_MESSAGE("Releasing thisframe texture.");
@@ -202,52 +287,160 @@ void	TextureManager::DeviceRelease()
 	}
 }
 
-int	TextureManager::LoadTexture(char *Filename, DWORD FromFile)
+int	TextureManager::LoadTexture(char *Filename, TextureRecordType type, DWORD FromFile)
 {
 	if(strlen(Filename)>240) return NULL;
-	
+
 	char NewPath[256];
 	strcpy_s(NewPath,256,"data\\textures\\");
 	strcat_s(NewPath,256,Filename);
 
-	_MESSAGE("Loading texture (%s)",NewPath);
+	if (type == TR_PLANAR) {
+	  IDirect3DTexture9* tex = NULL;
 
-	IDirect3DTexture9* tex=NULL;
+	  _MESSAGE("Loading texture (%s)",NewPath);
 
-	if(FromFile)
-	{
-		if(FAILED(D3DXCreateTextureFromFileEx(GetD3DDevice(),NewPath,D3DX_DEFAULT_NONPOW2,D3DX_DEFAULT_NONPOW2,D3DX_FROM_FILE,0,D3DFMT_UNKNOWN,
-			D3DPOOL_MANAGED,D3DX_DEFAULT,D3DX_DEFAULT,0,0,0,&tex))||!tex)
-			return -1;
-	} 
-	else 
-	{
-		if(FAILED(D3DXCreateTextureFromFile(GetD3DDevice(),NewPath,&tex))||!tex) 
-			return -1;
+	  if(FromFile)
+	  {
+	    if(FAILED(D3DXCreateTextureFromFileEx(
+		GetD3DDevice(),
+		NewPath,
+		D3DX_DEFAULT_NONPOW2,
+		D3DX_DEFAULT_NONPOW2,
+		D3DX_FROM_FILE,
+		0,
+		D3DFMT_UNKNOWN,
+		D3DPOOL_MANAGED,
+		D3DX_DEFAULT,
+		D3DX_DEFAULT,
+		0,
+		0,
+		0,
+		&tex))||!tex)
+	      return -1;
+	  }
+	  else
+	  {
+	    if(FAILED(D3DXCreateTextureFromFile(
+		GetD3DDevice(),
+		NewPath,
+		&tex))||!tex)
+	      return -1;
+	  }
+
+	  for(int i=0;i<Textures.size();i++)
+	  {
+	    if(!Textures[i]->HasTexture())
+	    {
+	      Textures[i]->SetTexture(tex, NewPath, FromFile != 0);
+	      return i;
+	    }
+	  }
+
+	  TextureRecord	*TextureElement=new(TextureRecord);
+	  TextureElement->SetTexture(tex, NewPath, FromFile != 0);
+	  Textures.push_back(TextureElement);
+	}
+	else if (type == TR_CUBIC) {
+	  IDirect3DCubeTexture9* tex = NULL;
+
+	  _MESSAGE("Loading volumetric texture (%s)",NewPath);
+
+	  if(FromFile)
+	  {
+	    if(FAILED(D3DXCreateCubeTextureFromFileEx(
+		GetD3DDevice(),
+		NewPath,
+		D3DX_DEFAULT_NONPOW2,
+		D3DX_FROM_FILE,
+		0,
+		D3DFMT_UNKNOWN,
+		D3DPOOL_MANAGED,
+		D3DX_DEFAULT,
+		D3DX_DEFAULT,
+		0,
+		0,
+		0,
+		&tex))||!tex)
+	      return -1;
+	  }
+	  else
+	  {
+	    if(FAILED(D3DXCreateCubeTextureFromFile(
+		GetD3DDevice(),
+		NewPath,
+		&tex))||!tex)
+	      return -1;
+	  }
+
+	  for(int i=0;i<Textures.size();i++)
+	  {
+	    if(!Textures[i]->HasTexture())
+	    {
+	      Textures[i]->SetTexture(tex, NewPath, FromFile != 0);
+	      return i;
+	    }
+	  }
+
+	  TextureRecord	*TextureElement=new(TextureRecord);
+	  TextureElement->SetTexture(tex, NewPath, FromFile != 0);
+	  Textures.push_back(TextureElement);
+	}
+	else if (type == TR_VOLUMETRIC) {
+	  IDirect3DVolumeTexture9* tex = NULL;
+
+	  _MESSAGE("Loading volumetric texture (%s)",NewPath);
+
+	  if(FromFile)
+	  {
+	    if(FAILED(D3DXCreateVolumeTextureFromFileEx(
+		GetD3DDevice(),
+		NewPath,
+		D3DX_DEFAULT_NONPOW2,
+		D3DX_DEFAULT_NONPOW2,
+		D3DX_DEFAULT_NONPOW2,
+		D3DX_FROM_FILE,
+		0,
+		D3DFMT_UNKNOWN,
+		D3DPOOL_MANAGED,
+		D3DX_DEFAULT,
+		D3DX_DEFAULT,
+		0,
+		0,
+		0,
+		&tex))||!tex)
+	      return -1;
+	  }
+	  else
+	  {
+	    if(FAILED(D3DXCreateVolumeTextureFromFile(
+		GetD3DDevice(),
+		NewPath,
+		&tex))||!tex)
+	      return -1;
+	  }
+
+	  for(int i=0;i<Textures.size();i++)
+	  {
+	    if(!Textures[i]->HasTexture())
+	    {
+	      Textures[i]->SetTexture(tex, NewPath, FromFile != 0);
+	      return i;
+	    }
+	  }
+
+	  TextureRecord	*TextureElement=new(TextureRecord);
+	  TextureElement->SetTexture(tex, NewPath, FromFile != 0);
+	  Textures.push_back(TextureElement);
 	}
 
-	for(int i=0;i<Textures.size();i++)
-	{
-		if(Textures[i]->texture==0)
-		{
-			Textures[i]->texture=tex;
-			strcpy_s(Textures[i]->Filepath,256,NewPath);
-			Textures[i]->FromFile=(FromFile!=0);
-			return i;
-		}
-	}
-	TextureRecord	*TextureElement=new(TextureRecord);
-	TextureElement->texture=tex;
-	strcpy_s(TextureElement->Filepath,256,Filename);
-	TextureElement->FromFile=(FromFile!=0);
-	Textures.push_back(TextureElement);
 	return Textures.size()-1;
 }
 
-StaticTextureRecord*	TextureManager::LoadStaticTexture(char *Filename)
+StaticTextureRecord*	TextureManager::LoadStaticTexture(char *Filename, TextureRecordType type)
 {
 	if(strlen(Filename)>240) return NULL;
-	
+
 	char NewPath[256];
 	strcpy_s(NewPath,256,"data\\textures\\");
 	strcat_s(NewPath,256,Filename);
@@ -256,7 +449,7 @@ StaticTextureRecord*	TextureManager::LoadStaticTexture(char *Filename)
 
 	for (int i=0;i<StaticTextures.size();i++)
 	{
-		if(_stricmp(NewPath,StaticTextures.at(i)->Filepath)==0)
+		if(_stricmp(NewPath,StaticTextures.at(i)->GetPath())==0)
 		{
 			_MESSAGE("Linking to existing texture.");
 			StaticTextures.at(i)->AddRef();
@@ -264,20 +457,96 @@ StaticTextureRecord*	TextureManager::LoadStaticTexture(char *Filename)
 		}
 	}
 
-	IDirect3DTexture9* tex=NULL;
+	StaticTextureRecord*	NewTex = NULL;
 
-	if(FAILED(D3DXCreateTextureFromFileEx(GetD3DDevice(),NewPath,D3DX_DEFAULT_NONPOW2,D3DX_DEFAULT_NONPOW2,D3DX_FROM_FILE,0,D3DFMT_UNKNOWN,
-			D3DPOOL_MANAGED,D3DX_DEFAULT,D3DX_DEFAULT,0,0,0,&tex))||!tex)
-		if(FAILED(D3DXCreateTextureFromFile(GetD3DDevice(),NewPath,&tex))||!tex) 
-			return NULL;
+	if (type == TR_PLANAR) {
+	  IDirect3DTexture9* tex=NULL;
 
-	StaticTextureRecord*	NewTex = new(StaticTextureRecord);
-	
-	NewTex->texture=tex;
-	NewTex->AddRef();
+	  if(FAILED(D3DXCreateTextureFromFileEx(
+	      GetD3DDevice(),
+	      NewPath,
+	      D3DX_DEFAULT_NONPOW2,
+	      D3DX_DEFAULT_NONPOW2,
+	      D3DX_FROM_FILE,
+	      0,
+	      D3DFMT_UNKNOWN,
+	      D3DPOOL_MANAGED,
+	      D3DX_DEFAULT,
+	      D3DX_DEFAULT,
+	      0,
+	      0,
+	      0,
+	      &tex))||!tex)
+		  if(FAILED(D3DXCreateTextureFromFile(
+		    GetD3DDevice(),
+		    NewPath,
+		    &tex))||!tex)
+			  return NULL;
 
-	strcpy_s(NewTex->Filepath,256,NewPath);
-	StaticTextures.push_back(NewTex);
+	  NewTex = new(StaticTextureRecord);
+	  NewTex->SetTexture(tex, NewPath);
+	  NewTex->AddRef();
+
+	  StaticTextures.push_back(NewTex);
+	}
+	else if (type == TR_CUBIC) {
+	  IDirect3DCubeTexture9* tex=NULL;
+
+	  if(FAILED(D3DXCreateCubeTextureFromFileEx(
+	      GetD3DDevice(),
+	      NewPath,
+	      D3DX_DEFAULT_NONPOW2,
+	      D3DX_FROM_FILE,
+	      0,
+	      D3DFMT_UNKNOWN,
+	      D3DPOOL_MANAGED,
+	      D3DX_DEFAULT,
+	      D3DX_DEFAULT,
+	      0,
+	      0,
+	      0,
+	      &tex))||!tex)
+	    if(FAILED(D3DXCreateCubeTextureFromFile(GetD3DDevice(),NewPath,&tex))||!tex)
+	      return NULL;
+
+	  NewTex = new(StaticTextureRecord);
+	  NewTex->SetTexture(tex, NewPath);
+	  NewTex->AddRef();
+
+	  StaticTextures.push_back(NewTex);
+	}
+	else if (type == TR_VOLUMETRIC) {
+	  IDirect3DVolumeTexture9* tex=NULL;
+
+	  if(FAILED(D3DXCreateVolumeTextureFromFileEx(
+	      GetD3DDevice(),
+	      NewPath,
+	      D3DX_DEFAULT_NONPOW2,
+	      D3DX_DEFAULT_NONPOW2,
+	      D3DX_DEFAULT_NONPOW2,
+	      D3DX_FROM_FILE,
+	      0,
+	      D3DFMT_UNKNOWN,
+	      D3DPOOL_MANAGED,
+	      D3DX_DEFAULT,
+	      D3DX_DEFAULT,
+	      0,
+	      0,
+	      0,
+	      &tex))||!tex)
+	    if(FAILED(D3DXCreateVolumeTextureFromFile(
+		GetD3DDevice(),
+		NewPath,
+		&tex))||!tex)
+	      return NULL;
+
+	  NewTex = new(StaticTextureRecord);
+	  NewTex->SetTexture(tex, NewPath);
+	  NewTex->AddRef();
+
+	  StaticTextures.push_back(NewTex);
+	}
+
 	return(NewTex);
 }
 
@@ -286,11 +555,9 @@ void TextureManager::NewGame()
 	TextureList::iterator Texture=Textures.begin();
 	while(Texture!=Textures.end())
 	{
-		if((*Texture)->texture)
-		{
-			while((*Texture)->texture->Release()){}
-			(*Texture)->texture=NULL;
-		}
+		if((*Texture)->HasTexture())
+			(*Texture)->Release();
+
 		Texture++;
 	}
 	Textures.clear();
@@ -306,160 +573,170 @@ bool TextureManager::IsValidTexture(int TextureNum)
 	return(true);
 }
 
-IDirect3DTexture9 *TextureManager::GetTexture(int TextureNum)
+TextureRecord *TextureManager::GetTexture(int TextureNum)
 {
 	if(IsValidTexture(TextureNum))
-		return(Textures.at(TextureNum)->texture);
+		return Textures.at(TextureNum);
 	return(NULL);
 }
 
-void TextureManager::ReleaseTexture(IDirect3DTexture9 *texture)
+template<>
+void TextureManager::ReleaseTexture(IDirect3DBaseTexture9 *texture)
 {
-	for(int pos=0;pos<StaticTextures.size();pos++)
-	{
-		if(StaticTextures.at(pos)->texture==texture)
-		{
-			_MESSAGE("Releasing static texture.");
-			if(!StaticTextures.at(pos)->Release())
-			{
-				_MESSAGE("and removing it from memory.");
-				StaticTextures.erase(StaticTextures.begin()+pos);
-				break;
-			}
-		}
-	}
-	return;
+  for(int pos=0;pos<StaticTextures.size();pos++)
+  {
+    if(StaticTextures.at(pos)->HasTexture(texture))
+    {
+      _MESSAGE("Releasing static texture.");
+      if(!StaticTextures.at(pos)->Release())
+      {
+	_MESSAGE("and removing it from memory.");
+	StaticTextures.erase(StaticTextures.begin()+pos);
+	break;
+      }
+    }
+  }
+  return;
+}
+
+template<>
+int TextureManager::FindTexture(IDirect3DBaseTexture9* texture)
+{
+  for(int pos=0;pos<Textures.size();pos++)
+  {
+    if(Textures.at(pos)->HasTexture(texture))
+    {
+      return(pos);
+    }
+  }
+  return(-1);
 }
 
  void TextureManager::FreeTexture(int index)
 {
-	if(index<0||index>=Textures.size()||!Textures[index]->texture)
-	{
-		_MESSAGE("Tried to free a non existant texture");
-		return;
-	}
-	if(Textures[index]->texture)
-	{
-		_MESSAGE("Releasing %s",Textures[index]->Filepath);
-		HUDManager::GetSingleton()->PurgeTexture(index);
-		ShaderManager::GetSingleton()->PurgeTexture(Textures[index]->texture);
-		while(Textures[index]->texture->Release()){};
-		Textures[index]->texture=NULL;
-		Textures[index]->Filepath[0]=0;
-	}	
+  if(index<0||index>=Textures.size()||!Textures[index]->HasTexture())
+  {
+    _MESSAGE("Tried to free a non existant texture");
+    return;
+  }
+  if(Textures[index]->HasTexture())
+  {
+    _MESSAGE("Releasing %s",Textures[index]->GetPath());
+    HUDManager::GetSingleton()->PurgeTexture(index);
+    Textures[index]->Purge();
+    Textures[index]->Release();
+  }
 }
 
 void TextureManager::LoadGame(OBSESerializationInterface *Interface)
 {
-	int maxtex=0;
-	int i;
-	UInt32	type, version, length;
-	int OldTextureNum=-1;
-	int TextureNum=-1;
-	char TexturePath[260];
-	bool TextureFromFile;
+  int maxtex=0;
+  int i;
+  UInt32	type, version, length;
+  int OldTextureNum=-1;
+  int TextureNum=-1;
+  char TexturePath[260];
+  bool TextureFromFile;
+  TextureRecordType TextureType;
 
-	Interface->GetNextRecordInfo(&type, &version, &length);
+  Interface->GetNextRecordInfo(&type, &version, &length);
 
-	if(type=='TIDX')
-	{
-		Interface->ReadRecordData(&maxtex,length);
-		_MESSAGE("Save file links %i textures.",maxtex);
-	}
-	else
-	{
-		_MESSAGE("No texture data found in save file.");
-		return;
-	}
+  if(type=='TIDX')
+  {
+    Interface->ReadRecordData(&maxtex,length);
+    _MESSAGE("Save file links %i textures.",maxtex);
+  }
+  else
+  {
+    _MESSAGE("No texture data found in save file.");
+    return;
+  }
 
-	while(TextureNum<(maxtex-1))
-	{
-		if((Interface->GetNextRecordInfo(&type,&version, &length))&&(type=='TNUM'))
-		{
-			OldTextureNum=TextureNum;
-			Interface->ReadRecordData(&TextureNum,length);
-			_MESSAGE("Found TNUM record = %i.",TextureNum);
-			for(i=OldTextureNum;i<TextureNum;i++)
-			{
-				TextureRecord *tex = new(TextureRecord);
-				tex->texture=NULL;
-				tex->Filepath[0]=0;
-				Textures.push_back(tex);
-			}
+  while(TextureNum<(maxtex-1))
+  {
+    if((Interface->GetNextRecordInfo(&type,&version, &length))&&(type=='TNUM'))
+    {
+      OldTextureNum=TextureNum;
+      Interface->ReadRecordData(&TextureNum,length);
+      _MESSAGE("Found TNUM record = %i.",TextureNum);
+      for(i=OldTextureNum;i<TextureNum;i++)
+      {
+	TextureRecord *tex = new(TextureRecord);
+	Textures.push_back(tex);
+      }
 
-			if((Interface->GetNextRecordInfo(&type,&version, &length))&&(type=='TPAT'))
-			{
-				Interface->ReadRecordData(TexturePath,length);
-				_MESSAGE("Found TPAT record = %s",TexturePath);
-			}
-			else
-			{
-				_MESSAGE("Error loading texture list. type!=TPAT");
-				return;
-			}
+      if((Interface->GetNextRecordInfo(&type,&version, &length))&&(type=='TPAT'))
+      {
+	Interface->ReadRecordData(TexturePath,length);
+	_MESSAGE("Found TPAT record = %s",TexturePath);
+      }
+      else
+      {
+	_MESSAGE("Error loading texture list. type!=TPAT");
+	return;
+      }
 
-			if((Interface->GetNextRecordInfo(&type, &version, &length)) && (type=='TFFL'))
-			{
-				Interface->ReadRecordData(&TextureFromFile,length);
-				_MESSAGE("Found TFFL record = %i",TextureFromFile);
-			}
-			else
-			{
-				_MESSAGE("Error loading texture list. type!=TFFL");
-				return;
-			}
+      if((Interface->GetNextRecordInfo(&type, &version, &length)) && (type=='TFFL'))
+      {
+	Interface->ReadRecordData(&TextureFromFile,length);
+	_MESSAGE("Found TFFL record = %i",TextureFromFile);
+      }
+      else
+      {
+	_MESSAGE("Error loading texture list. type!=TFFL");
+	return;
+      }
 
-			if(LoadTexture(TexturePath,TextureFromFile)==-1)
-			{
-				_MESSAGE("Error loading texture list: texture (%s) no longer exists.",TexturePath);
-				TextureRecord *tex = new(TextureRecord);
-				tex->texture=NULL;
-				tex->Filepath[0]=0;
-				Textures.push_back(tex);
-			}
-		}
-		else
-		{
-			_MESSAGE("Error loading texture list: too small.");
-			return;
-		}
-	}
-}	 
+      if((Interface->GetNextRecordInfo(&type, &version, &length)) && (type=='TTYP'))
+      {
+	Interface->ReadRecordData(&TextureType,length);
+	_MESSAGE("Found TTYP record = %i",TextureType);
+      }
+      else
+      {
+	TextureType = TR_PLANAR;
+	_MESSAGE("Error loading texture list. type!=TTYP");
+	//	  return;
+      }
+
+      if(LoadTexture(TexturePath,TextureType,TextureFromFile)==-1)
+      {
+	_MESSAGE("Error loading texture list: texture (%s) no longer exists.",TexturePath);
+	TextureRecord *tex = new(TextureRecord);
+	Textures.push_back(tex);
+      }
+    }
+    else
+    {
+      _MESSAGE("Error loading texture list: too small.");
+      return;
+    }
+  }
+}
 
  void TextureManager::SaveGame(OBSESerializationInterface *Interface)
  {
-	int i;
-	int MaxTexture;
+   int i;
+   int MaxTexture;
 
-	MaxTexture=Textures.size();
+   MaxTexture=Textures.size();
 
-	_MESSAGE("Calling TextureManager::SaveGame");
+   _MESSAGE("Calling TextureManager::SaveGame");
 
-	Interface->WriteRecord('TIDX',TEXTUREVERSION,&MaxTexture,sizeof(MaxTexture));
+   Interface->WriteRecord('TIDX',TEXTUREVERSION,&MaxTexture,sizeof(MaxTexture));
 
-	for (i=0;i<MaxTexture;i++)
-	{
-		if(Textures.at(i)->texture)
-		{
-			Interface->WriteRecord('TNUM',TEXTUREVERSION,&i,sizeof(i));
-			Interface->WriteRecord('TPAT',TEXTUREVERSION,Textures.at(i)->Filepath,strlen(Textures.at(i)->Filepath)+1);
-			Interface->WriteRecord('TFFL',TEXTUREVERSION,&Textures.at(i)->FromFile,sizeof(Textures.at(i)->FromFile));
-		}
-	}
+   for (i=0;i<MaxTexture;i++)
+   {
+     if(Textures.at(i)->HasTexture())
+     {
+       const char *path = Textures.at(i)->GetPath();
+       const bool fromfile = Textures.at(i)->IsFromFile();
+       const TextureRecordType type = Textures.at(i)->GetType();
+
+       Interface->WriteRecord('TNUM',TEXTUREVERSION,&i,sizeof(i));
+       Interface->WriteRecord('TPAT',TEXTUREVERSION,path,strlen(path)+1);
+       Interface->WriteRecord('TFFL',TEXTUREVERSION,&fromfile,sizeof(fromfile));
+       Interface->WriteRecord('TVOL',TEXTUREVERSION,&type,sizeof(type));
+     }
+   }
  }
-
- int TextureManager::FindTexture(IDirect3DTexture9* texture)
- {
-	for(int pos=0;pos<Textures.size();pos++)
-	{
-		if(Textures.at(pos)->texture==texture)
-		{
-			return(pos);
-		}
-	}
-	return(-1);
- }
-
-
-
-	

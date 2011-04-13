@@ -137,45 +137,79 @@ bool ShaderRecord::LoadShader(char *Filename)
 
 void ShaderRecord::ApplyCompileDirectives()
 {
-	LPCSTR pName=NULL;
-	Effect->GetString("Name",&pName);
-	if (pName)
-		strcpy(Name,(char *)pName);
+  LPCSTR pName=NULL;
+  Effect->GetString("Name",&pName);
+  if (pName)
+    strcpy(Name,(char *)pName);
 
-	StaticTextureRecord	*Tex;
+  D3DXEFFECT_DESC Description;
+  Effect->GetDesc(&Description);
 
-	D3DXEFFECT_DESC Description;
-	Effect->GetDesc(&Description);
+  for (int par=0;par<Description.Parameters;par++)
+  {
+    D3DXHANDLE handle;
+    handle = Effect->GetParameter(NULL,par);
 
-	for (int par=0;par<Description.Parameters;par++)
+    if(handle)
+    {
+      D3DXPARAMETER_DESC Description;
+      Effect->GetParameterDesc(handle,&Description);
+
+      if (Description.Type==D3DXPT_TEXTURECUBE)
+      {
+	D3DXHANDLE handle2;
+	handle2 = Effect->GetAnnotationByName(handle,"filename");
+
+	if (handle2)
 	{
-		D3DXHANDLE handle;
-		handle = Effect->GetParameter(NULL,par);
+	  LPCSTR	pString=NULL;
+	  Effect->GetString(handle2,&pString);
 
-		if(handle)
-		{
-			D3DXPARAMETER_DESC Description;
-			Effect->GetParameterDesc(handle,&Description);
+	  _MESSAGE("Found filename : %s",pString);
 
-			if (Description.Type=D3DXPT_TEXTURE)
-			{
-				D3DXHANDLE handle2;
-				handle2 = Effect->GetAnnotationByName(handle,"filename");
-
-				if (handle2)
-				{
-					LPCSTR	pString=NULL;
-					Effect->GetString(handle2,&pString);
-
-					_MESSAGE("Found filename : %s",pString);
-
-					Tex = TextureManager::GetSingleton()->LoadStaticTexture((char *)pString);
-					if (Tex)
-						Effect->SetTexture(handle,Tex->texture);
-				}
-			}
-		}
+	  StaticTextureRecord *Tex = TextureManager::GetSingleton()->LoadStaticTexture((char *)pString, TR_CUBIC);
+	  if (Tex)
+	    Effect->SetTexture(handle,Tex->GetTexture());
 	}
+      }
+      else if (Description.Type==D3DXPT_TEXTURE3D)
+      {
+	D3DXHANDLE handle2;
+	handle2 = Effect->GetAnnotationByName(handle,"filename");
+
+	if (handle2)
+	{
+	  LPCSTR	pString=NULL;
+	  Effect->GetString(handle2,&pString);
+
+	  _MESSAGE("Found filename : %s",pString);
+
+	  StaticTextureRecord *Tex = TextureManager::GetSingleton()->LoadStaticTexture((char *)pString, TR_VOLUMETRIC);
+	  if (Tex)
+	    Effect->SetTexture(handle,Tex->GetTexture());
+	}
+      }
+      else if ((Description.Type==D3DXPT_TEXTURE) ||
+	       (Description.Type==D3DXPT_TEXTURE1D) ||
+	       (Description.Type==D3DXPT_TEXTURE2D))
+      {
+	D3DXHANDLE handle2;
+	handle2 = Effect->GetAnnotationByName(handle,"filename");
+
+	if (handle2)
+	{
+	  LPCSTR	pString=NULL;
+	  Effect->GetString(handle2,&pString);
+
+	  _MESSAGE("Found filename : %s",pString);
+
+	  StaticTextureRecord *Tex = TextureManager::GetSingleton()->LoadStaticTexture((char *)pString, TR_PLANAR);
+	  if (Tex)
+	    Effect->SetTexture(handle,Tex->GetTexture());
+	}
+      }
+    }
+  }
 }
 
 bool ShaderRecord::SetShaderInt(char *name, int value)
@@ -198,22 +232,22 @@ bool ShaderRecord::SetShaderVector(char *name,v1_2_416::NiVector4 *value)
 
 bool ShaderRecord::SetShaderTexture(char *name, int TextureNum)
 {
-	IDirect3DTexture9* texture;
+	TextureRecord* texture;
 	texture = TextureManager::GetSingleton()->GetTexture(TextureNum);
 
-	IDirect3DTexture9* OldTexture = NULL;
+	IDirect3DBaseTexture9* OldTexture = NULL;
 	Effect->GetTexture(name, (LPDIRECT3DBASETEXTURE9 *)&OldTexture);
 	if(OldTexture)
 		TextureManager::GetSingleton()->ReleaseTexture(OldTexture);
 
-	HRESULT hr = Effect->SetTexture(name,texture);
+	HRESULT hr = Effect->SetTexture(name,texture->GetTexture());
 	return (hr == D3D_OK);
 }
 
 void ShaderRecord::SaveVars(OBSESerializationInterface *Interface)
 {
 	D3DXEFFECT_DESC Description;
-	IDirect3DTexture9 *Texture;
+	IDirect3DBaseTexture9 *Texture;
 
 	Effect->GetDesc(&Description);
 	_MESSAGE("Shader %s has %i parameters.",Filepath,Description.Parameters);
@@ -228,13 +262,17 @@ void ShaderRecord::SaveVars(OBSESerializationInterface *Interface)
 			switch (Description.Type)
 			{
 			case D3DXPT_TEXTURE:
+			case D3DXPT_TEXTURE1D:
+			case D3DXPT_TEXTURE2D:
+			case D3DXPT_TEXTURE3D:
+			case D3DXPT_TEXTURECUBE:
 
 				int tex;
 				Texture=NULL;
 
 				TextureType TextureData;
 
-				Effect->GetTexture(handle,(LPDIRECT3DBASETEXTURE9 *)&Texture);
+				Effect->GetTexture(handle, &Texture);
 				tex=TextureManager::GetSingleton()->FindTexture(Texture);
 				strcpy(TextureData.Name,Description.Name);
 				if(tex>0)
@@ -905,111 +943,115 @@ void ShaderManager::LoadGame(OBSESerializationInterface *Interface)
 
 bool ShaderManager::IsShaderValid(int ShaderNum)
 {
-	if(Shaders.find(ShaderNum)==Shaders.end())
-		return(false);
-	return(true);
+  if(Shaders.find(ShaderNum)==Shaders.end())
+    return(false);
+  return(true);
 }
 
 bool ShaderManager::EnableShader(int ShaderNum, bool State)
 {
-	ShaderList::iterator Shader;
+  ShaderList::iterator Shader;
 
-	Shader=Shaders.find(ShaderNum);
-	if(Shader!=Shaders.end())
-	{
-		Shader->second->Enabled=State;
-		return(true);
-	}
-	return(false);
+  Shader=Shaders.find(ShaderNum);
+  if(Shader!=Shaders.end())
+  {
+    Shader->second->Enabled=State;
+    return(true);
+  }
+  return(false);
 }
 
 bool ShaderManager::SetShaderInt(int ShaderNum, char *name, int value)
 {
-	ShaderList::iterator Shader;
+  ShaderList::iterator Shader;
 
-	Shader=Shaders.find(ShaderNum);
-	if(Shader!=Shaders.end())
-	{
-		return(Shader->second->SetShaderInt(name,value));
-	}
-	return(false);
+  Shader=Shaders.find(ShaderNum);
+  if(Shader!=Shaders.end())
+  {
+    return(Shader->second->SetShaderInt(name,value));
+  }
+  return(false);
 }
 
 bool ShaderManager::SetShaderFloat(int ShaderNum, char *name, float value)
 {
-	ShaderList::iterator Shader;
+  ShaderList::iterator Shader;
 
-	Shader=Shaders.find(ShaderNum);
-	if(Shader!=Shaders.end())
-	{
-		return(Shader->second->SetShaderFloat(name,value));
-	}
-	return(false);
+  Shader=Shaders.find(ShaderNum);
+  if(Shader!=Shaders.end())
+  {
+    return(Shader->second->SetShaderFloat(name,value));
+  }
+  return(false);
 }
 
 bool ShaderManager::SetShaderVector(int ShaderNum, char *name, v1_2_416::NiVector4 *value)
 {
-	ShaderList::iterator Shader;
+  ShaderList::iterator Shader;
 
-	Shader=Shaders.find(ShaderNum);
-	if(Shader!=Shaders.end())
-	{
-		return(Shader->second->SetShaderVector(name,value));
-	}
-	return(false);
+  Shader=Shaders.find(ShaderNum);
+  if(Shader!=Shaders.end())
+  {
+    return(Shader->second->SetShaderVector(name,value));
+  }
+  return(false);
 }
 
 bool ShaderManager::SetShaderTexture(int ShaderNum, char *name, int TextureNum)
 {
-	ShaderList::iterator Shader;
+  ShaderList::iterator Shader;
 
-	Shader=Shaders.find(ShaderNum);
-	if(Shader!=Shaders.end())
-	{
-		return(Shader->second->SetShaderTexture(name,TextureNum));
-	}
-	return(false);
+  Shader=Shaders.find(ShaderNum);
+  if(Shader!=Shaders.end())
+  {
+    return(Shader->second->SetShaderTexture(name,TextureNum));
+  }
+  return(false);
 }
 
-void ShaderManager::PurgeTexture(IDirect3DTexture9 *texture)
+void ShaderManager::PurgeTexture(IDirect3DBaseTexture9 *texture)
 {
-	ShaderList::iterator Shader=Shaders.begin();
+  ShaderList::iterator Shader=Shaders.begin();
 
-	while(Shader!=Shaders.end())
+  while(Shader!=Shaders.end())
+  {
+    D3DXEFFECT_DESC Description;
+    Shader->second->Effect->GetDesc(&Description);
+    for (int par=0;par<Description.Parameters;par++)
+    {
+      D3DXHANDLE	handle;
+      handle=Shader->second->Effect->GetParameter(NULL,par);
+      if(handle)
+      {
+	D3DXPARAMETER_DESC Description;
+	Shader->second->Effect->GetParameterDesc(handle,&Description);
+	if((Description.Type=D3DXPT_TEXTURE) ||
+	   (Description.Type=D3DXPT_TEXTURE1D) ||
+	   (Description.Type=D3DXPT_TEXTURE2D) ||
+	   (Description.Type=D3DXPT_TEXTURE3D) ||
+	   (Description.Type=D3DXPT_TEXTURECUBE))
 	{
-		D3DXEFFECT_DESC Description;
-		Shader->second->Effect->GetDesc(&Description);
-		for (int par=0;par<Description.Parameters;par++)
-		{
-			D3DXHANDLE	handle;
-			handle=Shader->second->Effect->GetParameter(NULL,par);
-			if(handle)
-			{
-				D3DXPARAMETER_DESC Description;
-				Shader->second->Effect->GetParameterDesc(handle,&Description);
-				if(Description.Type=D3DXPT_TEXTURE)
-				{
-					IDirect3DBaseTexture9 *ShaderTexture=NULL;				// NB must set to NULL otherwise strange things happen
-					Shader->second->Effect->GetTexture(handle,&ShaderTexture);
-					if(ShaderTexture==texture)
-					{
-						Shader->second->Effect->SetTexture(handle,NULL);
-						_MESSAGE("Removing texture %s from shader %i",Description.Name,Shader->first);
-					}
+	  IDirect3DBaseTexture9 *ShaderTexture=NULL;				// NB must set to NULL otherwise strange things happen
+	  Shader->second->Effect->GetTexture(handle,&ShaderTexture);
+	  if(ShaderTexture==texture)
+	  {
+	    Shader->second->Effect->SetTexture(handle,NULL);
+	    _MESSAGE("Removing texture %s from shader %i",Description.Name,Shader->first);
+	  }
 
-				}
-			}
-		}
-		Shader++;
 	}
+      }
+    }
+    Shader++;
+  }
 }
 
 bool ShaderManager::GetShaderState(int ShaderNum)
 {
-	ShaderList::iterator Shader;
+  ShaderList::iterator Shader;
 
-	Shader=Shaders.find(ShaderNum);
-	if(Shader!=Shaders.end())
-		return(Shader->second->IsEnabled());
-	return(false);
+  Shader=Shaders.find(ShaderNum);
+  if(Shader!=Shaders.end())
+    return(Shader->second->IsEnabled());
+  return(false);
 }

@@ -2,7 +2,7 @@
 #define	DEBUG_WINDOW_HPP
 
 #ifdef	OBGE_DEVLING
-#include "D3D.hpp"
+#include "D3D9.hpp"
 
 class DebugWindow
 {
