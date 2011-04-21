@@ -1,8 +1,8 @@
 #ifndef	DEBUG_WINDOW_HPP
 #define	DEBUG_WINDOW_HPP
 
-#ifdef	OBGE_DEVLING
 #include "D3D9.hpp"
+#ifdef	OBGE_DEVLING
 
 class DebugWindow
 {

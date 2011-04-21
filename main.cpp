@@ -14,6 +14,7 @@
 #include "Rendering.h"
 #include "DepthBufferHook.h"
 #include "RenderSurfaceParametersHook.hpp"
+#include "ShaderIOHook.hpp"
 #include "RenderStateManagerHooks.h"
 #include "GlobalSettings.h"
 #include "GUIs_DebugWindow.hpp"
@@ -161,7 +162,7 @@ void MessageHandler(OBSEMessagingInterface::Message* msg)
 	case OBSEMessagingInterface::kMessage_SaveGame:
 		_MESSAGE("Received save game message.");
 	default:
-		_MESSAGE("Ingnoring message.");
+//		_MESSAGE("Ignoring message.");
 		break;
 	}
 }
@@ -290,13 +291,13 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 	obse->RegisterCommand(&kCommandInfo_GetAvailableGraphicsMemory);	// 2100
 	obse->RegisterCommand(&kCommandInfo_GetScreenWidth);				// 2101
 	obse->RegisterCommand(&kCommandInfo_GetScreenHeight);				// 2102
-	obse->RegisterCommand(&kCommandInfo_LoadShader);					// 2103
+	obse->RegisterCommand(&kCommandInfo_LoadEffect);					// 2103
 	obse->RegisterCommand(&kCommandInfo_ApplyFullscreenShader);			// 2104
 	obse->RegisterCommand(&kCommandInfo_RemoveFullscreenShader);		// 2105
-	obse->RegisterCommand(&kCommandInfo_SetShaderInt);					// 2106
-	obse->RegisterCommand(&kCommandInfo_SetShaderFloat);				// 2107
-	obse->RegisterCommand(&kCommandInfo_SetShaderVector);				// 2108
-	obse->RegisterCommand(&kCommandInfo_SetShaderTexture);				// 2109
+	obse->RegisterCommand(&kCommandInfo_SetEffectInt);					// 2106
+	obse->RegisterCommand(&kCommandInfo_SetEffectFloat);				// 2107
+	obse->RegisterCommand(&kCommandInfo_SetEffectVector);				// 2108
+	obse->RegisterCommand(&kCommandInfo_SetEffectTexture);				// 2109
 	obse->RegisterCommand(&kCommandInfo_ForceGraphicsReset);			// 210A
 	obse->RegisterCommand(&kCommandInfo_LoadTexture);					// 210B
 	obse->RegisterCommand(&kCommandInfo_FreeTexture);					// 210C
@@ -307,7 +308,7 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 	obse->RegisterCommand(&kCommandInfo_SetHUDElementScale);			// 2111
 	obse->RegisterCommand(&kCommandInfo_SetHUDElementRotation);			// 2112
 	obse->RegisterCommand(&kCommandInfo_PurgeManagedTextures);			// 2113
-	obse->RegisterCommand(&kCommandInfo_IsShaderEnabled);				// 2114
+	obse->RegisterCommand(&kCommandInfo_IsEffectEnabled);				// 2114
 #ifdef	OBGE_LOGGING
 	obse->RegisterCommand(&kCommandInfo_DumpFrameScript);			// 2115
 	obse->RegisterCommand(&kCommandInfo_DumpFrameSurfaces);			// 2116
@@ -337,6 +338,7 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 
 			CreateDepthBufferHook();
 			CreateRenderSurfaceHook();
+			CreateShaderIOHook();
 		//	v1_2_416::NiDX9RenderStateEx::HookRenderStateManager();
 		}
 		else

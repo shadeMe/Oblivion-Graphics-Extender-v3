@@ -143,7 +143,7 @@ class SpoofShaderList
 {
 public:
 
-	NiTPointerList<SpoofShader>		ShaderList;				// 00
+	NiTPointerList<SpoofShader>		EffectList;				// 00
 	NiScreenElements				*ScreenElements;		// 10
 	v1_2_416::BSRenderedTexture		*RenderedTexture;		// 14
 	SpoofShader						*CopyShader;			// 18

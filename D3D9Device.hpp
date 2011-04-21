@@ -105,6 +105,8 @@ public:
 		_MESSAGE("OD3D9: Device constructed from 0x%08x", _ReturnAddress());
 
 #ifdef	OBGE_LOGGING
+		Sleep(20000);		// Give me enough time to attach to process for debugging. Vista seems to block JIT debugging.
+
 		/* setup logging */
 		frame_dmp = 0;
 		frame_trk = true;

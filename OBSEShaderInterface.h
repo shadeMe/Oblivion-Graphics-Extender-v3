@@ -3,7 +3,7 @@
 #include "SpoofShader.h"
 #include "TextBuffer.h"
 #include "d3dx9.h"
-#include "ShaderManager.h"
+#include "EffectManager.h"
 #include <stdio.h>
 #include "obse\PluginAPI.h"
 

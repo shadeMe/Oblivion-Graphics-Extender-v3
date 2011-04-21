@@ -1,11 +1,11 @@
 #include "Commands_Shaders.h"
 #include "Commands_Misc.h"
 #include "Commands_Params.h"
-#include "ShaderManager.h"
+#include "EffectManager.h"
 #include "Script.h"
 #include "OBSEShaderInterface.h"
 
-static bool LoadShader_Execute(COMMAND_ARGS)
+static bool LoadEffect_Execute(COMMAND_ARGS)
 {
 	*result=0;
 	
@@ -17,7 +17,7 @@ static bool LoadShader_Execute(COMMAND_ARGS)
 	if(IsEnabled())
 	{
 		_MESSAGE("Shader (%s) - Script refID = %x %s",path,scriptObj->refID,(scriptObj->refID==0)?"(Error NULL refID)":" ");
-		*result = ShaderManager::GetSingleton()->AddShader(path,AllowDuplicates!=0,scriptObj->refID);
+		*result = EffectManager::GetSingleton()->AddEffect(path,AllowDuplicates!=0,scriptObj->refID);
 	}
 
 	return true;
@@ -30,7 +30,7 @@ static bool ApplyFullscreenShader_Execute(COMMAND_ARGS)
 	DWORD id, HUD;
 	if(!ExtractArgs(EXTRACTARGS, &id, &HUD)) return true;
 
-	if(!IsEnabled() || !ShaderManager::GetSingleton()->EnableShader(id,true))
+	if(!IsEnabled() || !EffectManager::GetSingleton()->EnableEffect(id,true))
 		*result=-1;
 
 	return true;
@@ -48,13 +48,13 @@ static bool RemoveFullscreenShader_Execute(COMMAND_ARGS)
 	{
 		if(!Delete)
 		{
-			if(!ShaderManager::GetSingleton()->EnableShader(id,false))
+			if(!EffectManager::GetSingleton()->EnableEffect(id,false))
 			{
 				*result=-1;
 			}
 		}
 		else
-			if(!ShaderManager::GetSingleton()->RemoveShader(id))
+			if(!EffectManager::GetSingleton()->RemoveEffect(id))
 			{
 				*result=-1;
 			}
@@ -64,7 +64,7 @@ static bool RemoveFullscreenShader_Execute(COMMAND_ARGS)
 	return true;
 }
 
-static bool SetShaderInt_Execute(COMMAND_ARGS)
+static bool SetEffectInt_Execute(COMMAND_ARGS)
 {
 	*result = 0;
 	
@@ -74,11 +74,11 @@ static bool SetShaderInt_Execute(COMMAND_ARGS)
 	if(!ExtractArgs(EXTRACTARGS, &id, &var, &i)) return true;
 
 	if(IsEnabled())
-		ShaderManager::GetSingleton()->SetShaderInt(id,var,i);
+		EffectManager::GetSingleton()->SetEffectInt(id,var,i);
 
 	return true;
 }
-static bool SetShaderFloat_Execute(COMMAND_ARGS)
+static bool SetEffectFloat_Execute(COMMAND_ARGS)
 {
 	*result = 0;
 	
@@ -88,12 +88,12 @@ static bool SetShaderFloat_Execute(COMMAND_ARGS)
 	if(!ExtractArgs(EXTRACTARGS, &id, &var, &f)) return true;
 
 	if(IsEnabled())
-		ShaderManager::GetSingleton()->SetShaderFloat(id,var,f);
+		EffectManager::GetSingleton()->SetEffectFloat(id,var,f);
 	
 
 	return true;
 }
-static bool SetShaderVector_Execute(COMMAND_ARGS)
+static bool SetEffectVector_Execute(COMMAND_ARGS)
 {
 	*result = 0;
 	
@@ -103,11 +103,11 @@ static bool SetShaderVector_Execute(COMMAND_ARGS)
 	if(!ExtractArgs(EXTRACTARGS, &id, &var, &v[0], &v[1], &v[2], &v[3])) return true;
 
 	if(IsEnabled())
-		ShaderManager::GetSingleton()->SetShaderVector(id,var,&v);
+		EffectManager::GetSingleton()->SetEffectVector(id,var,&v);
 	
 	return true;
 }
-static bool SetShaderTexture_Execute(COMMAND_ARGS)
+static bool SetEffectTexture_Execute(COMMAND_ARGS)
 {
 	*result = 0;
 
@@ -117,22 +117,22 @@ static bool SetShaderTexture_Execute(COMMAND_ARGS)
 	if(!ExtractArgs(EXTRACTARGS, &id, &var, &i)) return true;
 
 	if(IsEnabled())
-		ShaderManager::GetSingleton()->SetShaderTexture(id,var,i);
+		EffectManager::GetSingleton()->SetEffectTexture(id,var,i);
 
 	return true;
 }
 
-static bool IsShaderEnabled_Execute(COMMAND_ARGS)
+static bool IsEffectEnabled_Execute(COMMAND_ARGS)
 {
 	*result=0;
 	DWORD id;
 	
 	if(!ExtractArgs(EXTRACTARGS, &id)) return true;
-	*result=ShaderManager::GetSingleton()->GetShaderState(id);
+	*result=EffectManager::GetSingleton()->GetEffectState(id);
 	return true;
 }
 
-CommandInfo kCommandInfo_LoadShader =
+CommandInfo kCommandInfo_LoadEffect =
 {
 	"LoadShader",
 	"",
@@ -141,7 +141,7 @@ CommandInfo kCommandInfo_LoadShader =
 	0,
 	2,
 	kParams_StringOptInt,
-	LoadShader_Execute,
+	LoadEffect_Execute,
 	0,
 	0,
 	0
@@ -177,7 +177,7 @@ CommandInfo kCommandInfo_RemoveFullscreenShader =
 	0
 };
 
-CommandInfo kCommandInfo_SetShaderInt =
+CommandInfo kCommandInfo_SetEffectInt =
 {
 	"SetShaderInt",
 	"",
@@ -186,12 +186,12 @@ CommandInfo kCommandInfo_SetShaderInt =
 	0,
 	3,
 	kParams_SetFullscreenShaderInt,
-	SetShaderInt_Execute,
+	SetEffectInt_Execute,
 	0,
 	0,
 	0
 };
-CommandInfo kCommandInfo_SetShaderFloat =
+CommandInfo kCommandInfo_SetEffectFloat =
 {
 	"SetShaderFloat",
 	"",
@@ -200,12 +200,12 @@ CommandInfo kCommandInfo_SetShaderFloat =
 	0,
 	3,
 	kParams_SetFullscreenShaderFloat,
-	SetShaderFloat_Execute,
+	SetEffectFloat_Execute,
 	0,
 	0,
 	0
 };
-CommandInfo kCommandInfo_SetShaderVector =
+CommandInfo kCommandInfo_SetEffectVector =
 {
 	"SetShaderVector",
 	"",
@@ -214,12 +214,12 @@ CommandInfo kCommandInfo_SetShaderVector =
 	0,
 	6,
 	kParams_SetFullscreenShaderVector,
-	SetShaderVector_Execute,
+	SetEffectVector_Execute,
 	0,
 	0,
 	0
 };
-CommandInfo kCommandInfo_SetShaderTexture =
+CommandInfo kCommandInfo_SetEffectTexture =
 {
 	"SetShaderTexture",
 	"",
@@ -228,13 +228,13 @@ CommandInfo kCommandInfo_SetShaderTexture =
 	0,
 	3,
 	kParams_SetFullscreenShaderInt,
-	SetShaderTexture_Execute,
+	SetEffectTexture_Execute,
 	0,
 	0,
 	0
 };
 
-CommandInfo kCommandInfo_IsShaderEnabled =
+CommandInfo kCommandInfo_IsEffectEnabled =
 {
 	"IsShaderEnabled",
 	"",
@@ -243,7 +243,7 @@ CommandInfo kCommandInfo_IsShaderEnabled =
 	0,
 	1,
 	kParams_OneInt,
-	IsShaderEnabled_Execute,
+	IsEffectEnabled_Execute,
 	0,
 	0,
 	0

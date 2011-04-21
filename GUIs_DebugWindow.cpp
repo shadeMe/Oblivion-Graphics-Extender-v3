@@ -2,8 +2,8 @@
 #include "GlobalSettings.h"
 #include <assert.h>
 
-#ifdef	OBGE_DEVLING
 #include "GUIs_DebugWindow.hpp"
+#ifdef	OBGE_DEVLING
 
 static global<bool> DWEnabled(false, NULL, "General", "bEnabledDW");
 static global<bool> FullScreen(0, "Oblivion.ini", "Display", "bFull Screen");
@@ -202,4 +202,13 @@ DebugWindow *DebugWindow::Expunge() {
 
 	return NULL;
 }
+
+/* ---------------------------------------- */
+
+#include <msvc/wx/setup.h>
+#pragma comment(lib,"Comctl32")
+#pragma comment(lib,"Rpcrt4")
+
+#include "GUIs_ShaderDeveloper.h"
+#include "GUIs_ShaderDeveloper.cpp"
 #endif

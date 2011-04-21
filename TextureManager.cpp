@@ -1,5 +1,5 @@
 #include "TextureManager.h"
-#include "ShaderManager.h"
+#include "EffectManager.h"
 #include "ScreenElements.h"
 #include "obse\pluginapi.h"
 #include "GlobalSettings.h"
@@ -81,11 +81,11 @@ bool TextureRecord::IsFromFile() const {
 
 void TextureRecord::Purge() {
   if (this->IsType(TR_PLANAR))
-    ShaderManager::GetSingleton()->PurgeTexture(this->textureP);
+    EffectManager::GetSingleton()->PurgeTexture(this->textureP);
   else if (this->IsType(TR_CUBIC))
-    ShaderManager::GetSingleton()->PurgeTexture(this->textureC);
+    EffectManager::GetSingleton()->PurgeTexture(this->textureC);
   else if (this->IsType(TR_VOLUMETRIC))
-    ShaderManager::GetSingleton()->PurgeTexture(this->textureV);
+    EffectManager::GetSingleton()->PurgeTexture(this->textureV);
 }
 
 void TextureRecord::Release() {
@@ -185,7 +185,7 @@ void	TextureManager::InitialiseFrameTextures()
 	UInt32 Width=v1_2_416::GetRenderer()->SizeWidth;
 	UInt32 Height=v1_2_416::GetRenderer()->SizeHeight;
 
-	_MESSAGE("Creating shader textures.");
+	_MESSAGE("Creating full screen textures.");
 	_MESSAGE("Width = %i, Height = %i",Width,Height);
 
 	if(BufferTexturesNumBits.data==32)
@@ -225,7 +225,7 @@ void	TextureManager::InitialiseFrameTextures()
 		GetD3DDevice()->CreateTexture(Width,Height,1,D3DUSAGE_RENDERTARGET,D3DFMT_X8R8G8B8,D3DPOOL_DEFAULT,&lastframeTex,0);
 	}
 
-	_MESSAGE("Setting shader surfaces.");
+	_MESSAGE("Setting full screen surfaces.");
 	thisframeTex->GetSurfaceLevel(0,&thisframeSurf);
 	lastpassTex->GetSurfaceLevel(0,&lastpassSurf);
 	lastframeTex->GetSurfaceLevel(0,&lastframeSurf);
@@ -344,7 +344,7 @@ int	TextureManager::LoadTexture(char *Filename, TextureRecordType type, DWORD Fr
 	else if (type == TR_CUBIC) {
 	  IDirect3DCubeTexture9* tex = NULL;
 
-	  _MESSAGE("Loading volumetric texture (%s)",NewPath);
+	  _MESSAGE("Loading cubic texture (%s)",NewPath);
 
 	  if(FromFile)
 	  {

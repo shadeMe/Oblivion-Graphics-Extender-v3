@@ -15,7 +15,7 @@
 static global<bool> UseSave(true,NULL,"Serialization","bSaveData");
 static global<bool> UseLoad(true,NULL,"Serialization","bLoadData");
 static global<bool> EnableInterOp(false,NULL,"PluginInterOp","bEnableInterOp");
-static global<bool> SaveFix(false,NULL,"Shaders","bNoShadersInMenus");
+static global<bool> SaveFix(false,NULL,"Effects","bNoShadersInMenus");
 static global<bool> Enabled(true,NULL,"General","bEnabled");
 
 // Uses code from OBGE by Timeslip.
@@ -31,7 +31,7 @@ bool LostDevice(bool stage,void *parameters)
 	_MESSAGE("Lost device handler:");
 	if (OBSEShaderInterface::Singleton)
 	{
-		CurrentNode=obImageSpaceShaderList->p->ShaderList.start;
+		CurrentNode=obImageSpaceShaderList->p->EffectList.start;
 		while(CurrentNode)
 		{
 			if(CurrentNode->data->IsSpoofShader())
@@ -53,15 +53,15 @@ OBSEShaderInterface	*OBSEShaderInterface::GetSingleton()
 	if (!Singleton)
 	{
 		Singleton = new(OBSEShaderInterface);
-		
+
 		v1_2_416::GetRenderer()->RegisterLostDeviceCallback(LostDevice,NULL);
-		
+
 		// Need to increase the ref count of the spoof shader otherwise the game engine will try to delete it. Of course
 		// as I haven't written a destructor it will fail.
-		Singleton->RefCount++;	
-	
+		Singleton->RefCount++;
+
 		obImageSpaceShaderList->p->AddShader(Singleton);
-	
+
 		Singleton->InitialiseShader();
 		Singleton->ActivateShader=true;
 		_MESSAGE("Added to list OK.");
@@ -73,22 +73,22 @@ OBSEShaderInterface	*OBSEShaderInterface::GetSingleton()
 void OBSEShaderInterface::ShaderCode(IDirect3DDevice9 *D3DDevice,IDirect3DSurface9 *RenderTo, IDirect3DSurface9 *RenderFrom, DeviceInfo *Info)
 {
 
-	
+
 	if(Info->AltRenderTarget)
 		_MESSAGE("Alt Render target - width = %i, height = %i",Info->Width,Info->Height);
-	
+
 	if(Info->AltRenderTarget && (SaveFix.data || (Info->Height==256 && Info->Width==256)))
 	{
 		D3DDevice->StretchRect(RenderFrom,0,RenderTo,0,D3DTEXF_NONE);
 		return;
 	}
-	
-	ShaderManager* ShaderMan=ShaderManager::GetSingleton();
-	ShaderMan->UpdateFrameConstants();
-	ShaderMan->Render(D3DDevice,RenderTo,RenderFrom);
+
+	EffectManager* EffectMan=EffectManager::GetSingleton();
+	EffectMan->UpdateFrameConstants();
+	EffectMan->Render(D3DDevice,RenderTo,RenderFrom);
 
 	HUDManager::GetSingleton()->Render();
-/*	
+/*
 	if(EnableInterOp.data)
 	{
 		struct INTEROP {
@@ -99,7 +99,7 @@ void OBSEShaderInterface::ShaderCode(IDirect3DDevice9 *D3DDevice,IDirect3DSurfac
 			UInt32		height;
 			D3DCAPS9	*DeviceCaps;
 		} InterOp;
-		
+
 		InterOp.version=1;
 		InterOp.D3DDevice=D3DDevice;
 		InterOp.RenderTo=RenderTo;
@@ -152,7 +152,7 @@ void OBSEShaderInterface::DeviceLost()
 	}
 
 	TextureManager::GetSingleton()->DeviceRelease();
-	ShaderManager::GetSingleton()->OnLostDevice();
+	EffectManager::GetSingleton()->OnLostDevice();
 }
 
 void OBSEShaderInterface::DeviceReset()
@@ -170,7 +170,7 @@ void OBSEShaderInterface::DeviceReset()
 	}
 
 	TextureManager::GetSingleton()->InitialiseFrameTextures();
-	ShaderManager::GetSingleton()->OnResetDevice();
+	EffectManager::GetSingleton()->OnResetDevice();
 }
 
 void OBSEShaderInterface::DeviceRelease()
@@ -182,7 +182,7 @@ void OBSEShaderInterface::DeviceRelease()
 		while(pFont->Release()){}
 		pFont=NULL;
 	}
-	
+
 	if(pFont2)
 	{
 		while(pFont2->Release()){}
@@ -190,11 +190,11 @@ void OBSEShaderInterface::DeviceRelease()
 	}
 
 	TextureManager::GetSingleton()->DeviceRelease();
-	ShaderManager::GetSingleton()->DeviceRelease();
+	EffectManager::GetSingleton()->DeviceRelease();
 	//LostDepthBuffer(true,NULL);
 
 	delete(TextureManager::GetSingleton());
-	delete(ShaderManager::GetSingleton());
+	delete(EffectManager::GetSingleton());
 
 	//delete MemoryDumpString;
 }
@@ -236,9 +236,9 @@ void OBSEShaderInterface::InitialiseShader(void)
 	FontColor=D3DCOLOR_RGBA(255,255,255,255);
 	FontColor2=D3DCOLOR_RGBA(0,0,0,255);
 
-	ShaderManager::GetSingleton()->InitialiseBuffers();
+	EffectManager::GetSingleton()->InitialiseBuffers();
 	TextureManager::GetSingleton()->InitialiseFrameTextures();
-	ShaderManager::GetSingleton()->LoadShaderList();
+	EffectManager::GetSingleton()->LoadEffectList();
 
 	//MemoryDumpString=new TextBuffer(10000);
 
@@ -248,8 +248,8 @@ void OBSEShaderInterface::InitialiseShader(void)
 void OBSEShaderInterface::NewGame()
 {
 	TextureManager::GetSingleton()->NewGame();
-	ShaderManager::GetSingleton()->NewGame();
-	ShaderManager::GetSingleton()->LoadShaderList();	
+	EffectManager::GetSingleton()->NewGame();
+	EffectManager::GetSingleton()->LoadEffectList();
 }
 
 void OBSEShaderInterface::LoadGame(OBSESerializationInterface *Interface)
@@ -260,7 +260,7 @@ void OBSEShaderInterface::LoadGame(OBSESerializationInterface *Interface)
 		if(UseLoad.data)
 		{
 			TextureManager::GetSingleton()->LoadGame(Interface);
-			ShaderManager::GetSingleton()->LoadGame(Interface);
+			EffectManager::GetSingleton()->LoadGame(Interface);
 		}
 		else
 		{
@@ -274,7 +274,7 @@ void OBSEShaderInterface::SaveGame(OBSESerializationInterface *Interface)
 	if(UseSave.data)
 	{
 		TextureManager::GetSingleton()->SaveGame(Interface);
-		ShaderManager::GetSingleton()->SaveGame(Interface);
+		EffectManager::GetSingleton()->SaveGame(Interface);
 	}
 	else
 	{

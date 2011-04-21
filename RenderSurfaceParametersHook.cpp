@@ -104,7 +104,7 @@ void __stdcall TrackRenderedSurfaceParameters(v1_2_416::NiDX9Renderer *renderer,
 /* ------------------------------------------------------------------------------------------------- */
 
 void CreateRenderSurfaceHook(void) {
-  /* ReflectionPass */
+	/* ReflectionPass */
 	*((int *)&ReflectionPass) = 0x0049BEF0;
 	TrackReflectionPass = &Anonymous::TrackReflectionPass;
 	/* GetRenderedSurfaceParameters */

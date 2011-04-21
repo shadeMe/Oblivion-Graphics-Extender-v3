@@ -7,7 +7,7 @@
 
 #undef	OBGE_LOGGING
 #undef	OBGE_HOOKING
-#undef	OBGE_DEVLING
+#define	OBGE_DEVLING
 #undef	OBGE_PROFILE
 #define	OBGE_TRACKER		0	// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
 #undef	OBGE_TRACKER_SURFACES		// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
