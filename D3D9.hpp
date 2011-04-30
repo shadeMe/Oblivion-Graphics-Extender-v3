@@ -5,14 +5,6 @@
 #include <d3d9.h>
 #include <d3dx9.h>
 
-#undef	OBGE_LOGGING
-#undef	OBGE_HOOKING
-#define	OBGE_DEVLING
-#undef	OBGE_PROFILE
-#define	OBGE_TRACKER		0	// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
-#undef	OBGE_TRACKER_SURFACES		// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
-#undef	OBGE_TRACKER_TEXTURES		// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
-
 // Tracker
 class OBGEDirect3D9; extern OBGEDirect3D9 *lastOBGEDirect3D9;
 
@@ -29,7 +21,7 @@ public:
 	}
 
 	/*** IUnknown methods ***/
-    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObj)
+	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObj)
 	{
 		return m_d3d->QueryInterface(riid, ppvObj);
 	}

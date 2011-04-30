@@ -13,7 +13,34 @@
 #undef APSTUDIO_READONLY_SYMBOLS
 
 /////////////////////////////////////////////////////////////////////////////
-// English (U.K.) resources
+// Deutsch (Deutschland) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_DEU)
+#ifdef _WIN32
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+#pragma code_page(1252)
+#endif //_WIN32
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Bitmap
+//
+
+IDB_BITMAP1             BITMAP                  "icons\\applications-development.bmp"
+IDB_BITMAP2             BITMAP                  "icons\\document-open.bmp"
+IDB_BITMAP3             BITMAP                  "icons\\document-save.bmp"
+IDB_BITMAP4             BITMAP                  "icons\\document-save-as.bmp"
+IDB_BITMAP5             BITMAP                  "icons\\apply.bmp"
+IDB_BITMAP6             BITMAP                  "icons\\edit-delete.bmp"
+IDB_BITMAP7             BITMAP                  "icons\\emblem-important.bmp"
+IDB_BITMAP8             BITMAP                  "icons\\emblem-readonly.bmp"
+IDB_BITMAP9             BITMAP                  "icons\\emblem-unreadable.bmp"
+#endif    // Deutsch (Deutschland) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Englisch (GB) resources
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENG)
 #ifdef _WIN32
@@ -86,7 +113,7 @@ BEGIN
     END
 END
 
-#endif    // English (U.K.) resources
+#endif    // Englisch (GB) resources
 /////////////////////////////////////////////////////////////////////////////
 
 

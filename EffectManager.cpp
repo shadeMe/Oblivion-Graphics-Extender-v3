@@ -81,7 +81,7 @@ bool EffectRecord::IsEnabled()
 	return(Enabled);
 }
 
-bool EffectRecord::LoadEffect(char *Filename)
+bool EffectRecord::LoadEffect(char *Filename, D3DXMACRO *defs)
 {
 	HRESULT hr;
 
@@ -102,9 +102,9 @@ bool EffectRecord::LoadEffect(char *Filename)
 
 	LPD3DXBUFFER pCompilationErrors=0;
 	if(UseLegacyCompiler.data)
-		hr=D3DXCreateEffectFromFileA(GetD3DDevice(),NewPath,0,0,D3DXFX_NOT_CLONEABLE|D3DXSHADER_USE_LEGACY_D3DX9_31_DLL,0,&Effect,&pCompilationErrors);
+		hr=D3DXCreateEffectFromFileA(GetD3DDevice(),NewPath,defs,0,D3DXFX_NOT_CLONEABLE|D3DXSHADER_USE_LEGACY_D3DX9_31_DLL,0,&Effect,&pCompilationErrors);
 	else
-		hr=D3DXCreateEffectFromFileA(GetD3DDevice(),NewPath,0,0,D3DXFX_NOT_CLONEABLE|(Optimize.Get() ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0),0,&Effect,&pCompilationErrors);
+		hr=D3DXCreateEffectFromFileA(GetD3DDevice(),NewPath,defs,0,D3DXFX_NOT_CLONEABLE|(Optimize.Get() ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0),0,&Effect,&pCompilationErrors);
 
 	if(hr!=D3D_OK && pCompilationErrors && !UseLegacyCompiler.data)
 	{
@@ -180,7 +180,7 @@ void EffectRecord::ApplyCompileDirectives()
 
 	if (handle2)
 	{
-	  LPCSTR	pString=NULL;
+	  LPCSTR pString=NULL;
 	  Effect->GetString(handle2,&pString);
 
 	  _MESSAGE("Found filename : %s",pString);
@@ -199,7 +199,7 @@ void EffectRecord::ApplyCompileDirectives()
 
 	if (handle2)
 	{
-	  LPCSTR	pString=NULL;
+	  LPCSTR pString=NULL;
 	  Effect->GetString(handle2,&pString);
 
 	  _MESSAGE("Found filename : %s",pString);

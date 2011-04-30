@@ -69,7 +69,7 @@ public:
 	void						ApplyConstants(Constants *ConstList);
 	void						ApplyDynamics();
 	bool						IsEnabled();
-	bool						LoadEffect(char *Filename);
+	bool						LoadEffect(char *Filename, D3DXMACRO *defs = NULL);
 	void						ApplyCompileDirectives(void);
 	bool						SetEffectInt(char *name, int value);
 	bool						SetEffectFloat(char *name, float value);

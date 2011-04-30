@@ -214,6 +214,7 @@ static CommandInfo kShowMemoryDump =
 #include "Hooking/apihijack.cpp"
 
 #include "Hooking/D3D9.cpp"
+#include "Hooking/D3DX.cpp"
 #include "Hooking/K32.cpp"
 #include "Hooking/U32.cpp"
 
@@ -265,9 +266,10 @@ bool OBSEPlugin_Query(const OBSEInterface * obse, PluginInfo * info)
 			return false;
 		}
 #endif
-		HookAPICalls(&K32Hook);
-		HookAPICalls(&U32Hook);
-	//	HookAPICalls(&D3DHook);
+		HookAPICalls(&K32Hook);	// static DLL linkage
+		HookAPICalls(&U32Hook);	// static DLL linkage
+	//	HookAPICalls(&D3DHook);	// dynamic DLL linkage
+		HookAPICalls(&D3XHook);	// static DLL linkage
 	}
 	else
 	{

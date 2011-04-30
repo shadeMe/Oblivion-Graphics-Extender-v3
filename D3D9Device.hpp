@@ -11,30 +11,25 @@
 /* ----------------------------------------------------------------------------- */
 
 // Hook-Tracker
-enum OBGEPass {
-	OBGEPASS_UNKNOWN	= 0x0,
-
-	OBGEPASS_REFLECTION	= 0x1,
-	OBGEPASS_WATER		= 0x2,
-	OBGEPASS_SHADOW		= 0x3,
-	OBGEPASS_HDR		= 0x4,
-
-	OBGEPASS_MAX		= OBGEPASS_HDR,
-	OBGEPASS_NUM		= OBGEPASS_HDR + 1,
-};
-
 extern enum OBGEPass currentPass;
 extern IDirect3DTexture9 *passTexture[OBGEPASS_NUM];
 extern IDirect3DSurface9 *passSurface[OBGEPASS_NUM];
 extern IDirect3DSurface9 *passDepth  [OBGEPASS_NUM];
+extern int                passFrames [OBGEPASS_NUM];
+extern int                passPasses [OBGEPASS_NUM];
+extern const char        *passNames  [OBGEPASS_NUM];
 
 /* ------------------------------------------------------------------------------- */
 
-#ifdef	OBGE_LOGGING
-extern int frame_dmp;
+#if	defined(OBGE_LOGGING)
 extern int frame_num;
 extern int frame_bge;
+extern int frame_dmp;
 extern IDebugLog *frame_log;
+#elif	defined(OBGE_DEVLING)
+extern int frame_num;
+extern int frame_bge;
+#define	frame_log ((IDebugLog *)NULL)
 #else
 #define	frame_log ((IDebugLog *)NULL)
 #endif
@@ -93,6 +88,9 @@ class OBGEDirect3DDevice9; extern OBGEDirect3DDevice9 *lastOBGEDirect3DDevice9;
 #include "D3D9Surface.hpp"
 #endif
 
+#include "ShaderManager.h"
+#include "GUIs_DebugWindow.hpp"
+
 class OBGEDirect3DDevice9 : public IDirect3DDevice9
 {
 public:
@@ -104,15 +102,28 @@ public:
 
 		_MESSAGE("OD3D9: Device constructed from 0x%08x", _ReturnAddress());
 
-#ifdef	OBGE_LOGGING
+#if	defined(OBGE_LOGGING)
 		Sleep(20000);		// Give me enough time to attach to process for debugging. Vista seems to block JIT debugging.
 
 		/* setup logging */
 		frame_dmp = 0;
 		frame_trk = true;
-		frame_num = 0;
 		frame_log = NULL;
+
+		frame_num = 0;
 		frame_bge = 0;
+#elif	defined(OBGE_DEVLING)
+		frame_num = 0;
+		frame_bge = 0;
+#endif
+
+#if	defined(OBGE_DEVLING)
+		m_shaders = ShaderManager::GetSingleton();
+		m_shadercv = NULL;
+		m_shadercp = NULL;
+
+		/* just for now */
+		DebugWindow::Create();
 #endif
 	}
 
@@ -170,7 +181,6 @@ public:
 	STDMETHOD(GetDisplayMode)(THIS_ UINT iSwapChain,D3DDISPLAYMODE* pMode)
 	{
 		return m_device->GetDisplayMode(iSwapChain, pMode);
-
 	}
 
 	STDMETHOD(GetCreationParameters)(THIS_ D3DDEVICE_CREATION_PARAMETERS *pParameters)
@@ -218,12 +228,13 @@ public:
 		memset(passTexture, 0, sizeof(passTexture));
 		memset(passSurface, 0, sizeof(passSurface));
 		memset(passDepth  , 0, sizeof(passDepth  ));
+		memset(passPasses , 0, sizeof(passPasses ));
 
-#ifdef	OBGE_LOGGING
+#if	defined(OBGE_LOGGING)
 		/* log just a single frame, otherwise it's too much data */
+		frame_num++;
 		frame_bge = 0;
 
-		frame_num++;
 		/* count down */
 		if (frame_dmp > 0)
 			frame_dmp = frame_dmp - 1;
@@ -247,6 +258,9 @@ public:
 		if (frame_log) {
 			frame_log->FormattedMessage("-- Frame %d --", frame_num);
 		}
+#elif	defined(OBGE_DEVLING)
+		frame_num++;
+		frame_bge = 0;
 #endif
 
 		return m_device->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
@@ -281,9 +295,8 @@ public:
 	STDMETHOD(CreateTexture)(THIS_ UINT Width,UINT Height,UINT Levels,DWORD Usage,D3DFORMAT Format,D3DPOOL Pool,IDirect3DTexture9** ppTexture,HANDLE* pSharedHandle)
 	{
 #ifdef	OBGE_LOGGING
-		if (frame_log) {
+		if (frame_log)
 			frame_log->FormattedMessage("CreateTexture from 0x%08x", _ReturnAddress());
-		}
 #endif
 
 		HRESULT hr = m_device->CreateTexture(Width, Height, Levels, Usage, Format, Pool, ppTexture, pSharedHandle);
@@ -373,9 +386,8 @@ public:
 	STDMETHOD(CreateRenderTarget)(THIS_ UINT Width,UINT Height,D3DFORMAT Format,D3DMULTISAMPLE_TYPE MultiSample,DWORD MultisampleQuality,BOOL Lockable,IDirect3DSurface9** ppSurface,HANDLE* pSharedHandle)
 	{
 #ifdef	OBGE_LOGGING
-		if (frame_log) {
+		if (frame_log)
 			frame_log->FormattedMessage("CreateRenderTarget from 0x%08x", _ReturnAddress());
-		}
 #endif
 
 		HRESULT hr = m_device->CreateRenderTarget(Width, Height, Format, MultiSample, MultisampleQuality, Lockable, ppSurface, pSharedHandle);
@@ -422,9 +434,8 @@ public:
 	STDMETHOD(CreateDepthStencilSurface)(THIS_ UINT Width,UINT Height,D3DFORMAT Format,D3DMULTISAMPLE_TYPE MultiSample,DWORD MultisampleQuality,BOOL Discard,IDirect3DSurface9** ppSurface,HANDLE* pSharedHandle)
 	{
 #ifdef	OBGE_LOGGING
-		if (frame_log) {
+		if (frame_log)
 			frame_log->FormattedMessage("CreateDepthStencilSurface from 0x%08x", _ReturnAddress());
-		}
 #endif
 
 		HRESULT hr = m_device->CreateDepthStencilSurface(Width, Height, Format, MultiSample, MultisampleQuality, Discard, ppSurface, pSharedHandle);
@@ -715,9 +726,28 @@ public:
 
 	STDMETHOD(BeginScene)(THIS)
 	{
-#ifdef	OBGE_LOGGING
-		frame_bge++;
+	//	assert(frame_num != 8000);
+	//	assert(currentPass != OBGEPASS_UNKNOWN);
+	//	assert(frame_bge == 26);
 
+#if	defined(OBGE_DEVLING)
+		m_shadercv = NULL;
+		m_shadercp = NULL;
+
+		if (m_shaders) {
+			/* clean all on first scene, and partial on successive scenes */
+			int frame_numr = m_shaders->trackd[currentPass].frame_numr;
+
+			m_shaders->Clear(currentPass, frame_numr != frame_num);
+			m_shaders->trackd[currentPass].frame_numr = frame_num;
+		}
+
+		passFrames[currentPass] = frame_num;
+#elif	defined(OBGE_LOGGING)
+		passFrames[currentPass] = frame_num;
+#endif
+
+#ifdef	OBGE_LOGGING
 		if (frame_log) {
 			frame_log->FormattedMessage("BeginScene %d from 0x%08x", frame_bge, _ReturnAddress());
 			frame_log->Indent();
@@ -729,35 +759,6 @@ public:
 
 	STDMETHOD(EndScene)(THIS)
 	{
-#if 0
-		// Draw a custom quad to the screen
-		struct TLVertex
-		{
-			float x, y, z, rhw;
-			DWORD color;
-		};
-
-		TLVertex vertices[] =
-		{
-			{ -0.5f, -0.5f, 0.0f, 1.0f, 0xffff0000 },
-			{ 99.5f, -0.5f, 0.0f, 1.0f, 0xff00ff00 },
-			{ -0.5f, 99.5f, 0.0f, 1.0f, 0xff0000ff },
-			{ 99.5f, 99.5f, 0.0f, 1.0f, 0xffff0000 }
-		};
-
-		SetVertexShader(0);
-		SetPixelShader(0);
-		SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
-		SetRenderState(D3DRS_ZENABLE, false);
-		SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-		SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
-		SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
-		SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
-		SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE);
-		DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, vertices, sizeof(TLVertex));
-		SetRenderState(D3DRS_ZENABLE, true);
-#endif
-
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
 			frame_log->Outdent();
@@ -766,6 +767,32 @@ public:
 #endif
 
 		HRESULT res = m_device->EndScene();
+
+#ifdef	OBGE_DEVLING
+		/* apparenty there is one BeginScene missing in the HDR-pipeline (2nd scene! */
+		if (m_shaders) {
+			/* record exact position of occurance */
+			int frame_cntr = m_shaders->trackd[currentPass].frame_cntr;
+
+			/* huh, going into menu provokes huge numbers here */
+			if (frame_cntr < OBGESCENE_NUM) {
+				m_shaders->trackd[currentPass].frame_used[frame_cntr] = frame_num;
+				m_shaders->trackd[currentPass].frame_pass[frame_cntr] = frame_bge;
+
+				m_shaders->trackd[currentPass].rt[frame_cntr] = passSurface[currentPass];
+				m_shaders->trackd[currentPass].ds[frame_cntr] = passDepth  [currentPass];
+
+				m_shaders->trackd[currentPass].frame_cntr = frame_cntr + 1;
+			}
+		}
+#endif
+
+#if	defined(OBGE_DEVLING) || defined(OBGE_LOGGING)
+		/* track the number of sub-passes for a particular pass */
+		passPasses[currentPass]++;
+
+		frame_bge++;
+#endif
 
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
@@ -780,7 +807,7 @@ public:
 			LstErr = GetRenderTargetData(pRenderTarget, pBuf);
 			char str[256]; sprintf_s(str, "OBGEv2-frame%04d-scene%02d.dds", frame_num, frame_bge);
 			LstErr = D3DXSaveSurfaceToFile(str, D3DXIFF_DDS, pBuf, NULL, NULL);
-			/* DAMN: how to delete? */
+			pBuf->Release();
 		}
 #endif
 
@@ -794,6 +821,21 @@ public:
 
 	STDMETHOD(SetTransform)(THIS_ D3DTRANSFORMSTATETYPE State,CONST D3DMATRIX* pMatrix)
 	{
+#ifdef	OBGE_DEVLING
+		if (m_shaders) {
+			/* record exact position of occurance */
+			int frame_cntr = m_shaders->trackd[currentPass].frame_cntr;
+
+			/* huh, going into menu provokes huge numbers here */
+			if (frame_cntr < OBGESCENE_NUM) {
+				if (State == D3DTS_VIEW)
+					m_shaders->trackd[currentPass].transf[frame_cntr][0] = *pMatrix;
+				else if (State == D3DTS_PROJECTION)
+					m_shaders->trackd[currentPass].transf[frame_cntr][1] = *pMatrix;
+			}
+		}
+#endif
+
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
 			frame_log->FormattedMessage("SetTransform:");
@@ -946,6 +988,18 @@ public:
 
 	STDMETHOD(SetRenderState)(THIS_ D3DRENDERSTATETYPE State,DWORD Value)
 	{
+#ifdef	OBGE_DEVLING
+		if (m_shaders) {
+			/* record exact position of occurance */
+			int frame_cntr = m_shaders->trackd[currentPass].frame_cntr;
+
+			/* huh, going into menu provokes huge numbers here */
+			if (frame_cntr < OBGESCENE_NUM) {
+				m_shaders->trackd[currentPass].states[frame_cntr][State] = Value;
+			}
+		}
+#endif
+
 		return m_device->SetRenderState(State, Value);
 	}
 
@@ -979,16 +1033,21 @@ public:
 		return m_device->GetClipStatus(pClipStatus);
 	}
 
-	STDMETHOD(GetTexture)(THIS_ DWORD Stage,IDirect3DBaseTexture9** ppTexture)
+	STDMETHOD(GetTexture)(THIS_ DWORD Sampler,IDirect3DBaseTexture9** ppTexture)
 	{
-		return m_device->GetTexture(Stage, ppTexture);
+		return m_device->GetTexture(Sampler, ppTexture);
 	}
 
-	STDMETHOD(SetTexture)(THIS_ DWORD Stage,IDirect3DBaseTexture9* pTexture)
+	STDMETHOD(SetTexture)(THIS_ DWORD Sampler,IDirect3DBaseTexture9* pTexture)
 	{
+#ifdef	OBGE_DEVLING
+		if (m_shaders)
+			m_shaders->traced[currentPass].values_s[Sampler] = pTexture;
+#endif
+
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
-			frame_log->FormattedMessage("SetTexture[%d]", Stage);
+			frame_log->FormattedMessage("SetTexture[%d]", Sampler);
 			frame_log->Indent();
 			frame_log->FormattedMessage("Address: 0x%08x", pTexture);
 
@@ -1015,7 +1074,7 @@ public:
 		}
 #endif
 
-		return m_device->SetTexture(Stage, pTexture);
+		return m_device->SetTexture(Sampler, pTexture);
 	}
 
 	STDMETHOD(GetTextureStageState)(THIS_ DWORD Stage,D3DTEXTURESTAGESTATETYPE Type,DWORD* pValue)
@@ -1035,6 +1094,11 @@ public:
 
 	STDMETHOD(SetSamplerState)(THIS_ DWORD Sampler,D3DSAMPLERSTATETYPE Type,DWORD Value)
 	{
+#ifdef	OBGE_DEVLING
+		if (m_shaders)
+			m_shaders->traced[currentPass].states_s[Sampler][Type] = Value;
+#endif
+
 		return m_device->SetSamplerState(Sampler, Type, Value);
 	}
 
@@ -1243,11 +1307,17 @@ public:
 		HRESULT res = m_device->CreateVertexShader(pFunction, ppShader);
 
 		if (frame_log || frame_trk) {
-			UINT len = 0; if (*ppShader) (*ppShader)->GetFunction(NULL, &len);
-			const char *nam = findShader(*ppShader, len, pFunction);
+#ifdef	OBGE_DEVLING
+			/* just register, don't return any manipulated class */
+			if (m_shaders)
+				m_shaders->GetRuntimeShader(pFunction, *ppShader);
+#endif
 
 #ifdef	OBGE_LOGGING
 			if (frame_log) {
+				UINT len = 0; if (*ppShader) (*ppShader)->GetFunction(NULL, &len);
+				const char *nam = findShader(*ppShader, len, pFunction);
+
 				frame_log->Indent();
 				frame_log->FormattedMessage("Length: %d", len);
 				frame_log->FormattedMessage("Name: %s", nam);
@@ -1261,6 +1331,27 @@ public:
 
 	STDMETHOD(SetVertexShader)(THIS_ IDirect3DVertexShader9* pShader)
 	{
+#ifdef	OBGE_DEVLING
+		m_shadercv = NULL;
+
+		if (m_shaders && pShader && (m_shadercv = m_shaders->Shaders[pShader])) {
+			m_shadercv->frame_used[OBGEPASS_UNKNOWN] = frame_num;
+			m_shadercv->frame_pass[OBGEPASS_UNKNOWN] = frame_bge;
+
+			m_shadercv->frame_used[currentPass] = frame_num;
+			m_shadercv->frame_pass[currentPass] = frame_bge;
+
+			m_shadercv->Clear(currentPass);
+
+			/* these have been set before, takeover */
+			memcpy(m_shadercv->traced[currentPass].states_s, m_shaders->traced[currentPass].states_s, sizeof(m_shaders->traced[currentPass].states_s));
+			memcpy(m_shadercv->traced[currentPass].values_s, m_shaders->traced[currentPass].values_s, sizeof(m_shaders->traced[currentPass].values_s));
+
+			/* it's impossible for that function to return NULL */
+			return m_device->SetVertexShader(m_shadercv->GetRuntimeShader(pShader));
+		}
+#endif
+
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
 			frame_log->FormattedMessage("SetVertexShader");
@@ -1281,6 +1372,16 @@ public:
 
 	STDMETHOD(SetVertexShaderConstantF)(THIS_ UINT StartRegister,CONST float* pConstantData,UINT Vector4fCount)
 	{
+#ifdef	OBGE_DEVLING
+		if (m_shadercv) {
+			memcpy(
+				m_shadercv->traced[currentPass].values_c[StartRegister],
+				pConstantData,
+				Vector4fCount * 4 * sizeof(float)
+			);
+		}
+#endif
+
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
 			frame_log->FormattedMessage("SetVertexShaderConstantF[%d+]", StartRegister);
@@ -1301,6 +1402,16 @@ public:
 
 	STDMETHOD(SetVertexShaderConstantI)(THIS_ UINT StartRegister,CONST int* pConstantData,UINT Vector4iCount)
 	{
+#ifdef	OBGE_DEVLING
+		if (m_shadercv) {
+			memcpy(
+				m_shadercv->traced[currentPass].values_i[StartRegister],
+				pConstantData,
+				Vector4iCount * 4 * sizeof(int)
+			);
+		}
+#endif
+
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
 			frame_log->FormattedMessage("SetVertexShaderConstantI[%d+]", StartRegister);
@@ -1372,19 +1483,24 @@ public:
 	STDMETHOD(CreatePixelShader)(THIS_ CONST DWORD* pFunction,IDirect3DPixelShader9** ppShader)
 	{
 #ifdef	OBGE_LOGGING
-		if (frame_log) {
+		if (frame_log)
 			frame_log->FormattedMessage("CreatePixelShader 0x%08x", _ReturnAddress());
-		}
 #endif
 
 		HRESULT res = m_device->CreatePixelShader(pFunction, ppShader);
 
 		if (frame_log || frame_trk) {
-			UINT len = 0; if (*ppShader) (*ppShader)->GetFunction(NULL, &len);
-			const char *nam = findShader(*ppShader, len, pFunction);
+#ifdef	OBGE_DEVLING
+			/* just register, don't return any manipulated class */
+			if (m_shaders)
+				m_shaders->GetRuntimeShader(pFunction, *ppShader);
+#endif
 
 #ifdef	OBGE_LOGGING
 			if (frame_log) {
+				UINT len = 0; if (*ppShader) (*ppShader)->GetFunction(NULL, &len);
+				const char *nam = findShader(*ppShader, len, pFunction);
+
 				frame_log->Indent();
 				frame_log->FormattedMessage("Length: %d", len);
 				frame_log->FormattedMessage("Name: %s", nam);
@@ -1398,6 +1514,27 @@ public:
 
 	STDMETHOD(SetPixelShader)(THIS_ IDirect3DPixelShader9* pShader)
 	{
+#ifdef	OBGE_DEVLING
+		m_shadercp = NULL;
+
+		if (m_shaders && pShader && (m_shadercp = m_shaders->Shaders[pShader])) {
+			m_shadercp->frame_used[OBGEPASS_UNKNOWN] = frame_num;
+			m_shadercp->frame_pass[OBGEPASS_UNKNOWN] = frame_bge;
+
+			m_shadercp->frame_used[currentPass] = frame_num;
+			m_shadercp->frame_pass[currentPass] = frame_bge;
+
+			m_shadercp->Clear(currentPass);
+
+			/* these have been set before, takeover */
+			memcpy(m_shadercp->traced[currentPass].states_s, m_shaders->traced[currentPass].states_s, sizeof(m_shaders->traced[currentPass].states_s));
+			memcpy(m_shadercp->traced[currentPass].values_s, m_shaders->traced[currentPass].values_s, sizeof(m_shaders->traced[currentPass].values_s));
+
+			/* it's impossible for that function to return NULL */
+			return m_device->SetPixelShader(m_shadercp->GetRuntimeShader(pShader));
+		}
+#endif
+
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
 			frame_log->FormattedMessage("SetPixelShader");
@@ -1418,6 +1555,16 @@ public:
 
 	STDMETHOD(SetPixelShaderConstantF)(THIS_ UINT StartRegister,CONST float* pConstantData,UINT Vector4fCount)
 	{
+#ifdef	OBGE_DEVLING
+		if (m_shadercp) {
+			memcpy(
+				m_shadercp->traced[currentPass].values_c[StartRegister],
+				pConstantData,
+				Vector4fCount * 4 * sizeof(float)
+			);
+		}
+#endif
+
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
 			frame_log->FormattedMessage("SetPixelShaderConstantF[%d+]", StartRegister);
@@ -1438,6 +1585,16 @@ public:
 
 	STDMETHOD(SetPixelShaderConstantI)(THIS_ UINT StartRegister,CONST int* pConstantData,UINT Vector4iCount)
 	{
+#ifdef	OBGE_DEVLING
+		if (m_shadercp) {
+			memcpy(
+				m_shadercp->traced[currentPass].values_i[StartRegister],
+				pConstantData,
+				Vector4iCount * 4 * sizeof(int)
+			);
+		}
+#endif
+
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
 			frame_log->FormattedMessage("SetPixelShaderConstantI[%d+]", StartRegister);
@@ -1515,6 +1672,12 @@ public:
 private:
 	IDirect3DDevice9* m_device;
 	IDirect3D9* m_d3d;
+
+#ifdef	OBGE_DEVLING
+	ShaderManager *m_shaders;
+	RuntimeShaderRecord *m_shadercv;
+	RuntimeShaderRecord *m_shadercp;
+#endif
 };
 
 #endif

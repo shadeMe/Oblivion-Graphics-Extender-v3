@@ -41,19 +41,19 @@ void *Anonymous::ReplaceShaderBinary(char *name) {
 			int size = *((int *)(binO + DIR_SIZE));
 			void *data = ((void *)(binO + DIR_DATA));
 
-			sb->SetBinary(size, data);
+			sb->SetBinary(size, (const DWORD *)data);
 		}
 
 		if ((bin = (unsigned char *)sb->GetBinary())) {
-			_MESSAGE("Replaced built-in shader %s.", name);
+			_DMESSAGE("Replaced built-in shader %s.", name);
 			bin = bin - DIR_DATA;
 		}
 		else if (binO) {
-			_MESSAGE("Unchanged built-in shader %s.", name);
+			_DMESSAGE("Unchanged built-in shader %s.", name);
 			bin = binO;
 		}
 		else {
-			_MESSAGE("No built-in shader %s exist, but may be provided", name);
+			_DMESSAGE("No built-in shader %s exist, but may be provided", name);
 			bin = NULL;
 		}
 	}

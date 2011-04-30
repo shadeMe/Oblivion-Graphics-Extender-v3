@@ -171,7 +171,7 @@ lighting\\1x\\p\\base.p.hlsl
 struct shaderID {
   UINT len;
   DWORD crc32;
-  char *name;
+  const char *name;
   void *ptr;
 } shaderDatabase[] = {
 
@@ -863,9 +863,9 @@ const char *findShader(void *iface) {
   return (iface ? "unknown" : "NULL");
 }
 
-struct formatID {
+const struct formatID {
   D3DFORMAT fmt;
-  char *name;
+  const char *name;
 } formatDatabase[] = {
 
 { D3DFMT_R8G8B8		    , "R8G8B8" },
@@ -945,9 +945,9 @@ const char *findFormat(D3DFORMAT fmt) {
   return "unknown";
 }
 
-struct usageID {
+const struct usageID {
   DWORD use;
-  char *name;
+  const char *name;
 } usageDatabase[] = {
 
 { 0x00000001L, "Rendertarget"},
@@ -986,4 +986,189 @@ const char *findUsage(DWORD use) {
   if (usestr[0] != '\0')
     return usestr;
   return "Plain";
+}
+
+const struct texturestateID {
+  D3DTEXTURESTAGESTATETYPE tstate;
+  const char *name;
+} texturestateDatabase[] = {
+
+{ D3DTSS_COLOROP        	, "COLOROP"        	  }, /* D3DTEXTUREOP - per-stage blending controls for color channels */
+{ D3DTSS_COLORARG1      	, "COLORARG1"      	  }, /* D3DTA_* (texture arg) */
+{ D3DTSS_COLORARG2      	, "COLORARG2"      	  }, /* D3DTA_* (texture arg) */
+{ D3DTSS_ALPHAOP        	, "ALPHAOP"        	  }, /* D3DTEXTUREOP - per-stage blending controls for alpha channel */
+{ D3DTSS_ALPHAARG1      	, "ALPHAARG1"      	  }, /* D3DTA_* (texture arg) */
+{ D3DTSS_ALPHAARG2      	, "ALPHAARG2"      	  }, /* D3DTA_* (texture arg) */
+{ D3DTSS_BUMPENVMAT00   	, "BUMPENVMAT00"   	  }, /* float (bump mapping matrix) */
+{ D3DTSS_BUMPENVMAT01   	, "BUMPENVMAT01"   	  }, /* float (bump mapping matrix) */
+{ D3DTSS_BUMPENVMAT10   	, "BUMPENVMAT10"   	  }, /* float (bump mapping matrix) */
+{ D3DTSS_BUMPENVMAT11   	, "BUMPENVMAT11"   	  }, /* float (bump mapping matrix) */
+{ D3DTSS_TEXCOORDINDEX  	, "TEXCOORDINDEX"  	  }, /* identifies which set of texture coordinates index this texture */
+{ D3DTSS_BUMPENVLSCALE  	, "BUMPENVLSCALE"  	  }, /* float scale for bump map luminance */
+{ D3DTSS_BUMPENVLOFFSET 	, "BUMPENVLOFFSET" 	  }, /* float offset for bump map luminance */
+{ D3DTSS_TEXTURETRANSFORMFLAGS	, "TEXTURETRANSFORMFLAGS" }, /* D3DTEXTURETRANSFORMFLAGS controls texture transform */
+{ D3DTSS_COLORARG0      	, "COLORARG0"      	  }, /* D3DTA_* third arg for triadic ops */
+{ D3DTSS_ALPHAARG0      	, "ALPHAARG0"      	  }, /* D3DTA_* third arg for triadic ops */
+{ D3DTSS_RESULTARG      	, "RESULTARG"      	  }, /* D3DTA_* arg for result (CURRENT or TEMP) */
+{ D3DTSS_CONSTANT       	, "CONSTANT"       	  }, /* Per-stage constant D3DTA_CONSTANT */
+
+};
+
+const char *findTextureState(D3DTEXTURESTAGESTATETYPE tstate) {
+  for (int g = 0; g < (sizeof(texturestateDatabase) / sizeof(texturestateID)); g++) {
+    if (texturestateDatabase[g].tstate == tstate)
+      return texturestateDatabase[g].name;
+  }
+
+  return "unknown";
+}
+
+const struct samplerstateID {
+  D3DSAMPLERSTATETYPE sstate;
+  const char *name;
+} samplerstateDatabase[] = {
+
+{ D3DSAMP_ADDRESSU       , "ADDRESSU"      }, /* D3DTEXTUREADDRESS for U coordinate */
+{ D3DSAMP_ADDRESSV       , "ADDRESSV"      }, /* D3DTEXTUREADDRESS for V coordinate */
+{ D3DSAMP_ADDRESSW       , "ADDRESSW"      }, /* D3DTEXTUREADDRESS for W coordinate */
+{ D3DSAMP_BORDERCOLOR    , "BORDERCOLOR"   }, /* D3DCOLOR */
+{ D3DSAMP_MAGFILTER      , "MAGFILTER"     }, /* D3DTEXTUREFILTER filter to use for magnification */
+{ D3DSAMP_MINFILTER      , "MINFILTER"     }, /* D3DTEXTUREFILTER filter to use for minification */
+{ D3DSAMP_MIPFILTER      , "MIPFILTER"     }, /* D3DTEXTUREFILTER filter to use between mipmaps during minification */
+{ D3DSAMP_MIPMAPLODBIAS  , "MIPMAPLODBIAS" }, /* float Mipmap LOD bias */
+{ D3DSAMP_MAXMIPLEVEL    , "MAXMIPLEVEL"   }, /* DWORD 0..(n-1) LOD index of largest map to use (0 == largest) */
+{ D3DSAMP_MAXANISOTROPY  , "MAXANISOTROPY" }, /* DWORD maximum anisotropy */
+{ D3DSAMP_SRGBTEXTURE    , "SRGBTEXTURE"   }, /* Default = 0 (which means Gamma 1.0, no correction required.) else correct for Gamma = 2.2 */
+{ D3DSAMP_ELEMENTINDEX   , "ELEMENTINDEX"  }, /* When multi-element texture is assigned to sampler, this indicates which element index to use.  Default = 0.  */
+{ D3DSAMP_DMAPOFFSET     , "DMAPOFFSET"    }, /* Offset in vertices in the pre-sampled displacement map. Only valid for D3DDMAPSAMPLER sampler  */
+
+};
+
+const char *findSamplerState(D3DSAMPLERSTATETYPE sstate) {
+  for (int g = 0; g < (sizeof(samplerstateDatabase) / sizeof(samplerstateID)); g++) {
+    if (samplerstateDatabase[g].sstate == sstate)
+      return samplerstateDatabase[g].name;
+  }
+
+  return "unknown";
+}
+
+const struct renderstateID {
+  D3DRENDERSTATETYPE rstate;
+  const char *name;
+} renderstateDatabase[] = {
+
+{ D3DRS_ZENABLE                   , "ZENABLE"                    },   /* D3DZBUFFERTYPE (or TRUE/FALSE for legacy) */
+{ D3DRS_FILLMODE                  , "FILLMODE"                   },   /* D3DFILLMODE */
+{ D3DRS_SHADEMODE                 , "SHADEMODE"                  },   /* D3DSHADEMODE */
+{ D3DRS_ZWRITEENABLE              , "ZWRITEENABLE"               },   /* TRUE to enable z writes */
+{ D3DRS_ALPHATESTENABLE           , "ALPHATESTENABLE"            },   /* TRUE to enable alpha tests */
+{ D3DRS_LASTPIXEL                 , "LASTPIXEL"                  },   /* TRUE for last-pixel on lines */
+{ D3DRS_SRCBLEND                  , "SRCBLEND"                   },   /* D3DBLEND */
+{ D3DRS_DESTBLEND                 , "DESTBLEND"                  },   /* D3DBLEND */
+{ D3DRS_CULLMODE                  , "CULLMODE"                   },   /* D3DCULL */
+{ D3DRS_ZFUNC                     , "ZFUNC"                      },   /* D3DCMPFUNC */
+{ D3DRS_ALPHAREF                  , "ALPHAREF"                   },   /* D3DFIXED */
+{ D3DRS_ALPHAFUNC                 , "ALPHAFUNC"                  },   /* D3DCMPFUNC */
+{ D3DRS_DITHERENABLE              , "DITHERENABLE"               },   /* TRUE to enable dithering */
+{ D3DRS_ALPHABLENDENABLE          , "ALPHABLENDENABLE"           },   /* TRUE to enable alpha blending */
+{ D3DRS_FOGENABLE                 , "FOGENABLE"                  },   /* TRUE to enable fog blending */
+{ D3DRS_SPECULARENABLE            , "SPECULARENABLE"             },   /* TRUE to enable specular */
+{ D3DRS_FOGCOLOR                  , "FOGCOLOR"                   },   /* D3DCOLOR */
+{ D3DRS_FOGTABLEMODE              , "FOGTABLEMODE"               },   /* D3DFOGMODE */
+{ D3DRS_FOGSTART                  , "FOGSTART"                   },   /* Fog start (for both vertex and pixel fog) */
+{ D3DRS_FOGEND                    , "FOGEND"                     },   /* Fog end      */
+{ D3DRS_FOGDENSITY                , "FOGDENSITY"                 },   /* Fog density  */
+{ D3DRS_RANGEFOGENABLE            , "RANGEFOGENABLE"             },   /* Enables range-based fog */
+{ D3DRS_STENCILENABLE             , "STENCILENABLE"              },   /* BOOL enable/disable stenciling */
+{ D3DRS_STENCILFAIL               , "STENCILFAIL"                },   /* D3DSTENCILOP to do if stencil test fails */
+{ D3DRS_STENCILZFAIL              , "STENCILZFAIL"               },   /* D3DSTENCILOP to do if stencil test passes and Z test fails */
+{ D3DRS_STENCILPASS               , "STENCILPASS"                },   /* D3DSTENCILOP to do if both stencil and Z tests pass */
+{ D3DRS_STENCILFUNC               , "STENCILFUNC"                },   /* D3DCMPFUNC fn.  Stencil Test passes if ((ref & mask) stencilfn (stencil & mask)) is true */
+{ D3DRS_STENCILREF                , "STENCILREF"                 },   /* Reference value used in stencil test */
+{ D3DRS_STENCILMASK               , "STENCILMASK"                },   /* Mask value used in stencil test */
+{ D3DRS_STENCILWRITEMASK          , "STENCILWRITEMASK"           },   /* Write mask applied to values written to stencil buffer */
+{ D3DRS_TEXTUREFACTOR             , "TEXTUREFACTOR"              },   /* D3DCOLOR used for multi-texture blend */
+{ D3DRS_WRAP0                     , "WRAP0"                      },  /* wrap for 1st texture coord. set */
+{ D3DRS_WRAP1                     , "WRAP1"                      },  /* wrap for 2nd texture coord. set */
+{ D3DRS_WRAP2                     , "WRAP2"                      },  /* wrap for 3rd texture coord. set */
+{ D3DRS_WRAP3                     , "WRAP3"                      },  /* wrap for 4th texture coord. set */
+{ D3DRS_WRAP4                     , "WRAP4"                      },  /* wrap for 5th texture coord. set */
+{ D3DRS_WRAP5                     , "WRAP5"                      },  /* wrap for 6th texture coord. set */
+{ D3DRS_WRAP6                     , "WRAP6"                      },  /* wrap for 7th texture coord. set */
+{ D3DRS_WRAP7                     , "WRAP7"                      },  /* wrap for 8th texture coord. set */
+{ D3DRS_CLIPPING                  , "CLIPPING"                   },
+{ D3DRS_LIGHTING                  , "LIGHTING"                   },
+{ D3DRS_AMBIENT                   , "AMBIENT"                    },
+{ D3DRS_FOGVERTEXMODE             , "FOGVERTEXMODE"              },
+{ D3DRS_COLORVERTEX               , "COLORVERTEX"                },
+{ D3DRS_LOCALVIEWER               , "LOCALVIEWER"                },
+{ D3DRS_NORMALIZENORMALS          , "NORMALIZENORMALS"           },
+{ D3DRS_DIFFUSEMATERIALSOURCE     , "DIFFUSEMATERIALSOURCE"      },
+{ D3DRS_SPECULARMATERIALSOURCE    , "SPECULARMATERIALSOURCE"     },
+{ D3DRS_AMBIENTMATERIALSOURCE     , "AMBIENTMATERIALSOURCE"      },
+{ D3DRS_EMISSIVEMATERIALSOURCE    , "EMISSIVEMATERIALSOURCE"     },
+{ D3DRS_VERTEXBLEND               , "VERTEXBLEND"                },
+{ D3DRS_CLIPPLANEENABLE           , "CLIPPLANEENABLE"            },
+{ D3DRS_POINTSIZE                 , "POINTSIZE"                  },   /* float point size */
+{ D3DRS_POINTSIZE_MIN             , "POINTSIZE_MIN"              },   /* float point size min threshold */
+{ D3DRS_POINTSPRITEENABLE         , "POINTSPRITEENABLE"          },   /* BOOL point texture coord control */
+{ D3DRS_POINTSCALEENABLE          , "POINTSCALEENABLE"           },   /* BOOL point size scale enable */
+{ D3DRS_POINTSCALE_A              , "POINTSCALE_A"               },   /* float point attenuation A value */
+{ D3DRS_POINTSCALE_B              , "POINTSCALE_B"               },   /* float point attenuation B value */
+{ D3DRS_POINTSCALE_C              , "POINTSCALE_C"               },   /* float point attenuation C value */
+{ D3DRS_MULTISAMPLEANTIALIAS      , "MULTISAMPLEANTIALIAS"       },  // BOOL - set to do FSAA with multisample buffer
+{ D3DRS_MULTISAMPLEMASK           , "MULTISAMPLEMASK"            },  // DWORD - per-sample enable/disable
+{ D3DRS_PATCHEDGESTYLE            , "PATCHEDGESTYLE"             },  // Sets whether patch edges will use float style tessellation
+{ D3DRS_DEBUGMONITORTOKEN         , "DEBUGMONITORTOKEN"          },  // DEBUG ONLY - token to debug monitor
+{ D3DRS_POINTSIZE_MAX             , "POINTSIZE_MAX"              },   /* float point size max threshold */
+{ D3DRS_INDEXEDVERTEXBLENDENABLE  , "INDEXEDVERTEXBLENDENABLE"   },
+{ D3DRS_COLORWRITEENABLE          , "COLORWRITEENABLE"           },  // per-channel write enable
+{ D3DRS_TWEENFACTOR               , "TWEENFACTOR"                },   // float tween factor
+{ D3DRS_BLENDOP                   , "BLENDOP"                    },   // D3DBLENDOP setting
+{ D3DRS_POSITIONDEGREE            , "POSITIONDEGREE"             },   // NPatch position interpolation degree. D3DDEGREE_LINEAR or D3DDEGREE_CUBIC (default)
+{ D3DRS_NORMALDEGREE              , "NORMALDEGREE"               },   // NPatch normal interpolation degree. D3DDEGREE_LINEAR (default) or D3DDEGREE_QUADRATIC
+{ D3DRS_SCISSORTESTENABLE         , "SCISSORTESTENABLE"          },
+{ D3DRS_SLOPESCALEDEPTHBIAS       , "SLOPESCALEDEPTHBIAS"        },
+{ D3DRS_ANTIALIASEDLINEENABLE     , "ANTIALIASEDLINEENABLE"      },
+{ D3DRS_MINTESSELLATIONLEVEL      , "MINTESSELLATIONLEVEL"       },
+{ D3DRS_MAXTESSELLATIONLEVEL      , "MAXTESSELLATIONLEVEL"       },
+{ D3DRS_ADAPTIVETESS_X            , "ADAPTIVETESS_X"             },
+{ D3DRS_ADAPTIVETESS_Y            , "ADAPTIVETESS_Y"             },
+{ D3DRS_ADAPTIVETESS_Z            , "ADAPTIVETESS_Z"             },
+{ D3DRS_ADAPTIVETESS_W            , "ADAPTIVETESS_W"             },
+{ D3DRS_ENABLEADAPTIVETESSELLATION, "ENABLEADAPTIVETESSELLATION" },
+{ D3DRS_TWOSIDEDSTENCILMODE       , "TWOSIDEDSTENCILMODE"        },   /* BOOL enable/disable 2 sided stenciling */
+{ D3DRS_CCW_STENCILFAIL           , "CCW_STENCILFAIL"            },   /* D3DSTENCILOP to do if ccw stencil test fails */
+{ D3DRS_CCW_STENCILZFAIL          , "CCW_STENCILZFAIL"           },   /* D3DSTENCILOP to do if ccw stencil test passes and Z test fails */
+{ D3DRS_CCW_STENCILPASS           , "CCW_STENCILPASS"            },   /* D3DSTENCILOP to do if both ccw stencil and Z tests pass */
+{ D3DRS_CCW_STENCILFUNC           , "CCW_STENCILFUNC"            },   /* D3DCMPFUNC fn.  ccw Stencil Test passes if ((ref & mask) stencilfn (stencil & mask)) is true */
+{ D3DRS_COLORWRITEENABLE1         , "COLORWRITEENABLE1"          },   /* Additional ColorWriteEnables for the devices that support D3DPMISCCAPS_INDEPENDENTWRITEMASKS */
+{ D3DRS_COLORWRITEENABLE2         , "COLORWRITEENABLE2"          },   /* Additional ColorWriteEnables for the devices that support D3DPMISCCAPS_INDEPENDENTWRITEMASKS */
+{ D3DRS_COLORWRITEENABLE3         , "COLORWRITEENABLE3"          },   /* Additional ColorWriteEnables for the devices that support D3DPMISCCAPS_INDEPENDENTWRITEMASKS */
+{ D3DRS_BLENDFACTOR               , "BLENDFACTOR"                },   /* D3DCOLOR used for a constant blend factor during alpha blending for devices that support D3DPBLENDCAPS_BLENDFACTOR */
+{ D3DRS_SRGBWRITEENABLE           , "SRGBWRITEENABLE"            },   /* Enable rendertarget writes to be DE-linearized to SRGB (for formats that expose D3DUSAGE_QUERY_SRGBWRITE) */
+{ D3DRS_DEPTHBIAS                 , "DEPTHBIAS"                  },
+{ D3DRS_WRAP8                     , "WRAP8"                      },   /* Additional wrap states for vs_3_0+ attributes with D3DDECLUSAGE_TEXCOORD */
+{ D3DRS_WRAP9                     , "WRAP9"                      },
+{ D3DRS_WRAP10                    , "WRAP10"                     },
+{ D3DRS_WRAP11                    , "WRAP11"                     },
+{ D3DRS_WRAP12                    , "WRAP12"                     },
+{ D3DRS_WRAP13                    , "WRAP13"                     },
+{ D3DRS_WRAP14                    , "WRAP14"                     },
+{ D3DRS_WRAP15                    , "WRAP15"                     },
+{ D3DRS_SEPARATEALPHABLENDENABLE  , "SEPARATEALPHABLENDENABLE"   },  /* TRUE to enable a separate blending function for the alpha channel */
+{ D3DRS_SRCBLENDALPHA             , "SRCBLENDALPHA"              },  /* SRC blend factor for the alpha channel when D3DRS_SEPARATEDESTALPHAENABLE is TRUE */
+{ D3DRS_DESTBLENDALPHA            , "DESTBLENDALPHA"             },  /* DST blend factor for the alpha channel when D3DRS_SEPARATEDESTALPHAENABLE is TRUE */
+{ D3DRS_BLENDOPALPHA              , "BLENDOPALPHA"               },  /* Blending operation for the alpha channel when D3DRS_SEPARATEDESTALPHAENABLE is TRUE */
+
+};
+
+const char *findRenderState(D3DRENDERSTATETYPE rstate) {
+  for (int g = 0; g < (sizeof(renderstateDatabase) / sizeof(renderstateID)); g++) {
+    if (renderstateDatabase[g].rstate == rstate)
+      return renderstateDatabase[g].name;
+  }
+
+  return "unknown";
 }
