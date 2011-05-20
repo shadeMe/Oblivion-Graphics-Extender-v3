@@ -6,7 +6,7 @@
 
 namespace v1_2_416
 {
-	class NiDX9ImplicitDepthStencilBufferDataEx: public NiDX9ImplicitDepthStencilBufferData
+	class NiDX9ImplicitDepthStencilBufferDataEx : public NiDX9ImplicitDepthStencilBufferData
 	{
 	public:
 		NiDX9ImplicitDepthStencilBufferDataEx();

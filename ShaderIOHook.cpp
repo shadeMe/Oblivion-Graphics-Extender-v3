@@ -33,7 +33,6 @@ void *Anonymous::ReplaceShaderBinary(char *name) {
 //	(this->*FindShaderBinary)(name, (void *)&bin);
 
 	if (sm && (sb = sm->GetBuiltInShader(name))) {
-		/* SLS1000.vso doesn't exist for example */
 		if (binO) {
 			/* internal directory-entry offsets */
 #define	DIR_SIZE	0x100
@@ -45,7 +44,7 @@ void *Anonymous::ReplaceShaderBinary(char *name) {
 		}
 
 		if ((bin = (unsigned char *)sb->GetBinary())) {
-			_DMESSAGE("Replaced built-in shader %s.", name);
+			_DMESSAGE("Hooked built-in shader %s.", name);
 			bin = bin - DIR_DATA;
 		}
 		else if (binO) {

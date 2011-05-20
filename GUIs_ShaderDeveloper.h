@@ -53,7 +53,8 @@ class wxShaderDeveloper : public wxFrame
 	
 	protected:
 		wxMenuBar* SDMenubar;
-		wxMenu* SDOptions;
+		wxMenu* SDShaderOptions;
+		wxMenu* SDEffectOptions;
 		wxChoice* SDChoicePass;
 		wxNotebook* SDViewSwitch;
 		wxPanel* SDPanelShaders;
@@ -66,15 +67,15 @@ class wxShaderDeveloper : public wxFrame
 		wxBitmapButton* SDButtonShaderSaveAs;
 		wxChoice* SDShaderVersion;
 		wxButton* SDShaderCompile;
-		wxNotebook* SDCodeSwitch;
-		wxPanel* SDSource;
-		wxTextCtrl* SDSourceEditor;
-		wxPanel* SDAssembly;
-		wxTextCtrl* SDAssemblyEditor;
-		wxPanel* SDErrors;
-		wxTextCtrl* SDErrorView;
-		wxPanel* Disassembly;
-		wxTextCtrl* SDDisassemblyView;
+		wxNotebook* SDShaderCodeSwitch;
+		wxPanel* SDShaderSource;
+		wxTextCtrl* SDShaderSourceEditor;
+		wxPanel* SDShaderAssembly;
+		wxTextCtrl* SDShaderAssemblyEditor;
+		wxPanel* SDShaderErrors;
+		wxTextCtrl* SDShaderErrorView;
+		wxPanel* SDShaderDisassembly;
+		wxTextCtrl* SDShaderDisassemblyView;
 		wxStaticText* SDStatusShader;
 		wxCheckBox* SDShaderEnable;
 		wxPanel* SDPanelShadersBottom;
@@ -85,6 +86,29 @@ class wxShaderDeveloper : public wxFrame
 		wxGrid* SDShaderConstSetGrid;
 		wxPanel* SDShaderSamplers;
 		wxGrid* SDShaderSamplerGrid;
+		wxPanel* SDPanelEffects;
+		wxSplitterWindow* SDSpitterEffects;
+		wxPanel* SDPanelEffectsTop;
+		wxBitmapComboBox* SDComboEffect;
+		wxToolBar* SDToolbarEffect;
+		wxBitmapButton* SDButtonEffectNew;
+		wxBitmapButton* SDButtonEffectLoad;
+		wxBitmapButton* SDButtonEffectSave;
+		wxBitmapButton* SDButtonEffectSaveAs;
+		wxButton* SDEffectCompile;
+		wxNotebook* SDEffectCodeSwitch;
+		wxPanel* SDEffectSource;
+		wxTextCtrl* SDEffectSourceEditor;
+		wxPanel* SDEffectErrors;
+		wxTextCtrl* SDEffectErrorView;
+		wxStaticText* SDStatusEffect;
+		wxCheckBox* SDEffectEnable;
+		wxPanel* SDPanelEffectsBottom;
+		wxNotebook* SDEffectVariables;
+		wxPanel* SDEffectConstants;
+		wxGrid* SDEffectConstSetGrid;
+		wxPanel* SDEffectTextures;
+		wxGrid* SDEffectTexturesGrid;
 		wxPanel* SDPanelScenes;
 		wxSplitterWindow* SDSplitterScenes;
 		wxPanel* SDPanelScenesTop;
@@ -110,7 +134,8 @@ class wxShaderDeveloper : public wxFrame
 		virtual void DoClose( wxCloseEvent& event ) { event.Skip(); }
 		virtual void DoResize( wxSizeEvent& event ) { event.Skip(); }
 		virtual void DoUpdate( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void DoOptions( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoShaderOptions( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoEffectOptions( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoRenderpassSwitch( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoViewSwitch( wxNotebookEvent& event ) { event.Skip(); }
 		virtual void DoShaderSwitch( wxCommandEvent& event ) { event.Skip(); }
@@ -119,8 +144,27 @@ class wxShaderDeveloper : public wxFrame
 		virtual void DoShaderSaveAs( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoShaderVersion( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoShaderCompile( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoShaderHighlight( wxKeyEvent& event ) { event.Skip(); }
 		virtual void DoShaderUpdate( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoAssemblerHighlight( wxKeyEvent& event ) { event.Skip(); }
 		virtual void DoShaderToggle( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoShaderConstantChange( wxGridEvent& event ) { event.Skip(); }
+		virtual void DoShaderConstantSelect( wxGridEvent& event ) { event.Skip(); }
+		virtual void DoShaderSamplerChange( wxGridEvent& event ) { event.Skip(); }
+		virtual void DoShaderSamplerSelect( wxGridEvent& event ) { event.Skip(); }
+		virtual void DoEffectSwitch( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoEffectAdd( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoEffectLoad( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoEffectSave( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoEffectSaveAs( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoEffectCompile( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoEffectHighlight( wxKeyEvent& event ) { event.Skip(); }
+		virtual void DoEffectUpdate( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoEffectToggle( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoEffectConstantChange( wxGridEvent& event ) { event.Skip(); }
+		virtual void DoEffectConstantSelect( wxGridEvent& event ) { event.Skip(); }
+		virtual void DoEffectTextureChange( wxGridEvent& event ) { event.Skip(); }
+		virtual void DoEffectTextureSelect( wxGridEvent& event ) { event.Skip(); }
 		virtual void DoScenesSwitch( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoSurfaceSwitch( wxNotebookEvent& event ) { event.Skip(); }
 		virtual void SDPaintRT( wxPaintEvent& event ) { event.Skip(); }
@@ -137,6 +181,12 @@ class wxShaderDeveloper : public wxFrame
 		{
 			SDSpitterShaders->SetSashPosition( 0 );
 			SDSpitterShaders->Disconnect( wxEVT_IDLE, wxIdleEventHandler( wxShaderDeveloper::SDSpitterShadersOnIdle ), NULL, this );
+		}
+		
+		void SDSpitterEffectsOnIdle( wxIdleEvent& )
+		{
+			SDSpitterEffects->SetSashPosition( 0 );
+			SDSpitterEffects->Disconnect( wxEVT_IDLE, wxIdleEventHandler( wxShaderDeveloper::SDSpitterEffectsOnIdle ), NULL, this );
 		}
 		
 		void SDSplitterScenesOnIdle( wxIdleEvent& )

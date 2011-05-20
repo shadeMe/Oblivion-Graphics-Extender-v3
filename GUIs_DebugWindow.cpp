@@ -5,30 +5,17 @@
 #include "D3D9.hpp"
 #include "D3D9Device.hpp"
 #include "GUIs_DebugWindow.hpp"
-#define	OBGE_DEVLING
+
 #ifdef	OBGE_DEVLING
 
+#include "EffectManager.h"
 #include "ShaderManager.h"
+#include "TextureManager.h"
+#include "TextureIOHook.hpp"
 #include "Half.hpp"
 
 static global<bool> DWEnabled(false, NULL, "General", "bEnabledDW");
 static global<bool> FullScreen(0, "Oblivion.ini", "Display", "bFull Screen");
-
-DebugWindow *dw = NULL;
-DebugWindow *DebugWindow::Create() {
-	if (!FullScreen.data && !dw)
-		dw = new DebugWindow();
-
-	return dw;
-}
-
-DebugWindow *DebugWindow::Expunge() {
-	if (DWEnabled.data) {
-		return DebugWindow::Create();
-	}
-
-	return NULL;
-}
 
 #define	OBGE_wx
 #ifndef	OBGE_wx
@@ -229,35 +216,17 @@ HWND DebugWindow::ControlActiveWindow(HWND org) {
 #include "GUIs_ShaderDeveloper.h"
 #include "GUIs_ShaderDeveloper.cpp"
 
-#define wxBName	      wxString((*BShader)->Name)
-#define wxBError      wxBitmap(wxT("#107"), wxBITMAP_TYPE_RESOURCE)
-#define wxBWarning    wxBitmap(wxT("#108"), wxBITMAP_TYPE_RESOURCE)
-#define wxBMissing    wxBitmap(wxT("#110"), wxBITMAP_TYPE_RESOURCE)
-#define wxBUnhooked   wxBitmap(wxT("#109"), wxBITMAP_TYPE_RESOURCE)
-#define wxBApplied    wxBitmap(wxT("#106"), wxBITMAP_TYPE_RESOURCE)
+#define SDVIEW_SHADER	0
+#define SDVIEW_EFFECT	1
+#define SDVIEW_SCENES	2
 
-#if 0
-D3DXPT_VOID,
-D3DXPT_BOOL,
-D3DXPT_INT,
-D3DXPT_FLOAT,
-D3DXPT_STRING,
-D3DXPT_TEXTURE,
-D3DXPT_TEXTURE1D,
-D3DXPT_TEXTURE2D,
-D3DXPT_TEXTURE3D,
-D3DXPT_TEXTURECUBE,
-D3DXPT_SAMPLER,
-D3DXPT_SAMPLER1D,
-D3DXPT_SAMPLER2D,
-D3DXPT_SAMPLER3D,
-D3DXPT_SAMPLERCUBE,
-D3DXPT_PIXELSHADER,
-D3DXPT_VERTEXSHADER,
-D3DXPT_PIXELFRAGMENT,
-D3DXPT_VERTEXFRAGMENT,
-D3DXPT_UNSUPPORTED,
-#endif
+#define wxBName		wxString((*BShader)->Name)
+#define wxMName		wxString((*MEffect)->Name)
+#define wxBMError	wxBitmap(wxT("#107"), wxBITMAP_TYPE_RESOURCE)
+#define wxBMWarning	wxBitmap(wxT("#108"), wxBITMAP_TYPE_RESOURCE)
+#define wxBMMissing	wxBitmap(wxT("#110"), wxBITMAP_TYPE_RESOURCE)
+#define wxBMUnhooked	wxBitmap(wxT("#109"), wxBITMAP_TYPE_RESOURCE)
+#define wxBMApplied	wxBitmap(wxT("#106"), wxBITMAP_TYPE_RESOURCE)
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Class wxShaderDeveloper
@@ -267,16 +236,37 @@ class GUIs_ShaderDeveloper : public wxShaderDeveloper
 public:
   GUIs_ShaderDeveloper(wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = wxEmptyString, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 630,704 ), long style = wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL) :
       wxShaderDeveloper(parent, id, title, pos, size, style) {
+    DefaultStyle.SetTextColour(wxColour("BLACK"));
+    CommentStyle.SetTextColour(wxColour("SEA GREEN"));
+    KeywordStyle.SetTextColour(wxColour("BLUE"));
+    FunctionStyle.SetTextColour(wxColour("RED"));
+    DeclaresStyle.SetTextColour(wxColour("ORANGE"));
   }
 
   ShaderManager *sm;
+  EffectManager *em;
   wxImage rt, ds;
   wxMemoryDC crt, cds;
   ShaderRecord *currs;
+  EffectRecord *currx;
   int currv;
   int fs[4];
   int pass;
   int scene;
+
+  /* --------------------------------------------------------------
+  */
+  std::vector<wxString> keywordsHLSL;
+  std::vector<wxString> keywordsAsm;
+  std::vector<char> symbols;
+
+  wxTextAttr DefaultStyle;
+  wxTextAttr CommentStyle;
+  wxTextAttr KeywordStyle;
+  wxTextAttr FunctionStyle;
+  wxTextAttr DeclaresStyle;
+  wxTextAttr PreprocessorStyle;
+  wxTextAttr SymbolStyle;
 
   /* --------------------------------------------------------------
    */
@@ -287,23 +277,90 @@ public:
     if (tex) {
       /* search render targets */
       if (sm) {
-        for (int p = 0; p < OBGEPASS_NUM; p++)
-        for (int s = 0; s < sm->trackd[p].frame_cntr; s++) {
-          IDirect3DSurface9 *pRenderTarget;
-          textureSurface *pTextureSurface;
+	for (int p = 0; p < OBGEPASS_NUM; p++)
+	  for (int s = 0; s < sm->trackd[p].frame_cntr; s++) {
+	    IDirect3DSurface9 *pRenderTarget;
+	    textureSurface *pTextureSurface;
 
-          if ((pRenderTarget = sm->trackd[p].rt[s]) && ((int)pRenderTarget != -1)) {
-	    if ((pTextureSurface = surfaceTexture[pRenderTarget])) {
-	      if (pTextureSurface->tex == tex) {
-	      	sprintf(buf, "RT of pass %d, scene %d", p, s);
-	      	return buf;
-              }
-            }
-          }
-        }
+	    if ((pRenderTarget = sm->trackd[p].rt[s]) && ((int)pRenderTarget != -1)) {
+	      if ((pTextureSurface = surfaceTexture[pRenderTarget])) {
+		if (pTextureSurface->tex == tex) {
+		  sprintf(buf, "RT of pass %d, scene %d", p, s);
+		  return buf;
+		}
+	      }
+	    }
+	  }
       }
 
-      sprintf(buf, "0x%08x", tex);
+      /* search alternate render targets */
+      if (em) {
+	if (em->OrigRT.IsTexture(tex))
+	  return "Incoming effects-rendertarget";
+	if (em->TrgtRT.IsTexture(tex))
+	  return "Outgoing effects-rendertarget";
+	if (em->CopyRT.IsTexture(tex))
+	  return "Alternating[0] effects-rendertarget";
+	if (em->LastRT.IsTexture(tex))
+	  return "Alternating[1] effects-rendertarget";
+	if (em->PrevRT.IsTexture(tex))
+	  return "Last pass effects-rendertarget copy";
+	if (em->PastRT.IsTexture(tex))
+	  return "Last frame effects-rendertarget copy";
+      }
+
+      /* search other render-targets */
+      std::map <void *, struct textureMap *>::iterator TRT = textureMaps.begin();
+      while (TRT != textureMaps.end()) {
+	if (TRT->second &&
+	    (TRT->second->Usage & D3DUSAGE_RENDERTARGET))
+	  if (TRT->first == tex) {
+	    sprintf(buf, "Unidentified rendertarget");
+	    return buf;
+	  }
+
+	TRT++;
+      }
+
+      /* search loaded texture files */
+      std::map<std::string, IDirect3DBaseTexture9 *>::iterator TFile = textureFiles.begin();
+      while (TFile != textureFiles.end()) {
+      	if ((*TFile).second == tex) {
+	  std::string str = (*TFile).first;
+	  const char *ptr = str.data(), *ofs;
+
+	  if ((ofs = strstr(ptr, "Textures\\")) ||
+	      (ofs = strstr(ptr, "textures\\")) ||
+	      (ofs = strstr(ptr, "textures/"))) {
+	    sprintf(buf, "%s", ofs + 9);
+	  }
+	  else
+	    sprintf(buf, "%s", ptr);
+
+	  return buf;
+      	}
+
+      	TFile++;
+      }
+
+      /* search managed texture files */
+      TextureManager *em = TextureManager::GetSingleton(); 
+      int TexNum = em->FindTexture(tex); ManagedTextureRecord *Tex;
+      if ((TexNum != -1) && (Tex = em->GetTexture(TexNum))) {
+	const char *ptr = Tex->GetPath(), *ofs;
+
+	if ((ofs = strstr(ptr, "Textures\\")) ||
+	    (ofs = strstr(ptr, "textures\\")) ||
+	    (ofs = strstr(ptr, "textures/"))) {
+	  sprintf(buf, "%s", ofs + 9);
+	}
+	else
+	  sprintf(buf, "%s", ptr);
+
+	return buf;
+      }
+
+      sprintf(buf, "0x%p", tex);
     }
     else
       strcpy(buf, "cleared");
@@ -314,7 +371,7 @@ public:
   /* --------------------------------------------------------------
    */
 
-  void SetConstantTable(wxGrid *gt, bool prefix, LPD3DXCONSTANTTABLE c, int len, int col, int offs) {
+  void SetShaderConstantTable(wxGrid *gt, bool prefix, LPD3DXCONSTANTTABLE c, int len, int col, int offs) {
     D3DXCONSTANTTABLE_DESC desc;
     D3DXCONSTANT_DESC cnst;
     UINT count = 1;
@@ -395,7 +452,7 @@ public:
     }
   }
 
-  void SetConstSetTable(wxGrid *gt, bool prefix, struct RuntimeShaderRecord::trace *t, int len, int col, int offs) {
+  void SetShaderConstSetTable(wxGrid *gt, bool prefix, struct RuntimeShaderRecord::trace *t, int len, int col, int offs) {
     char buf[256];
 
     if (gt && t) {
@@ -413,6 +470,17 @@ public:
 
 	      gt->SetCellTextColour(pos + x, col, clr);
 	      gt->SetCellValue(pos + x, col, wxString(buf));
+
+	      /* non-editable cell */
+	      wxString Description = gt->GetCellValue(pos + x, col - 1);
+	      if ((Description.GetData() == strstr(Description.GetData(), "cust_"))) {
+		gt->SetReadOnly(pos + x, col, false);
+		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ));
+	      }
+	      else {
+		gt->SetReadOnly(pos + x, col, true);
+		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ));
+	      }
 	    }
 	  }
 	}
@@ -430,6 +498,17 @@ public:
 
 	      gt->SetCellTextColour(pos + x, col, clr);
 	      gt->SetCellValue(pos + x, col, wxString(buf));
+
+	      /* non-editable cell */
+	      wxString Description = gt->GetCellValue(pos + x, col - 1);
+	      if ((Description.GetData() == strstr(Description.GetData(), "cust_"))) {
+		gt->SetReadOnly(pos + x, col, false);
+		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ));
+	      }
+	      else {
+		gt->SetReadOnly(pos + x, col, true);
+		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ));
+	      }
 	    }
 	  }
 	}
@@ -445,22 +524,36 @@ public:
 	    if (*((int *)&t->values_c[x][0]) != -1) {
 	      sprintf(buf, "%f, %f, %f, %f", t->values_c[x][0], t->values_c[x][1], t->values_c[x][2], t->values_c[x][3]);
 
-	      wxString meaning = gt->GetCellValue(pos + x, col - 1);
-	      if (strstr(meaning.GetData(), "color") ||
-		  strstr(meaning.GetData(), "Color")) {
-		unsigned long b = (unsigned long)(t->values_c[x][0] * 255);
-		unsigned long g = (unsigned long)(t->values_c[x][1] * 255);
-		unsigned long r = (unsigned long)(t->values_c[x][2] * 255);
+	      gt->SetCellValue(pos + x, col, wxString(buf));
 
-		gt->SetCellBackgroundColour(pos + x, col,
-		  wxColour((r << 16) | (g << 8) | (b << 0)));
-		gt->SetCellTextColour(pos + x, col,
-		  wxColour(((255 - r) << 16) | ((255 - g) << 8) | ((255 - b) << 0)));
+	      /* non-editable cell */
+	      wxString Description = gt->GetCellValue(pos + x, col - 1);
+	      if ((Description.GetData() == strstr(Description.GetData(), "cust_"))) {
+		gt->SetReadOnly(pos + x, col, false);
+		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ));
+	      }
+	      else {
+		gt->SetReadOnly(pos + x, col, true);
+		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ));
+	      }
+
+	      wxString meaning0 = gt->GetCellValue(pos + x, col - 2);
+	      wxString meaning1 = gt->GetCellValue(pos + x, col - 1);
+	      if (strstr(meaning0.GetData(), "color") ||
+		  strstr(meaning0.GetData(), "Color") ||
+		  strstr(meaning1.GetData(), "color") ||
+		  strstr(meaning1.GetData(), "Color")) {
+		  unsigned long b = (unsigned long)(t->values_c[x][0] * 255);
+		  unsigned long g = (unsigned long)(t->values_c[x][1] * 255);
+		  unsigned long r = (unsigned long)(t->values_c[x][2] * 255);
+
+		  gt->SetCellBackgroundColour(pos + x, col,
+		    wxColour((r << 16) | (g << 8) | (b << 0)));
+		  gt->SetCellTextColour(pos + x, col,
+		    wxColour(((255 - r) << 16) | ((255 - g) << 8) | ((255 - b) << 0)));
 	      }
 	      else
 		gt->SetCellTextColour(pos + x, col, clr);
-
-	      gt->SetCellValue(pos + x, col, wxString(buf));
 	    }
 	  }
 	}
@@ -478,6 +571,17 @@ public:
 
 	      gt->SetCellTextColour(pos + x, col, clr);
 	      gt->SetCellValue(pos + x, col, wxString(dt));
+
+	      /* non-editable cell */
+	      wxString Description = gt->GetCellValue(pos + x, col - 1);
+	      if ((Description.GetData() == strstr(Description.GetData(), "cust_"))) {
+		gt->SetReadOnly(pos + x, col, false);
+		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ));
+	      }
+	      else {
+		gt->SetReadOnly(pos + x, col, true);
+		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ));
+	      }
 	    }
 	  }
 	}
@@ -485,7 +589,7 @@ public:
     }
   }
 
-  void SetSamplerTable(wxGrid *gt, bool prefix, struct RuntimeShaderRecord::trace *t, int len, int col, int offs) {
+  void SetShaderSamplerTable(wxGrid *gt, bool prefix, struct RuntimeShaderRecord::trace *t, int len, int col, int offs) {
     char buf[256];
 
     if (gt && t) {
@@ -502,9 +606,11 @@ public:
 	    wxColour clr = wxColour("DARK GREEN");
 	    gt->SetCellTextColour(pos + d, col + 0, clr);
 	    gt->SetCellValue(pos + d, col + 0, wxString("Texture"));
+	    gt->SetReadOnly(pos + d, col + 0, true);
 
 	    const char *dt = DescribeTexture(t->values_s[x]);
 	    gt->SetCellValue(pos + d, col + 1, wxString(dt));
+	    gt->SetReadOnly(pos + d, col + 1, true);
 
 	    d++;
 	  }
@@ -520,62 +626,188 @@ public:
 
 	      sprintf(buf, "%s", findSamplerState((D3DSAMPLERSTATETYPE)y));
 	      gt->SetCellValue(pos + d, col + 0, wxString(buf));
+	      gt->SetReadOnly(pos + d, col + 0, true);
 
-	      switch ((D3DSAMPLERSTATETYPE)y) {
-	      	case D3DSAMP_ADDRESSU:
-	      	case D3DSAMP_ADDRESSV:
-		case D3DSAMP_ADDRESSW:
-		  switch ((D3DTEXTUREADDRESS)t->states_s[x][y]) {
-		    case D3DTADDRESS_WRAP:       strcpy(buf, "WRAP"); break;
-		    case D3DTADDRESS_MIRROR:     strcpy(buf, "MIRROR"); break;
-		    case D3DTADDRESS_CLAMP:      strcpy(buf, "CLAMP"); break;
-		    case D3DTADDRESS_BORDER:     strcpy(buf, "BORDER"); break;
-		    case D3DTADDRESS_MIRRORONCE: strcpy(buf, "MIRRORONCE"); break;
-		    default: sprintf(buf, "%d", t->states_s[x][y]); break;
-		  }
-	      	  break;
-	      	// hex
-	      	case D3DSAMP_BORDERCOLOR:
-	          sprintf(buf, "0x%08x", t->states_s[x][y]);
-	      	  break;
-	      	case D3DSAMP_MAGFILTER:
-	      	case D3DSAMP_MINFILTER:
-	      	case D3DSAMP_MIPFILTER:
-		  switch ((D3DTEXTUREFILTERTYPE)t->states_s[x][y]) {
-		    case D3DTEXF_NONE:          strcpy(buf, "NONE"); break;
-		    case D3DTEXF_POINT:         strcpy(buf, "POINT"); break;
-		    case D3DTEXF_LINEAR:        strcpy(buf, "LINEAR"); break;
-		    case D3DTEXF_ANISOTROPIC:   strcpy(buf, "ANISOTROPIC"); break;
-		    case D3DTEXF_PYRAMIDALQUAD: strcpy(buf, "PYRAMIDALQUAD"); break;
-		    case D3DTEXF_GAUSSIANQUAD:  strcpy(buf, "GAUSSIANQUAD"); break;
-		    default: sprintf(buf, "%d", t->states_s[x][y]); break;
-		  }
-	      	  break;
-	      	// float
-	      	case D3DSAMP_MIPMAPLODBIAS:	// deviation <>1.0
-	      	case D3DSAMP_SRGBTEXTURE:	// gamma <>1.0
-	          sprintf(buf, "%f", *((float *)&t->states_s[x][y]));
-	      	  break;
-	      	// int
-	      	case D3DSAMP_MAXMIPLEVEL:
-	      	case D3DSAMP_MAXANISOTROPY:
-	      	case D3DSAMP_ELEMENTINDEX:
-	          sprintf(buf, "%d", t->states_s[x][y]);
-	      	  break;
-	      	// long
-	      	case D3DSAMP_DMAPOFFSET:
-	          sprintf(buf, "%d", t->states_s[x][y]);
-	      	  break;
-	      	// unknown
-	      	default:
-	          sprintf(buf, "0x%08x", t->states_s[x][y]);
-	      	  break;
-	      }
-
+	      sprintf(buf, "%s", findSamplerStateValue((D3DSAMPLERSTATETYPE)y, t->states_s[x][y]));
 	      gt->SetCellValue(pos + d, col + 1, wxString(buf));
+	      gt->SetReadOnly(pos + d, col + 1, true);
 
 	      d++;
 	    }
+	  }
+	}
+      }
+    }
+  }
+
+  void SetEffectConstSetTable(wxGrid *gt, bool prefix, ID3DXEffect *x, int len, int col, int offs) {
+    char buf[256];
+
+    if (gt && x) {
+      int pos = offs + 0, d = 0;
+      D3DXEFFECT_DESC Description;
+      x->GetDesc(&Description);
+
+      for (int par = 0; par < Description.Parameters; par++) {
+	D3DXHANDLE handle;
+
+	if ((handle = x->GetParameter(NULL, par))) {
+	  D3DXPARAMETER_DESC Description;
+	  x->GetParameterDesc(handle, &Description);
+
+	  switch (Description.Type) {
+	    case D3DXPT_INT: {
+	      IntType IntData;
+
+	      IntData.size = Description.Elements;
+	      if (IntData.size == 0)
+		IntData.size = 1;
+	      IntData.size *= Description.Columns;
+
+	      x->GetIntArray(handle, (int *)&IntData.data, IntData.size * Description.Rows);
+
+	      for (int rw = 0; rw < Description.Rows; rw++) {
+		gt->InsertRows(pos + d, 1);
+
+		if (Description.Rows > 1)
+		  sprintf(buf, "%s[%d]", Description.Name, rw);
+		else
+		  sprintf(buf, "%s", Description.Name);
+
+		gt->SetRowLabelValue(pos + d, wxString(buf));
+
+		buf[0] = '\0';
+		for (int i = rw * IntData.size; i < (rw + 1) * IntData.size; i++)
+		  sprintf(buf, "%s%d%s", buf, IntData.data[i], i != ((rw + 1) * IntData.size - 1) ? ", " : "");
+
+		wxColour clr = wxColour("BLUE");
+		gt->SetCellTextColour(pos + d, col + 0, clr);
+		gt->SetCellValue(pos + d, col + 0, wxString(buf));
+
+		/* non-editable cell */
+		if ((Description.Name != strstr(Description.Name, "obge_")) &&
+		    (Description.Name != strstr(Description.Name, "oblv_"))) {
+		  gt->SetReadOnly(pos + d, col, false);
+		  gt->SetCellBackgroundColour(pos + d, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ));
+		}
+		else {
+		  gt->SetReadOnly(pos + d, col, true);
+		  gt->SetCellBackgroundColour(pos + d, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ));
+		}
+
+		d++;
+	      }
+	    } break;
+	    case D3DXPT_FLOAT: {
+	      FloatType FloatData;
+
+	      FloatData.size = Description.Elements;
+	      if (FloatData.size == 0)
+		FloatData.size = 1;
+	      FloatData.size *= Description.Columns;
+
+	      x->GetFloatArray(handle, (float *)&FloatData.data, FloatData.size * Description.Rows);
+
+	      for (int rw = 0; rw < Description.Rows; rw++) {
+		gt->InsertRows(pos + d, 1);
+
+		if (Description.Rows > 1)
+		  sprintf(buf, "%s[%d]", Description.Name, rw);
+		else
+		  sprintf(buf, "%s", Description.Name);
+
+		gt->SetRowLabelValue(pos + d, wxString(buf));
+
+		buf[0] = '\0';
+		for (int i = rw * FloatData.size; i < (rw + 1) * FloatData.size; i++)
+		  sprintf(buf, "%s%f%s", buf, FloatData.data[i], i != ((rw + 1) * FloatData.size - 1) ? ", " : "");
+
+		wxColour clr = wxColour("BLUE");
+		gt->SetCellTextColour(pos + d, col + 0, clr);
+		gt->SetCellValue(pos + d, col + 0, wxString(buf));
+
+		/* non-editable cell */
+		if ((Description.Name != strstr(Description.Name, "obge_")) &&
+		    (Description.Name != strstr(Description.Name, "oblv_"))) {
+		  gt->SetReadOnly(pos + d, col, false);
+		  gt->SetCellBackgroundColour(pos + d, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ));
+		}
+		else {
+		  gt->SetReadOnly(pos + d, col, true);
+		  gt->SetCellBackgroundColour(pos + d, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ));
+		}
+
+		if (strstr(Description.Name, "color") ||
+		    strstr(Description.Name, "Color")) {
+		    unsigned long b = (unsigned long)(FloatData.data[0] * 255);
+		    unsigned long g = (unsigned long)(FloatData.data[1] * 255);
+		    unsigned long r = (unsigned long)(FloatData.data[2] * 255);
+
+		    gt->SetCellBackgroundColour(pos + d, col,
+		      wxColour((r << 16) | (g << 8) | (b << 0)));
+		    gt->SetCellTextColour(pos + d, col,
+		      wxColour(((255 - r) << 16) | ((255 - g) << 8) | ((255 - b) << 0)));
+		}
+		else
+		  gt->SetCellTextColour(pos + d, col, clr);
+
+		d++;
+	      }
+	    } break;
+	  }
+	}
+      }
+    }
+  }
+
+  void SetEffectTextureTable(wxGrid *gt, bool prefix, ID3DXEffect *x, int len, int col, int offs) {
+//  char buf[256];
+
+    if (gt && x) {
+      int pos = offs + 0, d = 0;
+      TextureManager *TexMan = TextureManager::GetSingleton();
+      D3DXEFFECT_DESC Description;
+      x->GetDesc(&Description);
+
+      for (int par = 0; par < Description.Parameters; par++) {
+	D3DXHANDLE handle;
+
+	if ((handle = x->GetParameter(NULL, par))) {
+	  D3DXPARAMETER_DESC Description;
+	  x->GetParameterDesc(handle, &Description);
+
+	  switch (Description.Type) {
+	    case D3DXPT_TEXTURE:
+	    case D3DXPT_TEXTURE1D:
+	    case D3DXPT_TEXTURE2D:
+	    case D3DXPT_TEXTURE3D:
+	    case D3DXPT_TEXTURECUBE: {
+	      IDirect3DBaseTexture9 *Texture = NULL;
+	      x->GetTexture(handle, &Texture);
+
+	      {
+		gt->InsertRows(pos + d, 1);
+
+		gt->SetRowLabelValue(pos + d, wxString(Description.Name));
+
+		wxColour clr = wxColour("DARK GREEN");
+		gt->SetCellTextColour(pos + d, col + 0, clr);
+		gt->SetCellValue(pos + d, col + 0, wxString(DescribeTexture(Texture)));
+
+		/* non-editable cell */
+		if ((Description.Name != strstr(Description.Name, "obge_")) &&
+		    (Description.Name != strstr(Description.Name, "oblv_"))) {
+		  gt->SetReadOnly(pos + d, col, false);
+		  gt->SetCellBackgroundColour(pos + d, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ));
+		}
+		else {
+		  gt->SetReadOnly(pos + d, col, true);
+		  gt->SetCellBackgroundColour(pos + d, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ));
+		}
+
+		d++;
+	      }
+	    } break;
 	  }
 	}
       }
@@ -588,24 +820,27 @@ public:
     if (gt && t) {
       int pos = offs + 0, d = 0;
 
-      for (int v = 0; v < 2; v++)
-      for (int x = 0; x < 4; x++) {
-        gt->InsertRows(pos + d, 1);
+      for (int v = 0; v < 3; v++) {
+        if (*((int *)&t->transf[o][v].m[0][0]) != -1) {
+          for (int x = 0; x < 4; x++) {
+            gt->InsertRows(pos + d, 1);
 
-        sprintf(buf, "%d", d);
-        gt->SetRowLabelValue(pos + d, wxString(buf));
+            sprintf(buf, "%d", d);
+            gt->SetRowLabelValue(pos + d, wxString(buf));
 
-        wxColour clr = wxColour("BLUE");
+            wxColour clr = wxColour("BLUE");
 
-	sprintf(buf, "%s[%d]", v ? "Projection" : "View", x);
-        gt->SetCellTextColour(pos + d, col + 0, clr);
-        gt->SetCellValue(pos + d, col + 0, wxString(buf));
+	    sprintf(buf, "%s[%d]", v == 0 ? "View" : (v == 1 ? "Projection" : "World"), x);
+            gt->SetCellTextColour(pos + d, col + 0, clr);
+            gt->SetCellValue(pos + d, col + 0, wxString(buf));
 
-	sprintf(buf, "%f, %f, %f, %f", t->transf[o][v].m[x][0], t->transf[o][v].m[x][1], t->transf[o][v].m[x][2], t->transf[o][v].m[x][3]);
-        gt->SetCellTextColour(pos + d, col + 1, clr);
-        gt->SetCellValue(pos + d, col + 1, wxString(buf));
+	    sprintf(buf, "%f, %f, %f, %f", t->transf[o][v].m[x][0], t->transf[o][v].m[x][1], t->transf[o][v].m[x][2], t->transf[o][v].m[x][3]);
+            gt->SetCellTextColour(pos + d, col + 1, clr);
+            gt->SetCellValue(pos + d, col + 1, wxString(buf));
 
-        d++;
+            d++;
+          }
+        }
       }
 
       for (int y = 0; y < 210; y++) {
@@ -621,185 +856,7 @@ public:
           sprintf(buf, "%s", findRenderState((D3DRENDERSTATETYPE)y));
           gt->SetCellValue(pos + d, col + 0, wxString(buf));
 
-	  switch ((D3DRENDERSTATETYPE)y) {
-	    case D3DRS_ZENABLE:
-	      switch ((D3DZBUFFERTYPE)t->states[o][y]) {
-		case D3DZB_FALSE: strcpy(buf, "FALSE"); break;
-		case D3DZB_TRUE:  strcpy(buf, "TRUE"); break;
-		case D3DZB_USEW:  strcpy(buf, "USEW"); break;
-		default: sprintf(buf, "%d", t->states[o][y]); break;
-	      }
-	      break;
-	    case D3DRS_FILLMODE:
-	      switch ((D3DFILLMODE)t->states[o][y]) {
-		case D3DFILL_POINT:     strcpy(buf, "POINT"); break;
-		case D3DFILL_WIREFRAME: strcpy(buf, "WIREFRAME"); break;
-		case D3DFILL_SOLID:     strcpy(buf, "SOLID"); break;
-		default: sprintf(buf, "%d", t->states[o][y]); break;
-	      }
-	      break;
-	    case D3DRS_SHADEMODE:
-	      switch ((D3DSHADEMODE)t->states[o][y]) {
-		case D3DSHADE_FLAT:    strcpy(buf, "FLAT"); break;
-		case D3DSHADE_GOURAUD: strcpy(buf, "GOURAUD"); break;
-		case D3DSHADE_PHONG:   strcpy(buf, "PHONG"); break;
-		default: sprintf(buf, "%d", t->states[o][y]); break;
-	      }
-	      break;
-	    case D3DRS_SRCBLEND:
-	    case D3DRS_DESTBLEND:
-	      switch ((D3DBLEND)t->states[o][y]) {
-	        case D3DBLEND_ZERO           : strcpy(buf, "ZERO"); break;
-	        case D3DBLEND_ONE            : strcpy(buf, "ONE"); break;
-	        case D3DBLEND_SRCCOLOR       : strcpy(buf, "SRCCOLOR"); break;
-	        case D3DBLEND_INVSRCCOLOR    : strcpy(buf, "INVSRCCOLOR"); break;
-	        case D3DBLEND_SRCALPHA       : strcpy(buf, "SRCALPHA"); break;
-	        case D3DBLEND_INVSRCALPHA    : strcpy(buf, "INVSRCALPHA"); break;
-	        case D3DBLEND_DESTALPHA      : strcpy(buf, "DESTALPHA"); break;
-	        case D3DBLEND_INVDESTALPHA   : strcpy(buf, "INVDESTALPHA"); break;
-	        case D3DBLEND_DESTCOLOR      : strcpy(buf, "DESTCOLOR"); break;
-	        case D3DBLEND_INVDESTCOLOR   : strcpy(buf, "INVDESTCOLOR"); break;
-	        case D3DBLEND_SRCALPHASAT    : strcpy(buf, "SRCALPHASAT"); break;
-	        case D3DBLEND_BOTHSRCALPHA   : strcpy(buf, "BOTHSRCALPHA"); break;
-	        case D3DBLEND_BOTHINVSRCALPHA: strcpy(buf, "BOTHINVSRCALPHA"); break;
-	        case D3DBLEND_BLENDFACTOR    : strcpy(buf, "BLENDFACTOR"); break;
-	        case D3DBLEND_INVBLENDFACTOR : strcpy(buf, "INVBLENDFACTOR"); break;
-	        case D3DBLEND_SRCCOLOR2      : strcpy(buf, "SRCCOLOR2"); break;
-	        case D3DBLEND_INVSRCCOLOR2   : strcpy(buf, "INVSRCCOLOR2"); break;
-		default: sprintf(buf, "%d", t->states[o][y]); break;
-	      }
-	      break;
-	    case D3DRS_CULLMODE:
-	      switch ((D3DCULL)t->states[o][y]) {
-		case D3DCULL_NONE: strcpy(buf, "NONE"); break;
-		case D3DCULL_CW:   strcpy(buf, "CW"); break;
-		case D3DCULL_CCW:  strcpy(buf, "CCW"); break;
-		default: sprintf(buf, "%d", t->states[o][y]); break;
-	      }
-	      break;
-	    case D3DRS_FOGTABLEMODE:
-	    case D3DRS_FOGVERTEXMODE:
-	      switch ((D3DFOGMODE)t->states[o][y]) {
-		case D3DFOG_NONE:   strcpy(buf, "NONE"); break;
-		case D3DFOG_EXP:    strcpy(buf, "EXP"); break;
-		case D3DFOG_EXP2:   strcpy(buf, "EXP2"); break;
-		case D3DFOG_LINEAR: strcpy(buf, "LINEAR"); break;
-		default: sprintf(buf, "%d", t->states[o][y]); break;
-	      }
-	      break;
-	    case D3DRS_ZFUNC:
-	    case D3DRS_ALPHAFUNC:
-	    case D3DRS_STENCILFUNC:
-	    case D3DRS_CCW_STENCILFUNC:
-	      switch ((D3DCMPFUNC)t->states[o][y]) {
-		case D3DCMP_NEVER       : strcpy(buf, "NEVER"); break;
-		case D3DCMP_LESS        : strcpy(buf, "LESS"); break;
-		case D3DCMP_EQUAL       : strcpy(buf, "EQUAL"); break;
-		case D3DCMP_LESSEQUAL   : strcpy(buf, "LESSEQUAL"); break;
-		case D3DCMP_GREATER     : strcpy(buf, "GREATER"); break;
-		case D3DCMP_NOTEQUAL    : strcpy(buf, "NOTEQUAL"); break;
-		case D3DCMP_GREATEREQUAL: strcpy(buf, "GREATEREQUAL"); break;
-		case D3DCMP_ALWAYS      : strcpy(buf, "ALWAYS"); break;
-		default: sprintf(buf, "%d", t->states[o][y]); break;
-	      }
-	      break;
-	    case D3DRS_BLENDOP:
-	    case D3DRS_SRCBLENDALPHA:
-	    case D3DRS_DESTBLENDALPHA:
-	    case D3DRS_BLENDOPALPHA:
-	      switch ((D3DBLENDOP)t->states[o][y]) {
-	        case D3DBLENDOP_ADD        : strcpy(buf, "ADD"); break;
-	        case D3DBLENDOP_SUBTRACT   : strcpy(buf, "SUBTRACT"); break;
-	        case D3DBLENDOP_REVSUBTRACT: strcpy(buf, "REVSUBTRACT"); break;
-	        case D3DBLENDOP_MIN        : strcpy(buf, "MIN"); break;
-	        case D3DBLENDOP_MAX        : strcpy(buf, "MAX"); break;
-		default: sprintf(buf, "%d", t->states[o][y]); break;
-	      }
-	      break;
-	    case D3DRS_STENCILFAIL:
-	    case D3DRS_STENCILZFAIL:
-	    case D3DRS_STENCILPASS:
-	    case D3DRS_CCW_STENCILFAIL:
-	    case D3DRS_CCW_STENCILZFAIL:
-	    case D3DRS_CCW_STENCILPASS:
-	      switch ((D3DSTENCILOP)t->states[o][y]) {
-	        case D3DSTENCILOP_KEEP   : strcpy(buf, "KEEP"); break;
-	        case D3DSTENCILOP_ZERO   : strcpy(buf, "ZERO"); break;
-	        case D3DSTENCILOP_REPLACE: strcpy(buf, "REPLACE"); break;
-	        case D3DSTENCILOP_INCRSAT: strcpy(buf, "INCRSAT"); break;
-	        case D3DSTENCILOP_DECRSAT: strcpy(buf, "DECRSAT"); break;
-	        case D3DSTENCILOP_INVERT : strcpy(buf, "INVERT"); break;
-	        case D3DSTENCILOP_INCR   : strcpy(buf, "INCR"); break;
-	        case D3DSTENCILOP_DECR   : strcpy(buf, "DECR"); break;
-		default: sprintf(buf, "%d", t->states[o][y]); break;
-	      }
-	      break;
-	    // bool
-	    case D3DRS_ZWRITEENABLE:
-	    case D3DRS_ALPHATESTENABLE:
-	    case D3DRS_LASTPIXEL:
-	    case D3DRS_DITHERENABLE:
-	    case D3DRS_ALPHABLENDENABLE:
-	    case D3DRS_FOGENABLE:
-	    case D3DRS_SPECULARENABLE:
-	    case D3DRS_RANGEFOGENABLE:
-	    case D3DRS_STENCILENABLE:
-	    case D3DRS_CLIPPING:
-	    case D3DRS_LIGHTING:
-	    case D3DRS_COLORVERTEX:
-	    case D3DRS_LOCALVIEWER:
-	    case D3DRS_NORMALIZENORMALS:
-	    case D3DRS_POINTSPRITEENABLE:
-	    case D3DRS_POINTSCALEENABLE:
-	    case D3DRS_MULTISAMPLEANTIALIAS:
-	    case D3DRS_INDEXEDVERTEXBLENDENABLE:
-	    case D3DRS_ANTIALIASEDLINEENABLE:
-	    case D3DRS_TWOSIDEDSTENCILMODE:
-	    case D3DRS_SRGBWRITEENABLE:
-	    case D3DRS_SEPARATEALPHABLENDENABLE:
-	      strcpy(buf, t->states[o][y] ? "TRUE" : "FALSE");
-	      break;
-	    // float
-	    case D3DRS_FOGSTART:
-	    case D3DRS_FOGEND:
-	    case D3DRS_FOGDENSITY:
-	    case D3DRS_POINTSIZE:
-	    case D3DRS_POINTSIZE_MIN:
-	    case D3DRS_POINTSCALE_A:
-	    case D3DRS_POINTSCALE_B:
-	    case D3DRS_POINTSCALE_C:
-	    case D3DRS_POINTSIZE_MAX:
-	    case D3DRS_TWEENFACTOR:
-	    case D3DRS_DEPTHBIAS:
-	      sprintf(buf, "%f", *((float *)&t->states[o][y]));
-	      break;
-	    // long
-	    case D3DRS_ALPHAREF:
-	    case D3DRS_STENCILREF:
-	    case D3DRS_VERTEXBLEND:
-	      sprintf(buf, "%d", t->states[o][y]);
-	      break;
-	    // mask
-	    case D3DRS_COLORWRITEENABLE:
-	      sprintf(buf, "0x%02x", t->states[o][y]);
-	      break;
-	    // hex
-	    case D3DRS_STENCILMASK:
-	    case D3DRS_STENCILWRITEMASK:
-	    case D3DRS_CLIPPLANEENABLE:
-	    case D3DRS_MULTISAMPLEMASK:
-	      sprintf(buf, "0x%08x", t->states[o][y]);
-	      break;
-	    // unknown
-	    case D3DRS_FOGCOLOR:
-	    case D3DRS_BLENDFACTOR:
-	    case D3DRS_TEXTUREFACTOR:
-	    case D3DRS_AMBIENT:
-            default:
-              sprintf(buf, "%d", t->states[o][y]);
-              break;
-          }
-
+	  sprintf(buf, "%s", findRenderStateValue((D3DRENDERSTATETYPE)y, t->states[o][y]));
           gt->SetCellValue(pos + d, col + 1, wxString(buf));
 
           d++;
@@ -811,7 +868,7 @@ public:
   /* --------------------------------------------------------------
    */
 
-  void SetConstantTable(ShaderRecord *o) {
+  void SetShaderConstantTable(ShaderRecord *o) {
     wxGrid *gt = SDShaderConstantGrid;
 
     memset(fs, 0, sizeof(fs));
@@ -837,9 +894,9 @@ public:
       gt->SetRowLabelValue(2, wxT("Binary Size"));
       gt->SetRowLabelValue(3, wxT("Constants"));
 
-      SetConstantTable(gt, true, o->pConstsOriginal, o->pShaderOriginal ? o->pShaderOriginal->GetBufferSize() : -1, 0, 0);
-      SetConstantTable(gt, true, o->pConstsReplaced, o->pShaderReplaced ? o->pShaderReplaced->GetBufferSize() : -1, 1, 0);
-      SetConstantTable(gt, true, o->pConstsRuntime , o->pShaderRuntime  ? o->pShaderRuntime->GetBufferSize()  : -1, 2, 0);
+      SetShaderConstantTable(gt, true, o->pConstsOriginal, o->pShaderOriginal ? o->pShaderOriginal->GetBufferSize() : -1, 0, 0);
+      SetShaderConstantTable(gt, true, o->pConstsReplaced, o->pShaderReplaced ? o->pShaderReplaced->GetBufferSize() : -1, 1, 0);
+      SetShaderConstantTable(gt, true, o->pConstsRuntime , o->pShaderRuntime  ? o->pShaderRuntime->GetBufferSize()  : -1, 2, 0);
     }
 
     wxSize sz = gt->GetClientSize();
@@ -849,7 +906,7 @@ public:
     gt->SetColSize(2, dv / 3);
   }
 
-  void SetConstSetTable(ShaderRecord *o) {
+  void SetShaderConstSetTable(ShaderRecord *o) {
     wxGrid *gt = SDShaderConstSetGrid;
 
     memset(fs, 0, sizeof(fs));
@@ -870,18 +927,18 @@ public:
       if (gt->GetNumberRows() > 0)
 	gt->DeleteRows(0, gt->GetNumberRows() - 0);
 
-      SetConstantTable(gt, false, o->pConstsOriginal, o->pShaderOriginal ? o->pShaderOriginal->GetBufferSize() : -1, 0, 0);
+      SetShaderConstantTable(gt, false, o->pConstsOriginal, o->pShaderOriginal ? o->pShaderOriginal->GetBufferSize() : -1, 0, 0);
 
       switch (o->pDX9ShaderType) {
 	default:
-	case SHADER_REPLACED: SetConstantTable(gt, false, o->pConstsReplaced, o->pShaderReplaced ? o->pShaderReplaced->GetBufferSize() : -1, 1, 0); break;
-	case SHADER_ORIGINAL: SetConstantTable(gt, false, o->pConstsOriginal, o->pShaderOriginal ? o->pShaderOriginal->GetBufferSize() : -1, 1, 0); break;
-	case SHADER_RUNTIME : SetConstantTable(gt, false, o->pConstsRuntime , o->pShaderRuntime  ? o->pShaderRuntime->GetBufferSize()  : -1, 1, 0); break;
+	case SHADER_REPLACED: SetShaderConstantTable(gt, false, o->pConstsReplaced, o->pShaderReplaced ? o->pShaderReplaced->GetBufferSize() : -1, 1, 0); break;
+	case SHADER_ORIGINAL: SetShaderConstantTable(gt, false, o->pConstsOriginal, o->pShaderOriginal ? o->pShaderOriginal->GetBufferSize() : -1, 1, 0); break;
+	case SHADER_RUNTIME : SetShaderConstantTable(gt, false, o->pConstsRuntime , o->pShaderRuntime  ? o->pShaderRuntime->GetBufferSize()  : -1, 1, 0); break;
       }
 
       RuntimeShaderRecord *r = o->pAssociate;
       if (r->frame_used[pass] >= 0)
-	SetConstSetTable(gt, false, &r->traced[pass], -1, 2, 0);
+	SetShaderConstSetTable(gt, false, &r->traced[pass], -1, 2, 0);
     }
 
     wxSize sz = gt->GetClientSize();
@@ -891,7 +948,7 @@ public:
     gt->SetColSize(2, dv / 2);
   }
 
-  void SetSamplerTable(ShaderRecord *o) {
+  void SetShaderSamplerTable(ShaderRecord *o) {
     wxGrid *gt = SDShaderSamplerGrid;
 
     memset(fs, 0, sizeof(fs));
@@ -913,7 +970,7 @@ public:
 
       RuntimeShaderRecord *r = o->pAssociate;
       if (r->frame_used[pass] >= 0)
-	SetSamplerTable(gt, false, &r->traced[pass], -1, 0, 0);
+	SetShaderSamplerTable(gt, false, &r->traced[pass], -1, 0, 0);
     }
 
     wxSize sz = gt->GetClientSize();
@@ -922,7 +979,73 @@ public:
     gt->SetColSize(1, dv / 2);
   }
 
+  /* --------------------------------------------------------------
+   */
+
+  void SetEffectConstantTable(EffectRecord *o) {
+  }
+
+  void SetEffectConstSetTable(EffectRecord *o) {
+    wxGrid *gt = SDEffectConstSetGrid;
+
+    memset(fs, 0, sizeof(fs));
+    gt->ClearGrid();
+
+    if (1 > gt->GetNumberCols())
+      gt->AppendCols(1 - gt->GetNumberCols());
+    if (gt->GetNumberCols() > 1)
+      gt->DeleteCols(0, gt->GetNumberCols() - 1);
+
+    gt->SetColLabelValue(0, wxT("Value"));
+
+    if (o && o->pEffect) {
+      if (0 > gt->GetNumberRows())
+	gt->AppendRows(0 - gt->GetNumberRows());
+      if (gt->GetNumberRows() > 0)
+	gt->DeleteRows(0, gt->GetNumberRows() - 0);
+
+      if (o->IsEnabled())
+	SetEffectConstSetTable(gt, false, o->GetEffect(), -1, 0, 0);
+    }
+
+    wxSize sz = gt->GetClientSize();
+    int dv = sz.GetWidth() - gt->GetRowLabelSize();
+    gt->SetColSize(0, dv);
+  }
+
+  void SetEffectTextureTable(EffectRecord *o) {
+    wxGrid *gt = SDEffectTexturesGrid;
+
+    memset(fs, 0, sizeof(fs));
+    gt->ClearGrid();
+
+    if (1 > gt->GetNumberCols())
+      gt->AppendCols(1 - gt->GetNumberCols());
+    if (gt->GetNumberCols() > 1)
+      gt->DeleteCols(0, gt->GetNumberCols() - 1);
+
+    gt->SetColLabelValue(0, wxT("Value"));
+
+    if (o && o->pEffect) {
+      if (0 > gt->GetNumberRows())
+	gt->AppendRows(0 - gt->GetNumberRows());
+      if (gt->GetNumberRows() > 0)
+	gt->DeleteRows(0, gt->GetNumberRows() - 0);
+
+      if (o->IsEnabled())
+	SetEffectTextureTable(gt, false, o->GetEffect(), -1, 0, 0);
+    }
+
+    wxSize sz = gt->GetClientSize();
+    int dv = sz.GetWidth() - gt->GetRowLabelSize();
+    gt->SetColSize(0, dv);
+  }
+
+  /* --------------------------------------------------------------
+   */
+
   void SetStatesTable(int o) {
+    int p = pass; FindScene(p, o);
     wxGrid *gt = SDSceneStateGrid;
 
     gt->ClearGrid();
@@ -941,8 +1064,8 @@ public:
       if (gt->GetNumberRows() > 0)
 	gt->DeleteRows(0, gt->GetNumberRows() - 0);
 
-      if (sm->trackd[pass].frame_cntr > 0)
-        SetRenderTable(gt, false, o, &sm->trackd[pass], -1, 0, 0);
+      if (sm->trackd[p].frame_cntr > 0)
+        SetRenderTable(gt, false, o, &sm->trackd[p], -1, 0, 0);
     }
 
     wxSize sz = gt->GetClientSize();
@@ -954,7 +1077,7 @@ public:
   /* --------------------------------------------------------------
    */
 
-  void SetImage(wxImage *im, IDirect3DSurface9 *pSurface) {
+  void SetImage(int p, wxImage *im, IDirect3DSurface9 *pSurface) {
     bool valid = false;
 
     if (im && pSurface) {
@@ -964,7 +1087,8 @@ public:
 
       // GetRenderTarget(0, &pRenderTarget);
       if (pSurface->GetDesc(&VDesc) == D3D_OK) {
-	if (pSurface->LockRect(&surf, NULL, D3DLOCK_NOSYSLOCK) == D3D_OK) {
+	/* locking INTZ may succeed but it's only garbage in it. */
+	if (0 && (pSurface->LockRect(&surf, NULL, D3DLOCK_NOSYSLOCK) == D3D_OK)) {
 	  pSurface->UnlockRect();
 	  pBuf = pSurface;
 
@@ -972,6 +1096,7 @@ public:
 	}
 
 	else if (VDesc.Usage & D3DUSAGE_DEPTHSTENCIL) {
+#if 0
 	  if (lastOBGEDirect3DDevice9->CreateOffscreenPlainSurface(VDesc.Width, VDesc.Height, VDesc.Format, D3DPOOL_SYSTEMMEM, &pBuf, NULL) == D3D_OK) {
 	    if (D3DXLoadSurfaceFromSurface(pBuf, NULL, NULL, pSurface, NULL, NULL, D3DX_FILTER_NONE, 0) == D3D_OK) {
 	      valid = true;
@@ -988,28 +1113,34 @@ public:
 
 	      D3DXMACRO def[2] = { {"", "1"}, {NULL, NULL} };
 	      switch (VDesc.Format) {
-		    case D3DFMT_D16_LOCKABLE: def[0].Name = "D16_LOCKABLE"; break;
-		    case D3DFMT_D32: def[0].Name = "D32"; break;
-		    case D3DFMT_D15S1: def[0].Name = "D15S1"; break;
-		    case D3DFMT_D24S8: def[0].Name = "D24S8"; break;
-		    case D3DFMT_D24X8: def[0].Name = "D24X8"; break;
-		    case D3DFMT_D24X4S4: def[0].Name = "D24X4S4"; break;
-		    case D3DFMT_D16: def[0].Name = "D16"; break;
+		    case D3DFMT_D16_LOCKABLE:  def[0].Name = "D16_LOCKABLE";  VDesc.Format = D3DFMT_L16; break;
+		    case D3DFMT_D32:	       def[0].Name = "D32";           VDesc.Format = D3DFMT_R32F; /* loss */ break;
+		    case D3DFMT_D15S1:	       def[0].Name = "D15S1";         VDesc.Format = D3DFMT_L16; break;
+		    case D3DFMT_D24S8:	       def[0].Name = "D24S8";         VDesc.Format = D3DFMT_R32F; break;
+		    case D3DFMT_D24X8:	       def[0].Name = "D24X8";         VDesc.Format = D3DFMT_R32F; break;
+		    case D3DFMT_D24X4S4:       def[0].Name = "D24X4S4";       VDesc.Format = D3DFMT_R32F; break;
+		    case D3DFMT_D16:	       def[0].Name = "D16";           VDesc.Format = D3DFMT_L16; break;
 
-		    case D3DFMT_D32F_LOCKABLE: def[0].Name = "D32F_LOCKABLE"; break;
-		    case D3DFMT_D24FS8: def[0].Name = "D24FS8"; break;
-		    case D3DFMT_D32_LOCKABLE: def[0].Name = "D32_LOCKABLE"; break;
+		    case D3DFMT_D32F_LOCKABLE: def[0].Name = "D32F_LOCKABLE"; VDesc.Format = D3DFMT_R32F; break;
+		    case D3DFMT_D24FS8:	       def[0].Name = "D24FS8";        VDesc.Format = D3DFMT_R32F; break;
+		    case D3DFMT_D32_LOCKABLE:  def[0].Name = "D32_LOCKABLE";  VDesc.Format = D3DFMT_R32F; /* loss */ break;
 
-		    case (D3DFORMAT)MAKEFOURCC('I','N','T','Z'): def[0].Name = "INTZ"; break;
-		    case (D3DFORMAT)MAKEFOURCC('D','F','2','4'): def[0].Name = "DF24"; break;
-		    case (D3DFORMAT)MAKEFOURCC('D','F','1','6'): def[0].Name = "DF16"; break;
+		    case (D3DFORMAT)MAKEFOURCC('I','N','T','Z'): def[0].Name = "INTZ"; VDesc.Format = D3DFMT_R32F; /* loss */ break;
+		    case (D3DFORMAT)MAKEFOURCC('D','F','2','4'): def[0].Name = "DF24"; VDesc.Format = D3DFMT_R32F; break;
+		    case (D3DFORMAT)MAKEFOURCC('D','F','1','6'): def[0].Name = "DF16"; VDesc.Format = D3DFMT_R16F; break;
 		    case (D3DFORMAT)MAKEFOURCC('R','A','W','Z'): def[0].Name = "RAWZ"; break;
 	      }
 
-	      if (D3D_Effect.LoadEffect("TransferZ.fx", (D3DXMACRO *)&def)) {
+	      if (D3D_Effect.LoadEffect("TransferZ.fx", 0xFF000000, true, (D3DXMACRO *)&def)) {
+		ID3DXEffect *Effect = D3D_Effect.GetEffect();
 		frame_trk = false;
 
 		if (lastOBGEDirect3DDevice9->CreateRenderTarget(VDesc.Width, VDesc.Height, VDesc.Format, D3DMULTISAMPLE_NONE, 0, FALSE, &rBuf, NULL) == D3D_OK) {
+		  lastOBGEDirect3DDevice9->SetRenderTarget(0, rBuf);
+		  lastOBGEDirect3DDevice9->SetDepthStencilSurface(NULL);
+		//lastOBGEDirect3DDevice9->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, D3DCOLOR_ARGB(0, 45, 50, 170), 1.0f, 0);
+		  lastOBGEDirect3DDevice9->BeginScene();
+
 		  IDirect3DVertexBuffer9 *D3D_EffectBuffer;
 		  float minx, minu, uadj, vadj;
 		  float rcpres[2];
@@ -1038,15 +1169,12 @@ public:
 		  CopyMemory(VertexPointer, ShaderVertices, sizeof(ShaderVertices));
 		  D3D_EffectBuffer->Unlock();
 
-		  lastOBGEDirect3DDevice9->SetStreamSource(0, D3D_EffectBuffer, 0, sizeof(D3D_sShaderVertex));
 		  lastOBGEDirect3DDevice9->SetFVF(D3DFVF_XYZ | D3DFVF_TEX1);
 
 		  lastOBGEDirect3DDevice9->SetRenderState(D3DRS_COLORWRITEENABLE, 0xF);
 		  lastOBGEDirect3DDevice9->SetRenderState(D3DRS_ALPHABLENDENABLE, false);
 		  lastOBGEDirect3DDevice9->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
 		  lastOBGEDirect3DDevice9->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-
-		  lastOBGEDirect3DDevice9->BeginScene();
 
 		  // Set up world/view/proj matrices to identity in case there's no vertex effect.
 		  D3DXMATRIX mIdent;
@@ -1059,18 +1187,20 @@ public:
 		  lastOBGEDirect3DDevice9->SetTransform(D3DTS_VIEW, &mIdent);
 		  lastOBGEDirect3DDevice9->SetTransform(D3DTS_WORLD, &mIdent);
 
-		  D3D_Effect.Effect->SetTexture("zbufferTexture", surfaceTexture[pSurface]->tex);
+		  Effect->SetTexture("zbufferTexture", surfaceTexture[pSurface]->tex);
+	//	  Effect->SetTexture("zbufferTexture", surfaceTexture[sm->trackd[6].rt[0]]->tex);
 
 		  UINT passes;
-		  D3D_Effect.Effect->Begin(&passes, NULL);
+		  Effect->Begin(&passes, NULL);
 
-		  for (UINT pass = 0; pass < passes; pass) {
-		    D3D_Effect.Effect->BeginPass(pass);
+		  for (UINT pass = 0; pass < passes; pass++) {
+		    Effect->BeginPass(pass);
+		    lastOBGEDirect3DDevice9->SetStreamSource(0, D3D_EffectBuffer, 0, sizeof(D3D_sShaderVertex));
 		    lastOBGEDirect3DDevice9->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
-		    D3D_Effect.Effect->EndPass();
+		    Effect->EndPass();
 		  }
 
-		  D3D_Effect.Effect->End();
+		  Effect->End();
 		  lastOBGEDirect3DDevice9->EndScene();
 
 		  if (lastOBGEDirect3DDevice9->CreateOffscreenPlainSurface(VDesc.Width, VDesc.Height, VDesc.Format, D3DPOOL_SYSTEMMEM, &pBuf, NULL) == D3D_OK) {
@@ -1078,12 +1208,15 @@ public:
 		      valid = true;
 		    }
 		  }
+
+		  rBuf->Release();
 		}
 
 		frame_trk = true;
 	      }
 	    }
 	  }
+#endif
 	}
 
 	else if (VDesc.Usage & D3DUSAGE_RENDERTARGET) {
@@ -1124,7 +1257,7 @@ public:
 		} break;
 		case D3DFMT_A8R8G8B8: {
 		  unsigned char *_argb = (unsigned char *)surf.pBits;
-		  if (pass == OBGEPASS_REFLECTION)
+		  if (p == OBGEPASS_REFLECTION)
 		    for (int hh = 0; hh < h; hh++) {
 		      for (int ww = 0; ww < w; ww++) {
 			int b = _argb[((hh * w) + ww) * 4 + 0];
@@ -1139,10 +1272,10 @@ public:
 		  else
 		    for (int hh = 0; hh < h; hh++) {
 		      for (int ww = 0; ww < w; ww++) {
-			int a = _argb[((hh * w) + ww) * 4 + 0];
-			int b = _argb[((hh * w) + ww) * 4 + 1];
-			int g = _argb[((hh * w) + ww) * 4 + 2];
-			int r = _argb[((hh * w) + ww) * 4 + 3];
+			int b = _argb[((hh * w) + ww) * 4 + 0];
+			int g = _argb[((hh * w) + ww) * 4 + 1];
+			int r = _argb[((hh * w) + ww) * 4 + 2];
+			int a = _argb[((hh * w) + ww) * 4 + 3];
 			rgb[((hh * w) + ww) * 3 + 0] = r;
 			rgb[((hh * w) + ww) * 3 + 1] = g;
 			rgb[((hh * w) + ww) * 3 + 2] = b;
@@ -1217,7 +1350,7 @@ public:
 		} break;
 		case D3DFMT_R32F: {
 		  float *_r = (float *)surf.pBits;
-		  if (pass == OBGEPASS_WATERHEIGHTMAP)
+		  if (p == OBGEPASS_WATERHEIGHTMAP)
 		    for (int hh = 0; hh < h; hh++) {
 		      for (int ww = 0; ww < w; ww++) {
 			int r = (int)(((float)_r[((hh * w) + ww) * 1 + 0] + 0.5) * 255);
@@ -1250,7 +1383,31 @@ public:
 		    D3DFMT_D32F_LOCKABLE        = 82,
 		    D3DFMT_D24FS8               = 83,
 		    D3DFMT_D32_LOCKABLE         = 84,
+		case (D3DFORMAT)MAKEFOURCC('D','F','2','4'): def[0].Name = "DF24"; VDesc.Format = D3DFMT_R32F; break;
+		case (D3DFORMAT)MAKEFOURCC('D','F','1','6'): def[0].Name = "DF16"; VDesc.Format = D3DFMT_R16F; break;
+		case (D3DFORMAT)MAKEFOURCC('R','A','W','Z'): def[0].Name = "RAWZ"; break;
+
 #endif
+		case (D3DFORMAT)MAKEFOURCC('I','N','T','Z'): {
+		  unsigned long *_z = (unsigned long *)surf.pBits;
+		  unsigned long Z = 0, ZZ = 0xFFFFFFFF;
+		  for (int hh = 0; hh < h; hh++) {
+		    for (int ww = 0; ww < w; ww++) {
+		      unsigned long z = _z[((hh * w) + ww) * 1 + 0];
+		      if (z > Z) Z = z; if (z < ZZ) ZZ = z;
+		    }
+		  }
+		  Z -= ZZ; if (0 >= Z) Z = 1;
+		  for (int hh = 0; hh < h; hh++) {
+		    for (int ww = 0; ww < w; ww++) {
+		      unsigned long z = _z[((hh * w) + ww) * 1 + 0] - ZZ;
+		      rgb[((hh * w) + ww) * 3 + 0] = (z * 255) / Z;
+		      rgb[((hh * w) + ww) * 3 + 1] = (z * 255) / Z;
+		      rgb[((hh * w) + ww) * 3 + 2] = (z * 255) / Z;
+		    }
+		  }
+		  valid = true;
+		} break;
                 default:
 		  assert(NULL);
                   break;
@@ -1279,11 +1436,11 @@ public:
   /* --------------------------------------------------------------
    */
 
-  void UpdateOptions(ShaderRecord *o) {
+  void UpdateShaderOptions(ShaderRecord *o) {
     SDShaderVersion->Clear();
 
     if (o) {
-      wxMenuItem *mi; mi = SDOptions->FindChildItem(wxID_UPGRADE, NULL);
+      wxMenuItem *mi; mi = SDShaderOptions->FindChildItem(wxID_UPGRADE, NULL);
       int idx = 0, sel = wxNOT_FOUND;
 
       if (o->iType == SHADER_PIXEL) {
@@ -1321,10 +1478,13 @@ public:
     }
   }
 
+  void UpdateEffectOptions(EffectRecord *o) {
+  }
+
   /* --------------------------------------------------------------
    */
 
-  void GetRecordStatus(ShaderRecord *o) {
+  void GetShaderRecordStatus(ShaderRecord *o) {
     char *status = "";
     char buf[256];
 
@@ -1376,7 +1536,7 @@ public:
 
 	SDShaderCompile->Enable();
 	if (x != wxNOT_FOUND)
-	  SDComboShader->SetItemBitmap(x, wxBError);
+	  SDComboShader->SetItemBitmap(x, wxBMError);
       }
       else if (strstr(buf, "warning")) {
       	/* two warnings possible:
@@ -1390,13 +1550,13 @@ public:
 
 	SDShaderCompile->Enable();
 	if (x != wxNOT_FOUND)
-	  SDComboShader->SetItemBitmap(x, wxBWarning);
+	  SDComboShader->SetItemBitmap(x, wxBMWarning);
       }
       else {
 	status = "Status: compiled as %s, enabled";
 	SDShaderCompile->Disable();
 	if (x != wxNOT_FOUND)
-	  SDComboShader->SetItemBitmap(x, wxBApplied);
+	  SDComboShader->SetItemBitmap(x, wxBMApplied);
       }
     }
     else {
@@ -1412,19 +1572,19 @@ public:
 
 	SDShaderCompile->Disable();
 	if (x != wxNOT_FOUND)
-	  SDComboShader->SetItemBitmap(x, wxBApplied);
+	  SDComboShader->SetItemBitmap(x, wxBMApplied);
       }
       else if (o && !o->pShaderOriginal) {
 	status = "Status: missing";
 	SDShaderCompile->Disable();
 	if (x != wxNOT_FOUND)
-	  SDComboShader->SetItemBitmap(x, wxBMissing);
+	  SDComboShader->SetItemBitmap(x, wxBMMissing);
       }
       else {
 	status = "Status: not compiled";
 	SDShaderCompile->Enable();
 	if (x != wxNOT_FOUND)
-	  SDComboShader->SetItemBitmap(x, wxBUnhooked);
+	  SDComboShader->SetItemBitmap(x, wxBMUnhooked);
       }
     }
 
@@ -1439,76 +1599,275 @@ public:
       SDShaderCompile->Enable();
   }
 
-  void UpdateRecord(ShaderRecord *o) {
-    GetRecordStatus(o);
+  void UpdateShaderRecord(ShaderRecord *o) {
+    GetShaderRecordStatus(o);
 
     /* source has changed */
-    wxString oo = SDSourceEditor->GetValue();
+    wxString oo = SDShaderSourceEditor->GetValue();
     const wxChar *ooo = oo.GetData();
     int size = strlen(ooo);
 
-    SDButtonShaderSave->Disable();
-
+    /* prevent flickering */
     if (o) {
       if (o->pSourceRuntime) {
 	if (strcmp(oo.GetData(), o->pSourceRuntime))
 	  SDButtonShaderSave->Enable();
+	else
+	  SDButtonShaderSave->Disable();
       }
       else if (o->pSourceReplaced) {
 	if (strcmp(oo.GetData(), o->pSourceReplaced))
 	  SDButtonShaderSave->Enable();
+	else
+	  SDButtonShaderSave->Disable();
       }
-      else {
+      else
 	SDButtonShaderSave->Enable();
-      }
+    }
+    else
+      SDButtonShaderSave->Disable();
+  }
+
+  void UpdateShaderText(wxTextCtrl *txt, const char *val) {
+    /* source has changed */
+    wxString oo = txt->GetValue();
+    const wxChar *ooo = oo.GetData();
+    int size = strlen(ooo);
+
+    if (strcmp(oo.GetData(), val)) {
+      txt->SetValue(wxString(val));
     }
   }
 
-  void SetRecord(ShaderRecord *o) {
+  void SetShaderRecord(ShaderRecord *o) {
     if (o && !o->pDisasmbly)
       o->DisassembleShader();
 
-    GetRecordStatus(o);
-    UpdateOptions(o);
+    GetShaderRecordStatus(o);
+    UpdateShaderOptions(o);
 
     SDButtonShaderSave->Disable();
 
+#if 0
+    int epos = SDShaderSourceEditor->GetLastPosition();
+    int apos = SDShaderAssemblyEditor->GetLastPosition();
+    int dpos = SDShaderDisassemblyView->GetLastPosition();
+#endif
+
     /* HLSL goes always (load/save/saveas) */
     if (o && o->pSourceRuntime)
-      SDSourceEditor->SetValue(wxString(o->pSourceRuntime));
+      UpdateShaderText(SDShaderSourceEditor, o->pSourceRuntime);
     else if (o && o->pSourceReplaced)
-      SDSourceEditor->SetValue(wxString(o->pSourceReplaced));
+      UpdateShaderText(SDShaderSourceEditor, o->pSourceReplaced);
     else
-      SDSourceEditor->SetValue(wxString(""));
+      UpdateShaderText(SDShaderSourceEditor, "");
 
     /* Assembler goes always (load/save/saveas) */
     if (o && o->pAsmblyReplaced)
-      SDAssemblyEditor->SetValue(wxString(o->pAsmblyReplaced));
+      UpdateShaderText(SDShaderAssemblyEditor, o->pAsmblyReplaced);
     else
-      SDAssemblyEditor->SetValue(wxString(""));
+      UpdateShaderText(SDShaderAssemblyEditor, "");
 
     /* Errors are only deactivated */
     if (o && o->pErrorMsgs) {
-      SDErrorView->Enable();
-      SDErrorView->SetValue(wxString((char *)o->pErrorMsgs->GetBufferPointer()));
+      SDShaderErrorView->Enable();
+      UpdateShaderText(SDShaderErrorView, (char *)o->pErrorMsgs->GetBufferPointer());
     }
     else {
-      SDErrorView->SetValue(wxString(""));
-      SDErrorView->Disable();
+      SDShaderErrorView->Disable();
+      UpdateShaderText(SDShaderErrorView, "");
     }
 
     /* Disassembly is only deactivated */
     if (o && o->pDisasmbly) {
-      SDDisassemblyView->Enable();
-      SDDisassemblyView->SetValue(wxString((char *)o->pDisasmbly->GetBufferPointer()));
+      SDShaderDisassemblyView->Enable();
+      UpdateShaderText(SDShaderDisassemblyView, (char *)o->pDisasmbly->GetBufferPointer());
     }
     else {
-      SDDisassemblyView->SetValue(wxString(""));
-      SDDisassemblyView->Disable();
+      SDShaderDisassemblyView->Disable();
+      UpdateShaderText(SDShaderDisassemblyView, "");
     }
 
-    SetConstantTable(o);
-    SetSamplerTable(o);
+#if 0
+    SDShaderSourceEditor->ShowPosition(epos);
+    SDShaderAssemblyEditor->ShowPosition(apos);
+    SDShaderDisassemblyView->ShowPosition(dpos);
+
+    if (SDShaderSourceEditor->ScrollLines(1))
+      SDShaderSourceEditor->ScrollLines(-1);
+    if (SDShaderAssemblyEditor->ScrollLines(1))
+      SDShaderAssemblyEditor->ScrollLines(-1);
+    if (SDShaderDisassemblyView->ScrollLines(1))
+      SDShaderDisassemblyView->ScrollLines(-1);
+#endif
+
+    SetShaderConstantTable(o);
+    SetShaderSamplerTable(o);
+  }
+
+  /* --------------------------------------------------------------
+   */
+
+  void GetEffectRecordStatus(EffectRecord *o) {
+    char *status = "";
+    char buf[256];
+
+    int x = SDComboEffect->GetSelection();
+    if (x == wxNOT_FOUND)
+      if (!SDComboEffect->IsEmpty())
+	SDComboEffect->SetSelection(x = 0);
+
+    if (1) {
+      SDEffectEnable->Enable();
+
+      if (o && o->IsEnabled())
+	SDEffectEnable->SetValue(wxCHK_CHECKED);
+      else
+	SDEffectEnable->SetValue(wxCHK_UNCHECKED);
+    }
+    else {
+      SDEffectEnable->Disable();
+
+      if (o && o->IsEnabled())
+        SDEffectEnable->SetValue(wxCHK_CHECKED);
+      else
+        SDEffectEnable->SetValue(wxCHK_UNCHECKED);
+    }
+
+    if (o && o->pErrorMsgs) {
+      char *buf = (char *)o->pErrorMsgs->GetBufferPointer();
+
+      if (strstr(buf, "error")) {
+      	/* two errors possible:
+      	 * - runtime failed, replacement good
+      	 * - both failed
+      	 */
+      	status = "Status: compiled, with errors, disabled";
+	SDEffectCompile->Enable();
+	if (x != wxNOT_FOUND)
+	  SDComboEffect->SetItemBitmap(x, wxBMError);
+      }
+      else if (strstr(buf, "warning")) {
+      	/* two warnings possible:
+      	 * - runtime warning
+      	 * - replacement warning
+      	 */
+      	status = "Status: compiled, with warnings, enabled";
+	SDEffectCompile->Enable();
+	if (x != wxNOT_FOUND)
+	  SDComboEffect->SetItemBitmap(x, wxBMWarning);
+      }
+      else {
+	status = "Status: compiled, enabled";
+	SDEffectCompile->Disable();
+	if (x != wxNOT_FOUND)
+	  SDComboEffect->SetItemBitmap(x, wxBMApplied);
+      }
+    }
+    else {
+      if (o && o->pEffect) {
+      	/* two activations possible:
+      	 * - runtime
+      	 * - replacement
+      	 */
+      	status = "Status: compiled, enabled";
+	SDEffectCompile->Disable();
+	if (x != wxNOT_FOUND)
+	  SDComboEffect->SetItemBitmap(x, wxBMApplied);
+      }
+      else if (o && !o->pSource) {
+	status = "Status: missing";
+	SDEffectCompile->Disable();
+	if (x != wxNOT_FOUND)
+	  SDComboEffect->SetItemBitmap(x, wxBMMissing);
+      }
+      else {
+	status = "Status: not compiled";
+	SDEffectCompile->Enable();
+	if (x != wxNOT_FOUND)
+	  SDComboEffect->SetItemBitmap(x, wxBMUnhooked);
+      }
+    }
+
+    sprintf(buf, status, "");
+    SDStatusEffect->SetLabel(buf);
+
+    if (o && o->pSource && !o->pEffect)
+      SDEffectCompile->Enable();
+  }
+
+  void UpdateEffectRecord(EffectRecord *o) {
+    GetEffectRecordStatus(o);
+
+    /* source has changed */
+    wxString oo = SDEffectSourceEditor->GetValue();
+    const wxChar *ooo = oo.GetData();
+    int size = strlen(ooo);
+
+    /* prevent flickering */
+    if (o) {
+      if (o->pEffect) {
+	if (strcmp(oo.GetData(), o->pSource))
+	  SDButtonEffectSave->Enable();
+	else
+	  SDButtonEffectSave->Disable();
+      }
+      else
+	SDButtonEffectSave->Enable();
+    }
+    else
+      SDButtonEffectSave->Disable();
+  }
+
+  void UpdateEffectText(wxTextCtrl *txt, const char *val) {
+    /* source has changed */
+    wxString oo = txt->GetValue();
+    const wxChar *ooo = oo.GetData();
+    int size = strlen(ooo);
+
+    if (strcmp(oo.GetData(), val)) {
+      txt->SetValue(wxString(val));
+    }
+  }
+
+  void SetEffectRecord(EffectRecord *o) {
+    if (o && !o->pEffect)
+      o->CompileEffect(true);
+
+    GetEffectRecordStatus(o);
+    UpdateEffectOptions(o);
+
+    SDButtonEffectSave->Disable();
+
+#if 0
+    int epos = SDEffectSourceEditor->GetLastPosition();
+#endif
+
+    /* HLSL goes always (load/save/saveas) */
+    if (o && o->pSource)
+      UpdateEffectText(SDEffectSourceEditor, o->pSource);
+    else
+      UpdateEffectText(SDEffectSourceEditor, "");
+
+    /* Errors are only deactivated */
+    if (o && o->pErrorMsgs) {
+      SDEffectErrorView->Enable();
+      UpdateEffectText(SDEffectErrorView, (char *)o->pErrorMsgs->GetBufferPointer());
+    }
+    else {
+      SDEffectErrorView->Disable();
+      UpdateEffectText(SDEffectErrorView, "");
+    }
+
+#if 0
+    SDEffectSourceEditor->ShowPosition(epos);
+
+    if (SDEffectSourceEditor->ScrollLines(1))
+      SDEffectSourceEditor->ScrollLines(-1);
+#endif
+
+    SetEffectConstantTable(o);
+    SetEffectTextureTable(o);
   }
 
   /* --------------------------------------------------------------
@@ -1518,7 +1877,7 @@ public:
     wxPaintDC dc(SDRendertargetView);
 
     /* refresh only if visible */
-    if (SDViewSwitch->GetSelection() != 1)
+    if (SDViewSwitch->GetSelection() != SDVIEW_SCENES)
       return;
     if (SDSurfaceSwitch->GetSelection() != 0)
       return;
@@ -1578,7 +1937,7 @@ public:
     wxPaintDC dc(SDDepthStencilView);
 
     /* refresh only if visible */
-    if (SDViewSwitch->GetSelection() != 1)
+    if (SDViewSwitch->GetSelection() != SDVIEW_SCENES)
       return;
     if (SDSurfaceSwitch->GetSelection() != 1)
       return;
@@ -1634,37 +1993,60 @@ public:
 #endif
   }
 
-  const char *GetViewStatus(int o, IDirect3DSurface9 *pSurface, bool comma = false) {
+  const char *GetViewStatus(int p, int o, IDirect3DSurface9 *pSurface, bool comma = false) {
     D3DSURFACE_DESC VDesc;
     static char buf[256];
     buf[0] = '\0';
 
     if (!pSurface && sm) {
-      pSurface = sm->trackd[pass].rt[o];
+      pSurface = sm->trackd[p].rt[o];
       if ((int)pSurface == -1) pSurface = 0;
     }
+
     if (pSurface && (pSurface->GetDesc(&VDesc) == D3D_OK)) {
       sprintf(buf, "%s%s, %dx%d", comma ? ", " : "", findFormat(VDesc.Format), VDesc.Width, VDesc.Height);
+
+      if (surfaceTexture[pSurface]) {
+	D3DTEXTUREFILTERTYPE af = surfaceTexture[pSurface]->tex->GetAutoGenFilterType();
+	if (surfaceTexture[pSurface]->map->Usage & D3DUSAGE_AUTOGENMIPMAP)
+	  sprintf(buf, "%s, AutoMip %d levels", buf, surfaceTexture[pSurface]->tex->GetLevelCount());
+      }
     }
+
+#ifdef	OBGE_PROFILE
+    if (sm && (sm->trackd[p].frame_time[o].QuadPart > 0)) {
+      char tme[256];
+      LARGE_INTEGER freq;
+
+      QueryPerformanceFrequency(&freq);
+
+      float a = (float)((1000.0 * sm->trackd[p].frame_time[o].QuadPart) / freq.QuadPart);
+      float b = (float)((1.0000 * freq.QuadPart) / sm->trackd[p].frame_time[o].QuadPart);
+
+      sprintf(tme, "%s%.2f ms, %.2f SPS", (comma || (buf[0] != '\0')) ? ", " : "", a, b); strcat(buf, tme);
+    }
+#endif
 
     return buf;
   }
 
   void SetView(int o) {
+    int p = pass; FindScene(p, o);
+
     IDirect3DSurface9 *_rt = NULL;
     IDirect3DSurface9 *_ds = NULL;
 
     if (sm) {
-      _rt = sm->trackd[pass].rt[o];
-      _ds = sm->trackd[pass].ds[o];
+      _rt = sm->trackd[p].rt[o];
+      _ds = sm->trackd[p].ds[o];
       if ((int)_rt == -1) _rt = 0;
       if ((int)_ds == -1) _ds = 0;
     }
 
-    SDStatusRT->SetLabel(wxString(GetViewStatus(o, _rt)));
+    SDStatusRT->SetLabel(wxString(GetViewStatus(p, o, _rt)));
 
-    SetImage(&rt, _rt);
-    SetImage(&ds, _ds);
+    SetImage(p, &rt, _rt);
+    SetImage(p, &ds, _ds);
 
     crt.SelectObject(wxBitmap(rt));
     cds.SelectObject(wxBitmap(ds));
@@ -1697,7 +2079,7 @@ public:
 	RuntimeShaderRecord *r = o->pAssociate;
 
 	/* info with pass-id */
-	if (pass == OBGEPASS_ANY) {
+	if (r && (pass == OBGEPASS_ANY)) {
 	  char num[256] = ""; bool has = false;
 	  for (int p = 0; p < OBGEPASS_NUM; p++) {
 	    if (r->frame_used[p] >= 0) {
@@ -1734,6 +2116,27 @@ public:
     }
   }
 
+  void UpdateFrameEffects() {
+    /* ------------------------------------------------ */
+    char buf[256];
+    int xx = SDComboEffect->GetCount();
+    int x = 0;
+
+    for (x = 0; x < xx; x++) {
+      wxString oo = SDComboEffect->GetString(x);
+      EffectRecord *o = FindEffectRecord(NULL, oo.GetData());
+
+      if (o) {
+	if (o->Private)
+	  sprintf(buf, "%s [private]", o->Name);
+	else
+	  sprintf(buf, "%s", o->Name);
+
+	SDComboEffect->SetString(x, wxString(buf));
+      }
+    }
+  }
+
   void UpdateFrameScene() {
     char buf[256];
 
@@ -1741,20 +2144,41 @@ public:
     SDChoiceScene->Clear();
 
     if (sm) {
-      struct ShaderManager::track *t = &sm->trackd[pass];
+      /* info with pass-id */
+      if ((pass == OBGEPASS_ANY) && sm) {
+	for (int p = 1; p < OBGEPASS_NUM; p++) {
+	  for (int scene = 0; scene < OBGESCENE_NUM; scene++) {
+	    struct ShaderManager::track *t = &sm->trackd[p];
 
-      for (int scene = 0; scene < t->frame_cntr; scene++) {
-      	assert(scene < 256);
+	    /* verify if the scene (which is a global identifier) occured in this pass, filter */
+	    if (t->frame_used[scene] > 0) {
+	      const char *fmt = GetViewStatus(p, scene, NULL, true);
 
-      	/* verify if the scene (which is a global identifier) occured in this pass, filter */
-      	if (t->frame_used[scene] > 0) {
-          const char *fmt = GetViewStatus(scene, NULL, true);
+	      /* info with pass-id */
+	      sprintf(buf, "Pass %d, scene %d%s", p, scene, fmt);
 
-	  /* info with frame-number */
-          sprintf(buf, "Scene %d%s [frame %d]", t->frame_pass[scene], fmt, t->frame_used[scene]);
+	      SDChoiceScene->Append(wxString(buf));
+	    }
+	  }
+	}
+      }
+      /* info with frame counter */
+      else {
+	struct ShaderManager::track *t = &sm->trackd[pass];
 
-          SDChoiceScene->Append(wxString(buf));
-        }
+	for (int scene = 0; scene < t->frame_cntr; scene++) {
+      	  assert(scene < 256);
+
+      	  /* verify if the scene (which is a global identifier) occured in this pass, filter */
+      	  if (t->frame_used[scene] > 0) {
+	    const char *fmt = GetViewStatus(pass, scene, NULL, true);
+
+	    /* info with frame-number */
+	    sprintf(buf, "Scene %d%s [frame %d]", t->frame_pass[scene], fmt, t->frame_used[scene]);
+
+	    SDChoiceScene->Append(wxString(buf));
+	  }
+	}
       }
     }
 
@@ -1770,10 +2194,125 @@ public:
   }
 
   void UpdateFrame() {
-    if (SDViewSwitch->GetSelection() == 0)
+    if (SDViewSwitch->GetSelection() == SDVIEW_SHADER)
       UpdateFrameShaders();
-    else if (SDViewSwitch->GetSelection() == 1)
+    else if (SDViewSwitch->GetSelection() == SDVIEW_EFFECT)
+      UpdateFrameEffects();
+    else if (SDViewSwitch->GetSelection() == SDVIEW_SCENES)
       UpdateFrameScene();
+  }
+
+  /* --------------------------------------------------------------
+   */
+
+  void SetPanels(int sel) {
+    /* ------------------------------------------------ */
+    if (sel == SDVIEW_SHADER) {
+      int j = SDComboShader->GetSelection();
+      if (j == wxNOT_FOUND) {
+	SDComboShader->Clear();
+
+	if (sm) {
+	  BuiltInShaderList::iterator BShader = sm->BuiltInShaders.begin();
+	  while (BShader != sm->BuiltInShaders.end()) {
+	    if ((*BShader)->pErrorMsgs) {
+	      char *buf = (char *)(*BShader)->pErrorMsgs->GetBufferPointer();
+
+	      if (strstr(buf, "error")) {
+		SDComboShader->Append(wxBName, wxBMError, (void *)(*BShader));
+	      }
+	      else if (strstr(buf, "warning")) {
+		SDComboShader->Append(wxBName, wxBMWarning, (void *)(*BShader));
+	      }
+	      else {
+		SDComboShader->Append(wxBName, wxBMApplied, (void *)(*BShader));
+	      }
+	    }
+	    else {
+	      if ((*BShader)->pShaderRuntime) {
+		SDComboShader->Append(wxBName, wxBMApplied, (void *)(*BShader));
+	      }
+	      else if ((*BShader)->pShaderReplaced) {
+		SDComboShader->Append(wxBName, wxBMApplied, (void *)(*BShader));
+	      }
+	      else if (!(*BShader)->pShaderOriginal) {
+		SDComboShader->Append(wxBName, wxBMMissing, (void *)(*BShader));
+	      }
+	      else {
+		SDComboShader->Append(wxBName, wxBMUnhooked, (void *)(*BShader));
+	      }
+	    }
+
+	    BShader++;
+	  }
+	}
+
+	if (!SDComboShader->IsEmpty()) {
+	  SDPanelShaders->Show();
+	  SDComboShader->SetSelection(0);
+
+	  DoShaderSwitch(true);
+	}
+	else
+	  SDPanelShaders->Hide();
+      }
+    }
+
+    /* ------------------------------------------------ */
+    else if (sel == SDVIEW_EFFECT) {
+      int j = SDComboEffect->GetSelection();
+      if (j == wxNOT_FOUND) {
+	SDComboEffect->Clear();
+
+	if (em) {
+	  ManagedEffectList::iterator MEffect = em->ManagedEffects.begin();
+	  while (MEffect != em->ManagedEffects.end()) {
+	    if ((*MEffect)->pErrorMsgs) {
+	      char *buf = (char *)(*MEffect)->pErrorMsgs->GetBufferPointer();
+
+	      if (strstr(buf, "error")) {
+		SDComboEffect->Append(wxMName, wxBMError, (void *)(*MEffect));
+	      }
+	      else if (strstr(buf, "warning")) {
+		SDComboEffect->Append(wxMName, wxBMWarning, (void *)(*MEffect));
+	      }
+	      else {
+		SDComboEffect->Append(wxMName, wxBMApplied, (void *)(*MEffect));
+	      }
+	    }
+	    else {
+	      SDComboEffect->Append(wxMName, wxBMApplied, (void *)(*MEffect));
+	    }
+
+	    MEffect++;
+	  }
+	}
+
+	if (!SDComboEffect->IsEmpty()) {
+	  SDPanelEffects->Show();
+	  SDComboEffect->SetSelection(0);
+
+	  DoEffectSwitch(true);
+	}
+	else
+	  SDPanelEffects->Hide();
+      }
+    }
+
+    /* ------------------------------------------------ */
+    else if (sel == SDVIEW_SCENES) {
+      int k = SDChoiceScene->GetSelection();
+      if (k == wxNOT_FOUND) {
+	if (!SDChoiceScene->IsEmpty()) {
+	  SDPanelScenes->Show();
+	  SDChoiceScene->SetSelection(0);
+
+	  DoScenesSwitch(true);
+	}
+	else
+	  SDPanelScenes->Hide();
+      }
+    }
   }
 
   /* --------------------------------------------------------------
@@ -1791,6 +2330,24 @@ public:
 	}
 
 	BShader++;
+      }
+    }
+
+    return o;
+  }
+
+  EffectRecord *FindEffectRecord(EffectRecord *o, wxString oo) {
+    const char *ooo = oo.GetData();
+
+    if (em) {
+      ManagedEffectList::iterator MEffect = em->ManagedEffects.begin();
+      while (MEffect != em->ManagedEffects.end()) {
+	if (ooo == strstr(ooo, (*MEffect)->Name)) {
+	  o = (*MEffect);
+	  break;
+	}
+
+	MEffect++;
       }
     }
 
@@ -1821,6 +2378,24 @@ public:
     return NULL;
   }
 
+  void FindScene(int &p, int &o) {
+    if ((p == OBGEPASS_ANY) && sm) {
+      int s = 0;
+      for (int _p = 1; _p < OBGEPASS_NUM; _p++) {
+	for (int _o = 0; _o < OBGESCENE_NUM; _o++) {
+	  if (sm->trackd[_p].frame_used[_o] > 0) {
+	    if (o == s) {
+	      p = _p;
+	      o = _o;
+	      return;
+	    }
+	    s++;
+	  }
+	}
+      }
+    }
+  }
+
   /* --------------------------------------------------------------
    */
 
@@ -1834,13 +2409,24 @@ public:
     if ((sm = ShaderManager::GetSingleton())) {
       wxMenuItem *mi;
 
-      mi = SDOptions->FindChildItem(wxID_COMPILE, NULL); mi->Check(sm->CompileSources());
-      mi = SDOptions->FindChildItem(wxID_SAVEBIN, NULL); mi->Check(sm->SaveShaderOverride());
-      mi = SDOptions->FindChildItem(wxID_LEGACY, NULL); mi->Check(sm->UseLegacyCompiler());
-      mi = SDOptions->FindChildItem(wxID_OPTIMIZE, NULL); mi->Check(sm->Optimize());
-      mi = SDOptions->FindChildItem(wxID_MAXIMUM, NULL); mi->Check(sm->MaximumSM());
-      mi = SDOptions->FindChildItem(wxID_UPGRADE, NULL); mi->Check(sm->UpgradeSM());
-      mi = SDOptions->FindChildItem(wxID_RUNTIME, NULL); mi->Check(sm->RuntimeSources());
+      mi = SDShaderOptions->FindChildItem(wxID_COMPILE, NULL); mi->Check(sm->CompileSources());
+      mi = SDShaderOptions->FindChildItem(wxID_SAVEBIN, NULL); mi->Check(sm->SaveShaderOverride());
+      mi = SDShaderOptions->FindChildItem(wxID_LEGACY, NULL); mi->Check(sm->UseLegacyCompiler());
+      mi = SDShaderOptions->FindChildItem(wxID_OPTIMIZE, NULL); mi->Check(sm->Optimize());
+      mi = SDShaderOptions->FindChildItem(wxID_MAXIMUM, NULL); mi->Check(sm->MaximumSM());
+      mi = SDShaderOptions->FindChildItem(wxID_UPGRADE, NULL); mi->Check(sm->UpgradeSM());
+      mi = SDShaderOptions->FindChildItem(wxID_RUNTIME, NULL); mi->Check(sm->RuntimeSources());
+    }
+
+    /* options have changed since last activation */
+    em = NULL;
+    if ((em = EffectManager::GetSingleton())) {
+      wxMenuItem *mi;
+
+      mi = SDEffectOptions->FindChildItem(wxID_COMPILE, NULL); mi->Check(em->CompileSources());
+//    mi = SDEffectOptions->FindChildItem(wxID_SAVEBIN, NULL); mi->Check(em->SaveEffectOverride());
+      mi = SDEffectOptions->FindChildItem(wxID_LEGACY, NULL); mi->Check(em->UseLegacyCompiler());
+      mi = SDEffectOptions->FindChildItem(wxID_OPTIMIZE, NULL); mi->Check(em->Optimize());
     }
 
     /* renderpasses might have changed since last activation */
@@ -1885,75 +2471,17 @@ public:
     int p = pass;
     pass = FindRenderpass(SDChoicePass->GetStringSelection());
 
-    /* ------------------------------------------------ */
-    if (SDViewSwitch->GetSelection() == 0) {
-      int j = SDComboShader->GetSelection();
-      if (j == wxNOT_FOUND) {
-	SDComboShader->Clear();
-
-	if (sm) {
-	  BuiltInShaderList::iterator BShader = sm->BuiltInShaders.begin();
-	  while (BShader != sm->BuiltInShaders.end()) {
-	    if ((*BShader)->pErrorMsgs) {
-	      char *buf = (char *)(*BShader)->pErrorMsgs->GetBufferPointer();
-
-	      if (strstr(buf, "error")) {
-		SDComboShader->Append(wxBName, wxBError, (void *)(*BShader));
-	      }
-	      else if (strstr(buf, "warning")) {
-		SDComboShader->Append(wxBName, wxBWarning, (void *)(*BShader));
-	      }
-	      else {
-		SDComboShader->Append(wxBName, wxBApplied, (void *)(*BShader));
-	      }
-	    }
-	    else {
-	      if ((*BShader)->pShaderRuntime) {
-		SDComboShader->Append(wxBName, wxBApplied, (void *)(*BShader));
-	      }
-	      else if ((*BShader)->pShaderReplaced) {
-		SDComboShader->Append(wxBName, wxBApplied, (void *)(*BShader));
-	      }
-	      else if (!(*BShader)->pShaderOriginal) {
-		SDComboShader->Append(wxBName, wxBMissing, (void *)(*BShader));
-	      }
-	      else {
-		SDComboShader->Append(wxBName, wxBUnhooked, (void *)(*BShader));
-	      }
-	    }
-
-	    BShader++;
-	  }
-	}
-
-	if (!SDComboShader->IsEmpty()) {
-	  SDPanelShaders->Show();
-	  SDComboShader->SetSelection(0);
-	}
-	else
-	  SDPanelShaders->Hide();
-      }
-    }
-
-    /* ------------------------------------------------ */
-    else if (SDViewSwitch->GetSelection() == 1) {
-      int k = SDChoiceScene->GetSelection();
-      if (k == wxNOT_FOUND) {
-	if (!SDChoiceScene->IsEmpty()) {
-	  SDPanelScenes->Show();
-	  SDChoiceScene->SetSelection(0);
-	}
-	else
-	  SDPanelScenes->Hide();
-      }
-    }
+    /* validate/Invalidate panels */
+    SetPanels(SDViewSwitch->GetSelection());
 
     /* we basically assume the frame/scene numbers change all the time */
     UpdateFrame();
 
-    if (SDViewSwitch->GetSelection() == 0)
+    if (SDViewSwitch->GetSelection() == SDVIEW_SHADER)
       DoShaderSwitch(forced || (p != pass));
-    else if (SDViewSwitch->GetSelection() == 1)
+    else if (SDViewSwitch->GetSelection() == SDVIEW_EFFECT)
+      DoEffectSwitch(forced || (p != pass));
+    else if (SDViewSwitch->GetSelection() == SDVIEW_SCENES)
       DoScenesSwitch(forced || (p != pass));
   }
 
@@ -1965,14 +2493,25 @@ public:
     wxObject *hit = event.GetEventObject();
 
     if (hit == SDViewSwitch) {
+      SetPanels(o);
+
       if (o == 0) {
 	SDPanelShaders->Show();
+	SDPanelEffects->Hide();
 	SDPanelScenes->Hide();
 
 	UpdateFrameShaders();
       }
       else if (o == 1) {
 	SDPanelShaders->Hide();
+	SDPanelEffects->Show();
+	SDPanelScenes->Hide();
+
+	UpdateFrameEffects();
+      }
+      else if (o == 2) {
+	SDPanelShaders->Hide();
+	SDPanelEffects->Hide();
 	SDPanelScenes->Show();
 
 	UpdateFrameScene();
@@ -2012,15 +2551,36 @@ public:
     ShaderRecord *o = FindShaderRecord(NULL, SDComboShader->GetStringSelection());
 
     /* ------------------------------------------------ */
-    if ((currs != o) || force) {
+    if ((currs != o) /*|| force*/) {
       currs = o;
-      SetRecord(o);
+      SetShaderRecord(o);
     }
 
     /* trace might have changed since last activation */
     if (currs) {
-      SetConstSetTable(currs);
-      SetSamplerTable(currs);
+      SetShaderConstSetTable(currs);
+      SetShaderSamplerTable(currs);
+    }
+  }
+
+  virtual void DoEffectSwitch(wxCommandEvent& event) {
+    DoEffectSwitch();
+    event.Skip();
+  }
+
+  void DoEffectSwitch(bool force = false) {
+    EffectRecord *o = FindEffectRecord(NULL, SDComboEffect->GetStringSelection());
+
+    /* ------------------------------------------------ */
+    if ((currx != o) /*|| force*/) {
+      currx = o;
+      SetEffectRecord(o);
+    }
+
+    /* trace might have changed since last activation */
+    if (currx) {
+      SetEffectConstSetTable(currx);
+      SetEffectTextureTable(currx);
     }
   }
 
@@ -2055,7 +2615,47 @@ public:
     ShaderRecord *o = FindShaderRecord(NULL, SDComboShader->GetStringSelection());
 
     /* ------------------------------------------------ */
-    UpdateRecord(o);
+    UpdateShaderRecord(o);
+  }
+
+  virtual void DoShaderConstantChange(wxGridEvent& event) {
+    DoShaderConstantChange();
+    event.Skip();
+  }
+
+  void DoShaderConstantChange() {
+  }
+
+  virtual void DoShaderConstantSelect(wxGridEvent& event) {
+    DoShaderConstantSelect();
+    event.Skip();
+  }
+
+  void DoShaderConstantSelect() {
+  }
+
+  virtual void DoShaderSamplerChange(wxGridEvent& event) {
+    DoShaderSamplerChange();
+    event.Skip();
+  }
+
+  void DoShaderSamplerChange() {
+  }
+
+  virtual void DoShaderSamplerSelect(wxGridEvent& event) {
+    DoShaderSamplerSelect();
+    event.Skip();
+  }
+
+  void DoShaderSamplerSelect() {
+  }
+
+  virtual void DoShaderLoad(wxCommandEvent& event) {
+    DoShaderLoad();
+    event.Skip();
+  }
+
+  void DoShaderLoad() {
   }
 
   virtual void DoShaderSave(wxCommandEvent& event) {
@@ -2067,7 +2667,7 @@ public:
     ShaderRecord *o = FindShaderRecord(NULL, SDComboShader->GetStringSelection());
 
     /* ------------------------------------------------ */
-    wxString oo = SDSourceEditor->GetValue();
+    wxString oo = SDShaderSourceEditor->GetValue();
     const wxChar *ooo = oo.GetData();
     int size = strlen(ooo);
 
@@ -2082,9 +2682,9 @@ public:
 	fclose(f);
 
 	if (o->RuntimeShader(ooo))
-	  SetRecord(o);
+	  SetShaderRecord(o);
         else
-	  UpdateRecord(o);
+	  UpdateShaderRecord(o);
 
 	/* trigger re-creation of the DX9-class */
 	if (SDShaderEnable->Get3StateValue() == wxCHK_CHECKED)
@@ -2097,6 +2697,14 @@ public:
     }
   }
 
+  virtual void DoShaderSaveAs(wxCommandEvent& event) {
+    DoShaderSaveAs();
+    event.Skip();
+  }
+
+  void DoShaderSaveAs() {
+  }
+
   virtual void DoShaderVersion(wxCommandEvent& event) {
     DoShaderVersion();
     event.Skip();
@@ -2106,7 +2714,7 @@ public:
     ShaderRecord *o = FindShaderRecord(NULL, SDComboShader->GetStringSelection());
 
     /* ------------------------------------------------ */
-    wxString oo = SDSourceEditor->GetValue();
+    wxString oo = SDShaderSourceEditor->GetValue();
     const wxChar *ooo = oo.GetData();
     int size = strlen(ooo);
 
@@ -2117,9 +2725,9 @@ public:
       /* the profile changed */
       if (!o->pProfile || strcmp(sss, o->pProfile)) {
 	if (o->RuntimeShader(ooo, sss))
-	  SetRecord(o);
+	  SetShaderRecord(o);
 	else
-	  UpdateRecord(o);
+	  UpdateShaderRecord(o);
 
 	/* trigger re-creation of the DX9-class */
 	if (SDShaderEnable->Get3StateValue() == wxCHK_CHECKED)
@@ -2141,15 +2749,15 @@ public:
     ShaderRecord *o = FindShaderRecord(NULL, SDComboShader->GetStringSelection());
 
     /* ------------------------------------------------ */
-    wxString oo = SDSourceEditor->GetValue();
+    wxString oo = SDShaderSourceEditor->GetValue();
     const wxChar *ooo = oo.GetData();
     int size = strlen(ooo);
 
     if (o) {
       if (o->RuntimeShader(ooo))
-	SetRecord(o);
+	SetShaderRecord(o);
       else
-	UpdateRecord(o);
+	UpdateShaderRecord(o);
 
       /* trigger re-creation of the DX9-class */
       if (SDShaderEnable->Get3StateValue() == wxCHK_CHECKED)
@@ -2183,28 +2791,203 @@ public:
   /* --------------------------------------------------------------
    */
 
-  virtual void DoOptions(wxCommandEvent& event) {
+  virtual void DoEffectUpdate(wxCommandEvent& event) {
+    DoEffectUpdate();
+    event.Skip();
+  }
+
+  void DoEffectUpdate() {
+    EffectRecord *o = FindEffectRecord(NULL, SDComboEffect->GetStringSelection());
+
+    /* ------------------------------------------------ */
+    UpdateEffectRecord(o);
+  }
+
+  virtual void DoEffectConstantChange(wxGridEvent& event) {
+    DoEffectConstantChange();
+    event.Skip();
+  }
+
+  void DoEffectConstantChange() {
+  }
+
+  virtual void DoEffectConstantSelect(wxGridEvent& event) {
+    DoEffectConstantSelect();
+    event.Skip();
+  }
+
+  void DoEffectConstantSelect() {
+  }
+
+  virtual void DoEffectTextureChange(wxGridEvent& event) {
+    DoEffectTextureChange();
+    event.Skip();
+  }
+
+  void DoEffectTextureChange() {
+  }
+
+  virtual void DoEffectTextureSelect(wxGridEvent& event) {
+    DoEffectTextureSelect();
+    event.Skip();
+  }
+
+  void DoEffectTextureSelect() {
+  }
+
+  virtual void DoEffectAdd(wxCommandEvent& event) {
+    DoEffectAdd();
+    event.Skip();
+  }
+
+  void DoEffectAdd() {
+  }
+
+  virtual void DoEffectLoad(wxCommandEvent& event) {
+    DoEffectLoad();
+    event.Skip();
+  }
+
+  void DoEffectLoad() {
+  }
+
+  virtual void DoEffectSave(wxCommandEvent& event) {
+    DoEffectSave();
+    event.Skip();
+  }
+
+  void DoEffectSave() {
+    EffectRecord *o = FindEffectRecord(NULL, SDComboEffect->GetStringSelection());
+
+    /* ------------------------------------------------ */
+    wxString oo = SDEffectSourceEditor->GetValue();
+    const wxChar *ooo = oo.GetData();
+    int size = strlen(ooo);
+
+    if (o) {
+      char strFileFull[MAX_PATH];
+      strcpy(strFileFull, o->Filepath);
+//    strcat(strFileFull, ".fx");
+
+      FILE *f;
+      if (!fopen_s(&f, strFileFull, "wb"/*"wt"*/)) {
+	fwrite(ooo, 1, size, f);
+	fclose(f);
+
+	if (o->RuntimeEffect(ooo))
+	  SetEffectRecord(o);
+        else
+	  UpdateEffectRecord(o);
+
+	/* trigger re-creation of the DX9-class */
+	if (SDEffectEnable->GetValue() == wxCHK_CHECKED)
+	  o->Enable(true);
+	else
+	  o->Enable(false);
+      }
+    }
+  }
+
+  virtual void DoEffectSaveAs(wxCommandEvent& event) {
+    DoEffectSaveAs();
+    event.Skip();
+  }
+
+  void DoEffectSaveAs() {
+  }
+
+  virtual void DoEffectCompile(wxCommandEvent& event) {
+    DoEffectCompile();
+    event.Skip();
+  }
+
+  void DoEffectCompile() {
+    EffectRecord *o = FindEffectRecord(NULL, SDComboEffect->GetStringSelection());
+
+    /* ------------------------------------------------ */
+    wxString oo = SDEffectSourceEditor->GetValue();
+    const wxChar *ooo = oo.GetData();
+    int size = strlen(ooo);
+
+    if (o) {
+      if (o->RuntimeEffect(ooo))
+	SetEffectRecord(o);
+      else
+	UpdateEffectRecord(o);
+
+      /* trigger re-creation of the DX9-class */
+      if (SDEffectEnable->GetValue() == wxCHK_CHECKED)
+	o->Enable(true);
+      else
+	o->Enable(false);
+    }
+  }
+
+  virtual void DoEffectToggle(wxCommandEvent& event) {
+    DoEffectToggle();
+    event.Skip();
+  }
+
+  void DoEffectToggle() {
+    EffectRecord *o = FindEffectRecord(NULL, SDComboEffect->GetStringSelection());
+
+    /* ------------------------------------------------ */
+    if (o) {
+      if (SDEffectEnable->GetValue() == wxCHK_CHECKED)
+	o->Enable(true);
+      else
+	o->Enable(false);
+    }
+  }
+
+  /* --------------------------------------------------------------
+   */
+
+  virtual void DoShaderOptions(wxCommandEvent& event) {
     ShaderRecord *o = FindShaderRecord(NULL, SDComboShader->GetStringSelection());
 
     /* ------------------------------------------------ */
-    UpdateOptions(o);
+    UpdateShaderOptions(o);
 
     if (sm) {
       wxMenuItem *mi;
 
-      mi = SDOptions->FindChildItem(wxID_COMPILE,  NULL); sm->CompileSources(mi->IsChecked());
-      mi = SDOptions->FindChildItem(wxID_SAVEBIN,  NULL); sm->SaveShaderOverride(mi->IsChecked());
-      mi = SDOptions->FindChildItem(wxID_OPTIMIZE, NULL); sm->Optimize(mi->IsChecked());
-      mi = SDOptions->FindChildItem(wxID_LEGACY,   NULL); sm->UseLegacyCompiler(mi->IsChecked());
-      mi = SDOptions->FindChildItem(wxID_MAXIMUM,  NULL); sm->MaximumSM(mi->IsChecked());
-      mi = SDOptions->FindChildItem(wxID_UPGRADE,  NULL); sm->UpgradeSM(mi->IsChecked());
-      mi = SDOptions->FindChildItem(wxID_RUNTIME,  NULL); sm->RuntimeSources(mi->IsChecked());
+      mi = SDShaderOptions->FindChildItem(wxID_COMPILE,  NULL); sm->CompileSources(mi->IsChecked());
+      mi = SDShaderOptions->FindChildItem(wxID_SAVEBIN,  NULL); sm->SaveShaderOverride(mi->IsChecked());
+      mi = SDShaderOptions->FindChildItem(wxID_OPTIMIZE, NULL); sm->Optimize(mi->IsChecked());
+      mi = SDShaderOptions->FindChildItem(wxID_LEGACY,   NULL); sm->UseLegacyCompiler(mi->IsChecked());
+      mi = SDShaderOptions->FindChildItem(wxID_MAXIMUM,  NULL); sm->MaximumSM(mi->IsChecked());
+      mi = SDShaderOptions->FindChildItem(wxID_UPGRADE,  NULL); sm->UpgradeSM(mi->IsChecked());
+      mi = SDShaderOptions->FindChildItem(wxID_RUNTIME,  NULL); sm->RuntimeSources(mi->IsChecked());
 
-      GetRecordStatus(o);
+      GetShaderRecordStatus(o);
     }
 
     event.Skip();
   }
+
+  virtual void DoEffectOptions(wxCommandEvent& event) {
+    EffectRecord *o = FindEffectRecord(NULL, SDComboEffect->GetStringSelection());
+
+    /* ------------------------------------------------ */
+    UpdateEffectOptions(o);
+
+    if (em) {
+      wxMenuItem *mi;
+
+      mi = SDEffectOptions->FindChildItem(wxID_COMPILE,  NULL); em->CompileSources(mi->IsChecked());
+//    mi = SDEffectOptions->FindChildItem(wxID_SAVEBIN,  NULL); em->SaveEffectBinary(mi->IsChecked());
+      mi = SDEffectOptions->FindChildItem(wxID_OPTIMIZE, NULL); em->Optimize(mi->IsChecked());
+      mi = SDEffectOptions->FindChildItem(wxID_LEGACY,   NULL); em->UseLegacyCompiler(mi->IsChecked());
+
+      GetEffectRecordStatus(o);
+    }
+
+    event.Skip();
+  }
+
+  /* --------------------------------------------------------------
+   */
 
   virtual void DoResize(wxSizeEvent& event) {
     DoRefresh();
@@ -2213,11 +2996,11 @@ public:
 
   void DoRefresh() {
     /* refresh only if visible */
-    if (SDViewSwitch->GetSelection() == 1) {
+    if (SDViewSwitch->GetSelection() == SDVIEW_SCENES) {
       if (SDSurfaceSwitch->GetSelection() == 0)
-        SDRendertarget->Refresh();
+	SDRendertarget->Refresh();
       else if (SDSurfaceSwitch->GetSelection() == 1)
-        SDDepthStencil->Refresh();
+	SDDepthStencil->Refresh();
     }
   }
 
@@ -2225,40 +3008,11 @@ public:
   }
 };
 
-// this is in any .cpp in library
-class GUIs_App: public wxApp
-{
-public:
-  bool OnInit()
-  {
- 	return true;
-  }
-};
-
-static wxAppConsole *wxCreateApp()
-{
-  wxAppConsole::CheckBuildOptions(WX_BUILD_OPTIONS_SIGNATURE,"my app");
-  return new GUIs_App;
-}
-
-WXDLLIMPEXP_BASE void wxSetInstance(HINSTANCE hInst);
-
-#pragma comment(linker,"/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
-
 DebugWindow::DebugWindow() {
-  int argc = 0; char** argv = NULL;
-
 //assert(NULL);
 
-  HINSTANCE exe = GetModuleHandle(NULL);
-  HINSTANCE dll = GetModuleHandle("OBGEv2.dll");
-
-  wxSetInstance(dll);
-  wxApp::SetInitializerFunction(wxCreateApp);
-  wxInitialize(argc, argv);
-
   GUIs_ShaderDeveloper *
-  sdev = new GUIs_ShaderDeveloper(NULL, wxID_ANY, "OBGE Frame-Walker", wxPoint(-100, 0), wxSize(630, 704));
+  sdev = new GUIs_ShaderDeveloper(NULL, wxID_ANY, "OBGE «Shader Developer»", wxPoint(-100, 0), wxSize(630, 704));
   sdev->Show();
   sdev->SetPosition(wxPoint(/*-70*/0, 0));
   this->sdev = (void *)sdev;
@@ -2269,9 +3023,77 @@ DebugWindow::DebugWindow() {
 DebugWindow::~DebugWindow() {
   GUIs_ShaderDeveloper *
   sdev = (GUIs_ShaderDeveloper *)this->sdev;
-  delete sdev;
+  sdev->Close();
+  sdev->Destroy();
+//delete sdev;
+}
 
-  wxUninitialize();
+#pragma comment(linker,"/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+
+bool da = false;
+
+// this is in any .cpp in library
+class GUIs_App: public wxApp
+{
+public:
+  bool OnInit()
+  {
+    da = true; return true;
+  }
+  int OnExit()
+  {
+    da = false; return wxApp::OnExit();
+  }
+};
+
+static wxAppConsole *wxCreateApp()
+{
+  wxAppConsole::CheckBuildOptions(WX_BUILD_OPTIONS_SIGNATURE, "my app");
+  return new GUIs_App;
+}
+
+WXDLLIMPEXP_BASE void wxSetInstance(HINSTANCE hInst);
+
+DebugWindow *dw = NULL;
+DebugWindow *DebugWindow::Create() {
+	if (!FullScreen.data && !dw)
+	  dw = new DebugWindow();
+
+	return dw;
+}
+
+void DebugWindow::Destroy() {
+	if (!FullScreen.data && dw) {
+	  delete dw; dw = NULL; }
+}
+
+DebugWindow *DebugWindow::Expunge() {
+	if (DWEnabled.data) {
+	  if (!da) {
+	    int argc = 0; char** argv = NULL;
+ 
+	    HINSTANCE exe = GetModuleHandle(NULL);
+	    HINSTANCE dll = GetModuleHandle("OBGEv2.dll");
+
+	    wxSetInstance(dll);
+	    wxApp::SetInitializerFunction(wxCreateApp);
+	    wxInitialize(argc, argv);
+	  }
+
+	  return DebugWindow::Create();
+	}
+
+	return NULL;
+}
+
+void DebugWindow::Exit() {
+	if (DWEnabled.data) {
+	  Destroy();
+
+	  if (da) {
+	    wxUninitialize();
+	  }
+	}
 }
 
 #endif

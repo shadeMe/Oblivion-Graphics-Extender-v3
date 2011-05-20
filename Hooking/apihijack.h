@@ -13,7 +13,7 @@
 // parameter is used to typecast the result to the appropriate pointer type.
 #define MakePtr(cast, ptr, addValue ) (cast)( (DWORD)(ptr)+(DWORD)(addValue))
 
-// Default Hook Stub Structure: Contains data about the original function, Name/Ordinal, Address 
+// Default Hook Stub Structure: Contains data about the original function, Name/Ordinal, Address
 // and a Count field.  This is actually a block of assembly code.
 #pragma pack( push, 1 )
 struct DLPD_IAT_STUB
@@ -29,7 +29,7 @@ struct DLPD_IAT_STUB
 };
 #pragma pack( pop )
 
-// Example DefaultHook procedure, called from the DLPD_IAT_STUB stubs.  
+// Example DefaultHook procedure, called from the DLPD_IAT_STUB stubs.
 // Increments "count" field of the stub.
 // See the implementation for more information.
 void __cdecl DefaultHook( PVOID dummy );
@@ -59,6 +59,7 @@ bool RedirectIAT( SDLLHook* DLLHook, PIMAGE_IMPORT_DESCRIPTOR pImportDesc, PVOID
 void* RedirectPA( SDLLHook* DLLHook, LPCSTR lpProcName, FARPROC fnc );
 
 // Hook functions one or more DLLs.
+bool HookAPICalls( SDLLHook* Hook, HMODULE hModEXE );
 bool HookAPICalls( SDLLHook* Hook );
 
 #endif

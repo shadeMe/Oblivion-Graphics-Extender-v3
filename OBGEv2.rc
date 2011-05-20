@@ -35,6 +35,7 @@ IDB_BITMAP6             BITMAP                  "icons\\edit-delete.bmp"
 IDB_BITMAP7             BITMAP                  "icons\\emblem-important.bmp"
 IDB_BITMAP8             BITMAP                  "icons\\emblem-readonly.bmp"
 IDB_BITMAP9             BITMAP                  "icons\\emblem-unreadable.bmp"
+IDB_BITMAP10            BITMAP                  "icons\\document-new.bmp"
 #endif    // Deutsch (Deutschland) resources
 /////////////////////////////////////////////////////////////////////////////
 

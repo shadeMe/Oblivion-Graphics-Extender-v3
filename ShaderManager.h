@@ -9,6 +9,10 @@
 #include <queue>
 #include <utility>
 
+#include "Nodes/NiVector4.h"
+#include "OBGE fork/Sky.h"
+#include "Nodes/NiBillboardNode.h"
+
 #include "D3D9Identifiers.hpp"
 
 class ShaderRecord;
@@ -16,6 +20,8 @@ class RuntimeShaderRecord;
 
 class ShaderRecord
 {
+	friend class GUIs_ShaderDeveloper;
+
 public:
 	ShaderRecord();
 	~ShaderRecord();
@@ -34,11 +40,13 @@ public:
 	bool						SaveShader();
 
 	bool						ConstructDX9Shader(char which);
+	DWORD *						GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *States);
 	bool						DestroyDX9Shader();
 
 public:
 	RuntimeShaderRecord *				pAssociate;
 	const DWORD *					pOblivionBinary;
+	LPD3DXCONSTANTTABLE				pOblivionConTab;
 
 	char						Name[100];
 	char						Filepath[MAX_PATH];
@@ -87,11 +95,24 @@ public:
 	/* allocated results */
 	char						pDX9ShaderWant;
 	char						pDX9ShaderType;
+	LPD3DXCONSTANTTABLE				pDX9ShaderCoTa;
 	union {
 	  IDirect3DVertexShader9 *			pDX9VertexShader;
 	  IDirect3DPixelShader9 *			pDX9PixelShader;
 	  IUnknown *					pDX9ShaderClss;
 	};
+};
+
+struct RuntimeVariable {
+  int offset, length;
+  const char *name;
+  union mem {
+    bool condition;
+    struct iv { int vec[4]; } *integer;
+    struct fv { float vec[4]; } *floating;
+    struct tv { D3DSAMPLERSTATETYPE Type; DWORD Value; } *state;
+    IDirect3DBaseTexture9 *texture;
+  } vals;
 };
 
 class RuntimeShaderRecord
@@ -100,29 +121,54 @@ public:
 	RuntimeShaderRecord();
 	~RuntimeShaderRecord();
 
-	bool						AssignShader(IUnknown *Shader, ShaderRecord *Associate);
-	bool						ActivateShader(char which);
+	void Release();
+	void OnLostDevice(void);
+	void OnResetDevice(void);
 
-	IDirect3DPixelShader9 *				GetRuntimeShader(IDirect3DPixelShader9 *Shader) const;
-	IDirect3DVertexShader9 *			GetRuntimeShader(IDirect3DVertexShader9 *Shader) const;
+	void CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa);
+	void SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice);
+
+	bool SetShaderConstantB(const char *name, bool value);
+	bool SetShaderConstantI(const char *name, int *values);
+	bool SetShaderConstantF(const char *name, float *values);
+	bool SetShaderSamplerTexture(const char *name, int TextureNum);
+
+	bool AssignShader(IUnknown *Shader, ShaderRecord *Associate);
+	bool ActivateShader(char which);
+
+	IDirect3DPixelShader9  *GetShader(IDirect3DPixelShader9  *Shader) const;
+	IDirect3DVertexShader9 *GetShader(IDirect3DVertexShader9 *Shader) const;
 
 public:
-	ShaderRecord *					pAssociate;
-	bool						bActive;
+	ShaderRecord *			pAssociate;
+	bool				bActive;
+	void *				pCustomCT;
+
+	/* get a copy of the z-buffer right from before and pass it to the shader */
+	IDirect3DSurface9 *		pGrabRT;
+	IDirect3DSurface9 *		pGrabDS;
+	IDirect3DSurface9 *		pGrabDZ;
+	IDirect3DTexture9 **		pTextRT;
+	IDirect3DTexture9 **		pTextDS;
+	IDirect3DTexture9 **		pTextDZ;
+
+	RuntimeVariable *		pBool;
+	RuntimeVariable *		pInt4;
+	RuntimeVariable *		pFloat4;
+	RuntimeVariable *		pTexture;
+	RuntimeVariable *		pSampler;
 
 	/* Oblivion's POV */
-	const DWORD *					pFunction;
+	char				iType;
+	const DWORD *			pFunction;
 	union {
-	  IDirect3DVertexShader9 *			pVertexShader;
-	  IDirect3DPixelShader9 *			pPixelShader;
-	  IUnknown *					pShader;
+	  IDirect3DVertexShader9 *	pVertexShader;
+	  IDirect3DPixelShader9 *	pPixelShader;
+	  IUnknown *			pShader;
 	};
 
-	/* stats */
-	int						frame_used[OBGEPASS_NUM];
-	int						frame_pass[OBGEPASS_NUM];
-
-#define	OBGESAMPLER_NUM	16
+	/* re-allocate textures after kill() */
+	std::vector<int>		Textures;
 
 #ifdef	OBGE_DEVLING
 	void Clear(int pass = -1) {
@@ -133,6 +179,12 @@ public:
 	    memset(&traced[pass], -1, sizeof(traced[pass]));
 	  }
 	}
+
+	/* stats */
+	int						frame_used[OBGEPASS_NUM];
+	int						frame_pass[OBGEPASS_NUM];
+
+#define	OBGESAMPLER_NUM	16
 
 	/* we assume a shader isn't used twice in a specific pass
 	 * thus we don't track over all of [pass][scene]
@@ -153,27 +205,66 @@ typedef std::list<RuntimeShaderRecord*> RuntimeShaderList;
 typedef std::list<ShaderRecord*> BuiltInShaderList;
 typedef std::map<IUnknown*, RuntimeShaderRecord*> ShaderList;
 
+struct ShaderConstants
+{
+	// ****** Global static shader constants ******
+	v1_2_416::NiVector4		rcpres;
+	v1_2_416::NiVector4		rcpresh;	// heightmap
+	v1_2_416::NiVector4		rcpresd;	// displacement
+
+	// ****** Global shader constants (Updated each scene) ******
+	D3DXMATRIX			wrld;
+	D3DXMATRIX			view;
+	D3DXMATRIX			proj;
+
+	v1_2_416::NiVector4		SunDir;
+	v1_2_416::NiVector4		GameTime;
+};
+
 class ShaderManager
 {
-private:
-	ShaderManager();
+	friend class ShaderRecord;
+	friend class GUIs_ShaderDeveloper;
+
 public:
+	ShaderManager();
 	~ShaderManager();
 
 	static ShaderManager*		GetSingleton(void);
 	static ShaderManager*		Singleton;
 
+	void						OnLostDevice(void);
+	void						OnResetDevice(void);
+	void						OnReleaseDevice(void);
+
+private:
+	void						Reset();
+public:
+	void						UpdateFrameConstants();
+
+public:
 	ShaderRecord *					GetBuiltInShader(const char *Name);
 	ShaderRecord *					GetBuiltInShader(const DWORD *Function);
-	RuntimeShaderRecord *				GetRuntimeShader(const DWORD *Function, IUnknown *Shader);
-	RuntimeShaderRecord *				GetRuntimeShader(IUnknown *Shader) { return Shaders[Shader]; }
-	IDirect3DPixelShader9 *				GetRuntimeShader(IDirect3DPixelShader9 *Shader);
-	IDirect3DVertexShader9 *			GetRuntimeShader(IDirect3DVertexShader9 *Shader);
+	RuntimeShaderRecord *				GetRuntimeShader(const char *Name);
+	RuntimeShaderRecord *				SetRuntimeShader(const DWORD *Function, IUnknown *Shader);
+	inline RuntimeShaderRecord *			GetRuntimeShader(IUnknown *Shader) { return Shaders[Shader]; }
+	IDirect3DPixelShader9  *			GetShader(IDirect3DPixelShader9  *Shader);
+	IDirect3DVertexShader9 *			GetShader(IDirect3DVertexShader9 *Shader);
 
+	bool						SetShaderConstantB(const char *ShaderName, char *name, bool value);
+	bool						SetShaderConstantI(const char *ShaderName, char *name, int *values);
+	bool						SetShaderConstantF(const char *ShaderName, char *name, float *values);
+	bool						SetShaderSamplerTexture(const char *ShaderName, char *name, int TextureNum);
+
+private:
 	BuiltInShaderList				BuiltInShaders;
 	RuntimeShaderList				RuntimeShaders;
 	ShaderList					Shaders;
 
+public:
+	ShaderConstants					ShaderConst;
+
+public:
 	void UseShaderOverride(bool yes);
 	void SaveShaderOverride(bool yes);
 	void UseLegacyCompiler(bool yes);
@@ -232,11 +323,14 @@ public:
 
 	  int					frame_used[OBGESCENE_NUM];	// upto 256 scenes
 	  int					frame_pass[OBGESCENE_NUM];
+#ifdef	OBGE_PROFILE
+	  LARGE_INTEGER				frame_time[OBGESCENE_NUM];
+#endif
 
 	  IDirect3DSurface9 *			rt[OBGESCENE_NUM];		// upto 256 scenes
 	  IDirect3DSurface9 *			ds[OBGESCENE_NUM];
 
-	  D3DMATRIX				transf[OBGESCENE_NUM][2];	// View & Projection
+	  D3DMATRIX				transf[OBGESCENE_NUM][3];	// View & Projection
 	  DWORD					states[OBGESCENE_NUM][210];	// ...
 	} trackd[OBGEPASS_NUM];
 #endif

@@ -1,6 +1,11 @@
 #include <sys/stat.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
+
+#include <string>
 
 #include "ShaderManager.h"
+#include "TextureManager.h"
 #include "GlobalSettings.h"
 
 #include "D3D9.hpp"
@@ -18,14 +23,14 @@ static global<char*> ShaderOverrideDirectory("data\\shaders\\override\\",NULL,"S
 /* #################################################################################################
  */
 
-class IncludeManager : public ID3DXInclude
+class HLSLIncludeManager : public ID3DXInclude
 {
 public:
     STDMETHOD(Open)(D3DXINCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes);
     STDMETHOD(Close)(LPCVOID pData);
 };
 
-HRESULT IncludeManager::Open(D3DXINCLUDE_TYPE IncludeType, LPCSTR pName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes)
+HRESULT HLSLIncludeManager::Open(D3DXINCLUDE_TYPE IncludeType, LPCSTR pName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes)
 {
     struct stat s;
     FILE *f;
@@ -57,7 +62,7 @@ HRESULT IncludeManager::Open(D3DXINCLUDE_TYPE IncludeType, LPCSTR pName, LPCVOID
     return S_OK;
 }
 
-HRESULT IncludeManager::Close(LPCVOID pData)
+HRESULT HLSLIncludeManager::Close(LPCVOID pData)
 {
     BYTE* pData2 = (BYTE*)pData;
     if (pData2)
@@ -65,7 +70,7 @@ HRESULT IncludeManager::Close(LPCVOID pData)
     return S_OK;
 }
 
-IncludeManager incl;
+static HLSLIncludeManager incl;
 
 /* #################################################################################################
  */
@@ -76,6 +81,7 @@ ShaderRecord::ShaderRecord() {
 
   pAssociate = NULL;
   pOblivionBinary = NULL;
+  pOblivionConTab = NULL;
 
   /* shader source, binaries and constant tables */
   pProfile = NULL;
@@ -95,6 +101,7 @@ ShaderRecord::ShaderRecord() {
   pDisasmbly = NULL;
 
   /* shader class and the identifier for which of the binaries is selected */
+  pDX9ShaderCoTa = NULL;
   pDX9ShaderClss = NULL;
   pDX9ShaderType = SHADER_UNSET;
   pDX9ShaderWant = SHADER_UNSET;
@@ -191,8 +198,6 @@ bool ShaderRecord::LoadShader(const char *Filename) {
       }
     }
   }
-  else
-    _DMESSAGE("Upgraded version of %s to max.", Name);
 
   /* getting a assembler source for compiling if there is any
    */
@@ -230,6 +235,8 @@ bool ShaderRecord::LoadShader(const char *Filename) {
 
       pShaderReplaced = NULL;
       pConstsReplaced = NULL;
+
+      assert(NULL);
     }
   }
 
@@ -281,6 +288,9 @@ bool ShaderRecord::LoadShader(const char *Filename) {
   /* automatically determine the highest shader-model
    */
   if (!pProfile && lastOBGEDirect3DDevice9) {
+    if (pSourceReplaced && ::MaximumSM.Get())
+      _DMESSAGE("Upgraded version of %s to max.", Name);
+
     if (iType == SHADER_VERTEX) {
       pProfile = strdup(D3DXGetVertexShaderProfile(lastOBGEDirect3DDevice9));
     }
@@ -356,16 +366,17 @@ bool ShaderRecord::RuntimeShader(const char *hlsl, const char *version) {
 bool ShaderRecord::ConstructDX9Shader(char which) {
   /* turn over a DX9-ready shader class when runtime is enabled */
   LPD3DXBUFFER p = NULL;
+  LPD3DXCONSTANTTABLE ct = NULL;
   const DWORD *pFunction = NULL, *pClassFunction = NULL;
   char choosen = SHADER_UNSET;
 
   /* cascade, the highest possible is selected */
-  if (pShaderRuntime && (which >= SHADER_RUNTIME))
-    p = pShaderRuntime, choosen = SHADER_RUNTIME;
+  /**/ if (pShaderRuntime  && (which >= SHADER_RUNTIME))
+    p = pShaderRuntime , ct = pConstsRuntime , choosen = SHADER_RUNTIME;
   else if (pShaderReplaced && (which >= SHADER_REPLACED))
-    p = pShaderReplaced, choosen = SHADER_REPLACED;
+    p = pShaderReplaced, ct = pConstsReplaced, choosen = SHADER_REPLACED;
   else if (pShaderOriginal && (which >= SHADER_ORIGINAL))
-    p = pShaderOriginal, choosen = SHADER_ORIGINAL;
+    p = pShaderOriginal, ct = pConstsOriginal, choosen = SHADER_ORIGINAL;
   if (p)
     pFunction = (const DWORD *)p->GetBufferPointer();
 
@@ -395,6 +406,7 @@ bool ShaderRecord::ConstructDX9Shader(char which) {
   if (pDX9ShaderClss)
     pDX9ShaderClss->Release();
 
+  pDX9ShaderCoTa = ct;
   pDX9ShaderClss = NULL;
   pDX9ShaderType = choosen;
 
@@ -412,10 +424,177 @@ bool ShaderRecord::ConstructDX9Shader(char which) {
   return (pDX9ShaderClss != NULL);
 }
 
+DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *States) {
+  const char *src = NULL;
+
+  /**/ if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_RUNTIME))
+    src = pSourceRuntime;
+  else if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_REPLACED))
+    src = pSourceReplaced;
+  else if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_ORIGINAL))
+    src = NULL;
+  else if (pShaderRuntime  && (pOblivionBinary == (const DWORD *)pShaderRuntime->GetBufferPointer()))
+    src = pSourceRuntime;
+  else if (pShaderReplaced && (pOblivionBinary == (const DWORD *)pShaderReplaced->GetBufferPointer()))
+    src = pSourceReplaced;
+  else if (pShaderOriginal && (pOblivionBinary == (const DWORD *)pShaderOriginal->GetBufferPointer()))
+    src = NULL;
+
+  if (src && strstr(sName, "sampler")) {
+    const char *key = "sampler";
+    std::string tName(sName);
+    std::string tPath(sName);
+
+    tName.replace(tName.find(key), strlen(key), "tex");
+    tPath.replace(tPath.find(key), strlen(key), "path");
+
+    const char *sampler = strstr(src, sName);
+    const char *texture = strstr(src, tName.c_str());
+    const char *texpath = strstr(src, tPath.c_str());
+
+    /* all different position */
+    if ((texture != sampler) &&
+        (texture != texpath) &&
+        (texpath != sampler)) {
+      const char *samplert = sampler;
+      while (--samplert > src)
+	if (*samplert == ';')
+	  break;
+
+      const char *samplerb = (sampler  ? strchr(sampler     , '{') : NULL);
+      const char *textureb = (texture  ? strchr(texture     , '"') : NULL);
+      const char *texpathb = (texpath  ? strchr(texpath     , '"') : NULL);
+      const char *samplere = (samplerb ? strchr(samplerb + 1, '}') : NULL);
+      const char *texturee = (textureb ? strchr(textureb + 1, '"') : NULL);
+      const char *texpathe = (texpathb ? strchr(texpathb + 1, '"') : NULL);
+
+      // check for the sampler-type
+      // check there is no ";" between the sampler and it's beginning block "{"
+      // check there is no ";" between the texture and it's ending block ";"
+      const char *sampleri = (samplert ? strstr(samplert, "sampler") : NULL);
+      const char *samplerc = (sampler  ? strchr(sampler , ';') : NULL);
+      const char *texturec = (texture  ? strchr(texture , ';') : NULL);
+      const char *texpathc = (texpath  ? strchr(texpath , ';') : NULL);
+
+      if ((sampleri <  sampler ) &&
+      //  (samplerc >= samplerb) &&
+	  ((texturec >= texturee) ||
+	   (texpathc >= texpathe))) {
+      	char buf[256];
+      	int len;
+
+	if (textureb) {
+	  len = texturee - (textureb + 1); if (len > 0)
+	  strncpy(buf, textureb + 1, len);
+	}
+	else if (texpathb) {
+	  len = texpathe - (texpathb + 1); if (len > 0)
+	  strncpy(buf, texpathb + 1, len);
+	}
+
+	if (len > 0) {
+	  buf[len] = '\0';
+
+	  TextureManager *TexMan = TextureManager::GetSingleton();
+	  if (sampleri[7] == 'C') *TexNum = TexMan->LoadManagedTexture(buf, TR_CUBIC);
+	  if (sampleri[7] == '3') *TexNum = TexMan->LoadManagedTexture(buf, TR_VOLUMETRIC);
+	  if (sampleri[7] == '2') *TexNum = TexMan->LoadManagedTexture(buf, TR_PLANAR);
+	  if (sampleri[7] == ' ') *TexNum = TexMan->LoadManagedTexture(buf, TR_PLANAR);
+	}
+      }
+
+      if ((sampleri <  sampler ) &&
+	  (samplerc >= samplerb) &&
+	  (samplere >  samplerb)) {
+	char buf[1024];
+	int len;
+
+	len = samplere - (samplerb + 1); if (len > 0)
+	strncpy(buf, samplerb + 1, len);
+
+	if (len > 0) {
+	  buf[len] = '\0';
+
+	  const char *au = strstr(buf, "AddressU");
+	  const char *av = strstr(buf, "AddressV");
+	  const char *aw = strstr(buf, "AddressW");
+	  const char *mp = strstr(buf, "MIPFILTER");
+	  const char *mn = strstr(buf, "MINFILTER");
+	  const char *mg = strstr(buf, "MAGFILTER");
+	  const char *bc = strstr(buf, "Bordercolor");
+
+	  if (au) {
+	    char *end = (char *)strchr(au, ';'); *end = '\0';
+	    /**/ if (strstr(au, "WRAP"      )) { *States++ = D3DSAMP_ADDRESSU; *States++ = D3DTADDRESS_WRAP; }
+	    else if (strstr(au, "MIRROR"    )) { *States++ = D3DSAMP_ADDRESSU; *States++ = D3DTADDRESS_MIRROR; }
+	    else if (strstr(au, "CLAMP"     )) { *States++ = D3DSAMP_ADDRESSU; *States++ = D3DTADDRESS_CLAMP; }
+	    else if (strstr(au, "BORDER"    )) { *States++ = D3DSAMP_ADDRESSU; *States++ = D3DTADDRESS_BORDER; }
+	    else if (strstr(au, "MIRRORONCE")) { *States++ = D3DSAMP_ADDRESSU; *States++ = D3DTADDRESS_MIRRORONCE; }
+	  }
+	  if (av) {
+	    char *end = (char *)strchr(av, ';'); *end = '\0';
+	    /**/ if (strstr(av, "WRAP"      )) { *States++ = D3DSAMP_ADDRESSV; *States++ = D3DTADDRESS_WRAP; }
+	    else if (strstr(av, "MIRROR"    )) { *States++ = D3DSAMP_ADDRESSV; *States++ = D3DTADDRESS_MIRROR; }
+	    else if (strstr(av, "CLAMP"     )) { *States++ = D3DSAMP_ADDRESSV; *States++ = D3DTADDRESS_CLAMP; }
+	    else if (strstr(av, "BORDER"    )) { *States++ = D3DSAMP_ADDRESSV; *States++ = D3DTADDRESS_BORDER; }
+	    else if (strstr(av, "MIRRORONCE")) { *States++ = D3DSAMP_ADDRESSV; *States++ = D3DTADDRESS_MIRRORONCE; }
+	  }
+	  if (aw) {
+	    char *end = (char *)strchr(aw, ';'); *end = '\0';
+	    /**/ if (strstr(aw, "WRAP"      )) { *States++ = D3DSAMP_ADDRESSW; *States++ = D3DTADDRESS_WRAP; }
+	    else if (strstr(aw, "MIRROR"    )) { *States++ = D3DSAMP_ADDRESSW; *States++ = D3DTADDRESS_MIRROR; }
+	    else if (strstr(aw, "CLAMP"     )) { *States++ = D3DSAMP_ADDRESSW; *States++ = D3DTADDRESS_CLAMP; }
+	    else if (strstr(aw, "BORDER"    )) { *States++ = D3DSAMP_ADDRESSW; *States++ = D3DTADDRESS_BORDER; }
+	    else if (strstr(aw, "MIRRORONCE")) { *States++ = D3DSAMP_ADDRESSW; *States++ = D3DTADDRESS_MIRRORONCE; }
+	  }
+	  if (mp) {
+	    char *end = (char *)strchr(mp, ';'); *end = '\0';
+	    /**/ if (strstr(mp, "NONE"         )) { *States++ = D3DSAMP_MIPFILTER; *States++ = D3DTEXF_NONE; }
+	    else if (strstr(mp, "POINT"        )) { *States++ = D3DSAMP_MIPFILTER; *States++ = D3DTEXF_POINT; }
+	    else if (strstr(mp, "LINEAR"       )) { *States++ = D3DSAMP_MIPFILTER; *States++ = D3DTEXF_LINEAR; }
+	    else if (strstr(mp, "ANISOTROPIC"  )) { *States++ = D3DSAMP_MIPFILTER; *States++ = D3DTEXF_ANISOTROPIC; }
+	    else if (strstr(mp, "PYRAMIDALQUAD")) { *States++ = D3DSAMP_MIPFILTER; *States++ = D3DTEXF_PYRAMIDALQUAD; }
+	    else if (strstr(mp, "GAUSSIANQUAD" )) { *States++ = D3DSAMP_MIPFILTER; *States++ = D3DTEXF_GAUSSIANQUAD; }
+	  }
+	  if (mn) {
+	    char *end = (char *)strchr(mn, ';'); *end = '\0';
+	    /**/ if (strstr(mn, "NONE"         )) { *States++ = D3DSAMP_MINFILTER; *States++ = D3DTEXF_NONE; }
+	    else if (strstr(mn, "POINT"        )) { *States++ = D3DSAMP_MINFILTER; *States++ = D3DTEXF_POINT; }
+	    else if (strstr(mn, "LINEAR"       )) { *States++ = D3DSAMP_MINFILTER; *States++ = D3DTEXF_LINEAR; }
+	    else if (strstr(mn, "ANISOTROPIC"  )) { *States++ = D3DSAMP_MINFILTER; *States++ = D3DTEXF_ANISOTROPIC; }
+	    else if (strstr(mn, "PYRAMIDALQUAD")) { *States++ = D3DSAMP_MINFILTER; *States++ = D3DTEXF_PYRAMIDALQUAD; }
+	    else if (strstr(mn, "GAUSSIANQUAD" )) { *States++ = D3DSAMP_MINFILTER; *States++ = D3DTEXF_GAUSSIANQUAD; }
+	  }
+	  if (mg) {
+	    char *end = (char *)strchr(mg, ';'); *end = '\0';
+	    /**/ if (strstr(mg, "NONE"         )) { *States++ = D3DSAMP_MAGFILTER; *States++ = D3DTEXF_NONE; }
+	    else if (strstr(mg, "POINT"        )) { *States++ = D3DSAMP_MAGFILTER; *States++ = D3DTEXF_POINT; }
+	    else if (strstr(mg, "LINEAR"       )) { *States++ = D3DSAMP_MAGFILTER; *States++ = D3DTEXF_LINEAR; }
+	    else if (strstr(mg, "ANISOTROPIC"  )) { *States++ = D3DSAMP_MAGFILTER; *States++ = D3DTEXF_ANISOTROPIC; }
+	    else if (strstr(mg, "PYRAMIDALQUAD")) { *States++ = D3DSAMP_MAGFILTER; *States++ = D3DTEXF_PYRAMIDALQUAD; }
+	    else if (strstr(mg, "GAUSSIANQUAD" )) { *States++ = D3DSAMP_MAGFILTER; *States++ = D3DTEXF_GAUSSIANQUAD; }
+	  }
+	  if (bc) {
+	    char *end = (char *)strchr(bc, ';'); *end = '\0';
+
+	    /* currently fixed */
+	    float col = 0.0;
+	    *States++ = D3DSAMP_BORDERCOLOR;
+	    *States++ = *((DWORD *)&col);
+	  }
+	}
+      }
+    }
+  }
+
+  return States;
+}
+
 bool ShaderRecord::DestroyDX9Shader() {
   if (pDX9ShaderClss)
     pDX9ShaderClss->Release();
 
+  pDX9ShaderCoTa = NULL;
   pDX9ShaderClss = NULL;
   pDX9ShaderType = SHADER_UNSET;
 
@@ -464,6 +643,7 @@ bool ShaderRecord::AssembleShader(bool forced) {
   LPSTR src = NULL; int len;
   LPD3DXBUFFER p = NULL;
   LPD3DXCONSTANTTABLE c = NULL;
+  bool save = false;
 
   /* cascade, the highest possible is selected */
   if (pAsmblyReplaced) {
@@ -492,9 +672,13 @@ bool ShaderRecord::AssembleShader(bool forced) {
 
     /* this didn't go so well */
     if (pErrorMsgs) {
-      _MESSAGE("Shader assembling errors occured in %s:", Filepath);
-      _MESSAGE((char*)pErrorMsgs->GetBufferPointer());
+      _MESSAGE("Shader assembling messages occured in %s:", Filepath);
+      _MESSAGE((char *)pErrorMsgs->GetBufferPointer());
+
+      save = !strstr((char *)pErrorMsgs->GetBufferPointer(), "error");
     }
+    else
+      save = true;
   }
 
   /* request the constant table seperatly */
@@ -512,7 +696,8 @@ bool ShaderRecord::AssembleShader(bool forced) {
   }
 
   /* auto-save or not */
-  SaveShader();
+  if (save)
+    SaveShader();
 
   return (pAsmblyReplaced && (pShaderReplaced != NULL));
 }
@@ -525,6 +710,7 @@ bool ShaderRecord::CompileShader(bool forced) {
   LPSTR src = NULL; int len;
   LPD3DXBUFFER p = NULL;
   LPD3DXCONSTANTTABLE c = NULL;
+  bool save = false;
 
   /* cascade, the highest possible is selected */
   if (pSourceRuntime) {
@@ -585,9 +771,13 @@ bool ShaderRecord::CompileShader(bool forced) {
 
     /* this didn't go so well */
     if (pErrorMsgs) {
-      _MESSAGE("Shader compiling errors occured in %s:", Filepath);
-      _MESSAGE((char*)pErrorMsgs->GetBufferPointer());
+      _MESSAGE("Shader compiling messages occured in %s:", Filepath);
+      _MESSAGE((char *)pErrorMsgs->GetBufferPointer());
+
+      save = !strstr((char *)pErrorMsgs->GetBufferPointer(), "error");
     }
+    else
+      save = true;
   }
 
   /* cascade, the highest possible is selected */
@@ -601,7 +791,8 @@ bool ShaderRecord::CompileShader(bool forced) {
   }
 
   /* auto-save or not */
-  SaveShader();
+  if (save)
+    SaveShader();
 
   return (pSourceRuntime  && (pShaderRuntime  != NULL)) ||
 	 (pSourceReplaced && (pShaderReplaced != NULL));
@@ -683,10 +874,20 @@ const DWORD *ShaderRecord::GetBinary() {
     succ = CompileShader();
 
   /* cascade, the highest possible is selected */
-  if (pShaderReplaced) return (pOblivionBinary = (const DWORD *)pShaderReplaced->GetBufferPointer());
-  if (pShaderOriginal) return (pOblivionBinary = (const DWORD *)pShaderOriginal->GetBufferPointer());
+  if (pShaderReplaced) {
+    pOblivionBinary = (const DWORD *)pShaderReplaced->GetBufferPointer();
+    pOblivionConTab =                pConstsReplaced;
+  }
+  else if (pShaderOriginal) {
+    pOblivionBinary = (const DWORD *)pShaderOriginal->GetBufferPointer();
+    pOblivionConTab =                pConstsOriginal;
+  }
+  else {
+    pOblivionBinary = NULL;
+    pOblivionConTab = NULL;
+  }
 
-  return (pOblivionBinary = NULL);
+  return pOblivionBinary;
 }
 
 /* #################################################################################################
@@ -698,11 +899,474 @@ RuntimeShaderRecord::RuntimeShaderRecord() {
   pShader = NULL;
   bActive = false;
 
+  pCustomCT = NULL;
+  pBool     = NULL;
+  pInt4     = NULL;
+  pFloat4   = NULL;
+  pTexture  = NULL;
+
+  pGrabRT = NULL;
+  pGrabDS = NULL;
+  pGrabDZ = NULL;
+  pTextRT = NULL;
+  pTextDS = NULL;
+  pTextDZ = NULL;
+
+#ifdef	OBGE_DEVLING
   memset(frame_used, -1, sizeof(frame_used));
+#endif
 }
 
 RuntimeShaderRecord::~RuntimeShaderRecord() {
-  /* we don't have any resources on our own, nothing to release */
+  /* first release (text points into pCustomCT) */
+  if (            pGrabRT)   pGrabRT ->Release();
+  if (pTextRT && *pTextRT) (*pTextRT)->Release();
+  if (            pGrabDS)   pGrabDS ->Release();
+  if (pTextDS && *pTextDS) (*pTextDS)->Release();
+
+  if (pCustomCT)
+    free(pCustomCT);
+
+  /* release previous texture */
+  TextureManager *TexMan = TextureManager::GetSingleton();
+  std::vector<int>::iterator PTexture = Textures.begin();
+
+  while (PTexture != Textures.end()) {
+    TexMan->ReleaseTexture(*PTexture);
+    PTexture++;
+  }
+}
+
+void RuntimeShaderRecord::Release() {
+  if (pCustomCT) {
+    free(pCustomCT);
+    pCustomCT = NULL;
+  }
+
+  pBool    = NULL;
+  pInt4    = NULL;
+  pFloat4  = NULL;
+  pTexture = NULL;
+}
+
+inline void RuntimeShaderRecord::OnLostDevice(void) {
+  if (pAssociate)
+    pAssociate->DestroyDX9Shader();
+}
+
+inline void RuntimeShaderRecord::OnResetDevice(void) {
+  if (pAssociate) {
+    pAssociate->DestroyDX9Shader();
+    ActivateShader(pAssociate->pDX9ShaderWant);
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ */
+
+void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
+  Release();
+
+  TextureManager *TexMan = TextureManager::GetSingleton();
+  std::vector<int> prevTextures = Textures; Textures.clear();
+
+  /* we got a table and we can use it */
+  if (CoTa && lastOBGEDirect3DDevice9) {
+    D3DXCONSTANTTABLE_DESC desc;
+    D3DXCONSTANT_DESC cnst;
+    UINT count = 1;
+
+    /* get the description, handles are just pointers, you can't release them */
+    if (CoTa->GetDesc(&desc) == D3D_OK) {
+      /* for assigning global references */
+      ShaderManager *sm = ShaderManager::GetSingleton();
+
+      /* counts of what's in the tables */
+      int lcls[4] = {0};
+      int nums[4] = {0};
+      int cnts[5] = {0};
+      int size;
+
+      /* count what's in the tables */
+      for (int c = 0; c < desc.Constants; c++) {
+	D3DXHANDLE handle = CoTa->GetConstant(NULL, c);
+	CoTa->GetConstantDesc(handle, &cnst, &count);
+
+	if (cnst.RegisterSet <= 4) {
+	  if ((cnst.Name == strstr(cnst.Name, "cust_")))
+	    lcls[cnst.RegisterSet] += cnst.RegisterCount;
+	  if ((cnst.Name == strstr(cnst.Name, "obge_")) ||
+	      (cnst.Name == strstr(cnst.Name, "oblv_")) ||
+	      (cnst.Name == strstr(cnst.Name, "cust_")))
+	    nums[cnst.RegisterSet] += 1;
+	}
+      }
+
+      /* check if there is anything we have to do by ourself or
+       * if all the variables are handled by Oblivion
+       */
+      if (nums[D3DXRS_BOOL   ]) nums[D3DXRS_BOOL   ]++;
+      if (nums[D3DXRS_INT4   ]) nums[D3DXRS_INT4   ]++;
+      if (nums[D3DXRS_FLOAT4 ]) nums[D3DXRS_FLOAT4 ]++;
+      if (nums[D3DXRS_SAMPLER]) nums[D3DXRS_SAMPLER]++;
+
+      if (nums[D3DXRS_BOOL   ] +
+	  nums[D3DXRS_INT4   ] +
+	  nums[D3DXRS_FLOAT4 ] +
+	  nums[D3DXRS_SAMPLER]) {
+
+      /* we allocate all resources in one big contiguous block */
+      size =
+	((nums[D3DXRS_BOOL   ] +
+	  nums[D3DXRS_INT4   ] +
+	  nums[D3DXRS_FLOAT4 ] +
+	  nums[D3DXRS_SAMPLER] +
+	  nums[D3DXRS_SAMPLER]) * sizeof(struct RuntimeVariable)) +
+	 ((lcls[D3DXRS_INT4   ] * sizeof(RuntimeVariable::mem::iv)) +
+	  (lcls[D3DXRS_FLOAT4 ] * sizeof(RuntimeVariable::mem::fv)) +
+	  (lcls[D3DXRS_SAMPLER] * sizeof(RuntimeVariable::mem::tv) * 16))
+      ;
+
+      pCustomCT = calloc(size, 1);
+      pBool    = (RuntimeVariable *)pCustomCT;
+      pInt4    = pBool    + nums[D3DXRS_BOOL   ];
+      pFloat4  = pInt4    + nums[D3DXRS_INT4   ];
+      pTexture = pFloat4  + nums[D3DXRS_FLOAT4 ];
+      pSampler = pTexture + nums[D3DXRS_SAMPLER];
+      RuntimeVariable::mem::iv *ivs = (RuntimeVariable::mem::iv *)(
+		 pSampler + nums[D3DXRS_SAMPLER]);
+      RuntimeVariable::mem::fv *fvs = (RuntimeVariable::mem::fv *)(
+		 ivs      + lcls[D3DXRS_INT4   ]);
+      RuntimeVariable::mem::tv *tvs = (RuntimeVariable::mem::tv *)(
+		 fvs      + lcls[D3DXRS_FLOAT4 ]);
+      assert((void *)((char *)pCustomCT + size) == (void *)(
+		 tvs      + lcls[D3DXRS_SAMPLER] * 16));
+
+      for (int c = 0; c < desc.Constants; c++) {
+	D3DXHANDLE handle = CoTa->GetConstant(NULL, c);
+	CoTa->GetConstantDesc(handle, &cnst, &count);
+
+	if (cnst.RegisterSet > 4)
+	  continue;
+	if ((cnst.Name != strstr(cnst.Name, "obge_")) &&
+	    (cnst.Name != strstr(cnst.Name, "oblv_")) &&
+	    (cnst.Name != strstr(cnst.Name, "cust_")))
+	  continue;
+
+	switch (cnst.RegisterSet) {
+	  case D3DXRS_BOOL:
+	    pBool[cnts[D3DXRS_BOOL]].offset = cnst.RegisterIndex;
+	    pBool[cnts[D3DXRS_BOOL]].length = cnst.RegisterCount;
+	    pBool[cnts[D3DXRS_BOOL]].name = cnst.Name;
+
+	    /**/ if (cnst.Name == strstr(cnst.Name, "obge_"))
+	      break;
+	    else if (cnst.Name == strstr(cnst.Name, "oblv_"))
+	      break;
+	    else if (cnst.Name == strstr(cnst.Name, "cust_")) {
+	      if (cnst.DefaultValue)
+		pBool[cnts[D3DXRS_BOOL]].vals.condition = *((bool *)cnst.DefaultValue);
+	    }
+
+	    cnts[D3DXRS_BOOL]++;
+	    break;
+	  case D3DXRS_INT4:
+	    pInt4[cnts[D3DXRS_INT4]].offset = cnst.RegisterIndex;
+	    pInt4[cnts[D3DXRS_INT4]].length = cnst.RegisterCount;
+	    pInt4[cnts[D3DXRS_INT4]].name = cnst.Name;
+
+	    /**/ if (cnst.Name == strstr(cnst.Name, "obge_"))
+	      break;
+	    else if (cnst.Name == strstr(cnst.Name, "oblv_"))
+	      break;
+	    else if (cnst.Name == strstr(cnst.Name, "cust_")) {
+	      if (cnst.DefaultValue)
+		memcpy(ivs, cnst.DefaultValue, cnst.RegisterCount * sizeof(int) * 4);
+	      pInt4[cnts[D3DXRS_INT4]].vals.integer = ivs; ivs += cnst.RegisterCount;
+	    }
+
+	    cnts[D3DXRS_INT4]++;
+	    break;
+	  case D3DXRS_FLOAT4:
+	    pFloat4[cnts[D3DXRS_FLOAT4]].offset = cnst.RegisterIndex;
+	    pFloat4[cnts[D3DXRS_FLOAT4]].length = cnst.RegisterCount;
+	    pFloat4[cnts[D3DXRS_FLOAT4]].name = cnst.Name;
+
+	    /**/ if (cnst.Name == strstr(cnst.Name, "obge_"))
+	      break;
+	    else if (cnst.Name == strstr(cnst.Name, "oblv_")) {
+	      /**/ if (cnst.Name == strstr(cnst.Name, "oblv_WorldTransform_CURRENTPASS"))
+	        pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.wrld;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_ViewTransform_CURRENTPASS"))
+	        pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.view;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_ProjectionTransform_CURRENTPASS"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.proj;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_ReciprocalResolution_CURRENTPASS"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.rcpres;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_ReciprocalResolution_WATERHEIGHTMAPPASS"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.rcpresh;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_ReciprocalResolution_WATERDISPLACEMENTPASS"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.rcpresd;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_SunDirection"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.SunDir;
+	      else if  (cnst.Name == strstr(cnst.Name, "oblv_GameTime"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.GameTime;
+	      else
+		break;
+	    }
+	    else if (cnst.Name == strstr(cnst.Name, "cust_")) {
+	      if (cnst.DefaultValue)
+		memcpy(fvs, cnst.DefaultValue, cnst.RegisterCount * sizeof(float) * 4);
+	      pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = fvs; fvs += cnst.RegisterCount;
+	    }
+
+	    cnts[D3DXRS_FLOAT4]++;
+ 	    break;
+	  case D3DXRS_SAMPLER:
+	    pTexture[cnts[D3DXRS_SAMPLER]].offset = cnst.RegisterIndex;
+	    pTexture[cnts[D3DXRS_SAMPLER]].length = cnst.RegisterCount;
+	    pTexture[cnts[D3DXRS_SAMPLER]].name = cnst.Name;
+
+	    /**/ if (cnst.Name == strstr(cnst.Name, "obge_"))
+	      break;
+	    else if (cnst.Name == strstr(cnst.Name, "oblv_")) {
+	      /**/ if (cnst.Name == strstr(cnst.Name, "oblv_CurrRendertarget0_CURRENTPASS"))
+		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL, pTextRT = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture, pGrabRT = NULL;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_CurrDepthStenzilZ_CURRENTPASS"))
+		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL, pTextDS = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture, pGrabDS = NULL;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_CurrDepthStenzilR_CURRENTPASS"))
+		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL, pTextDZ = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture, pGrabDZ = NULL;
+	      else
+		break;
+	    }
+	    else if (cnst.Name == strstr(cnst.Name, "cust_")) {
+	      pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL;
+
+	      /* read and interprete the source and extract optional information */
+	      int tnm = -1;
+	      int sts = (RuntimeVariable::mem::tv *)
+		pAssociate->GetDX9ShaderTexture(cnst.Name,
+		(int *)&tnm,
+		(DWORD *)tvs) - tvs;
+
+	      /* specific sampler-states have been defined */
+	      if (tvs->Type) {
+		assert(sts < 16);
+
+		pSampler[cnts[D3DXRS_SAMPLER + 1]].offset = cnst.RegisterIndex;
+		pSampler[cnts[D3DXRS_SAMPLER + 1]].length = cnst.RegisterCount;
+		pSampler[cnts[D3DXRS_SAMPLER + 1]].name = cnst.Name;
+
+		pSampler[cnts[D3DXRS_SAMPLER + 1]].vals.state = tvs; tvs += sts + 1;
+ 		
+		cnts[D3DXRS_SAMPLER + 1]++; 
+	      }
+
+	      /* a specific texture has been given */
+	      if (tnm != -1) {
+		ManagedTextureRecord *tx = TexMan->GetTexture(tnm);
+		IDirect3DBaseTexture9 *dx = (tx ? tx->GetTexture() : NULL);
+
+		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = dx;
+		Textures.push_back(tnm);
+	      }
+	    }
+
+	    cnts[D3DXRS_SAMPLER]++;
+	    break;
+	}
+      }
+
+      if (!cnts[D3DXRS_BOOL	  ]) pBool    = NULL;
+      if (!cnts[D3DXRS_INT4	  ]) pInt4    = NULL;
+      if (!cnts[D3DXRS_FLOAT4	  ]) pFloat4  = NULL;
+      if (!cnts[D3DXRS_SAMPLER	  ]) pTexture = NULL;
+      if (!cnts[D3DXRS_SAMPLER + 1]) pSampler = NULL;
+    }
+    }
+  }
+
+  /* release previous texture */
+  std::vector<int>::iterator PTexture = prevTextures.begin();
+
+  while (PTexture != prevTextures.end()) {
+    TexMan->ReleaseTexture(*PTexture);
+    PTexture++;
+  }
+}
+
+void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice) {
+  if (pCustomCT) {
+    if (pTextRT || pTextDS)
+      SceneDevice->EndScene();
+
+    if (pTextRT) {
+      (*pTextRT) = NULL; IDirect3DSurface9 *pCurrRT;
+      if (SceneDevice->GetRenderTarget(0, &pCurrRT) == D3D_OK) {
+	D3DSURFACE_DESC CurrD;              pCurrRT->GetDesc(&CurrD);
+	D3DSURFACE_DESC GrabD; if (pGrabRT) pGrabRT->GetDesc(&GrabD);
+
+	/* different */
+	if (memcmp(&CurrD, &GrabD, sizeof(D3DSURFACE_DESC))) {
+	  if ( pGrabRT)   pGrabRT ->Release();
+	  if (*pTextRT) (*pTextRT)->Release();
+
+	  pGrabRT = NULL;
+	  if (StateDevice->CreateTexture(CurrD.Width, CurrD.Height, 1, CurrD.Usage, CurrD.Format, CurrD.Pool, pTextRT, NULL) == D3D_OK)
+	    (*pTextRT)->GetSurfaceLevel(0, &pGrabRT);
+	}
+
+	if (pGrabRT)
+	  SceneDevice->StretchRect(pCurrRT, NULL, pGrabRT, NULL, D3DTEXF_NONE);
+      }
+    }
+
+    if (pTextDS) {
+      (*pTextDS) = NULL; IDirect3DSurface9 *pCurrDS;
+      if (SceneDevice->GetDepthStencilSurface(&pCurrDS) == D3D_OK) {
+	D3DSURFACE_DESC CurrD;              pCurrDS->GetDesc(&CurrD);
+	D3DSURFACE_DESC GrabD; if (pGrabDS) pGrabDS->GetDesc(&GrabD);
+
+	/* different */
+	if (memcmp(&CurrD, &GrabD, sizeof(D3DSURFACE_DESC))) {
+	  if ( pGrabDS)   pGrabDS ->Release();
+	  if (*pTextDS) (*pTextDS)->Release();
+
+	  pGrabDS = NULL;
+	  if (StateDevice->CreateTexture(CurrD.Width, CurrD.Height, 1, CurrD.Usage, CurrD.Format, CurrD.Pool, pTextDS, NULL) == D3D_OK)
+	    (*pTextDS)->GetSurfaceLevel(0, &pGrabDS);
+	}
+
+	if (pGrabDS)
+	  SceneDevice->StretchRect(pCurrDS, NULL, pGrabDS, NULL, D3DTEXF_NONE);
+      }
+    }
+
+    if (pTextRT || pTextDS)
+      SceneDevice->BeginScene();
+
+    if (pTextDZ) {
+      (*pTextDZ) = NULL; IDirect3DSurface9 *pCurrDZ;
+      if (SceneDevice->GetDepthStencilSurface(&pCurrDZ) == D3D_OK) {
+	if (surfaceTexture[pCurrDZ]) {
+	  (*pTextDZ) = surfaceTexture[pCurrDZ]->tex;
+
+	  StateDevice->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+	}
+      }
+    }
+
+    if (iType == SHADER_VERTEX) {
+      RuntimeVariable *rV;
+      if ((rV = pBool))
+	do {
+	  StateDevice->SetVertexShaderConstantB(rV->offset, (const BOOL *)&rV->vals.condition, rV->length);
+	} while ((++rV)->length);
+      if ((rV = pInt4))
+	do {
+	  StateDevice->SetVertexShaderConstantI(rV->offset, (const int *)rV->vals.integer, rV->length);
+	} while ((++rV)->length);
+      if ((rV = pFloat4))
+	do {
+	  StateDevice->SetVertexShaderConstantF(rV->offset, (const float *)rV->vals.floating, rV->length);
+	} while ((++rV)->length);
+      if ((rV = pTexture))
+	do {
+	  StateDevice->SetTexture(rV->offset, rV->vals.texture);
+	} while ((++rV)->length);
+      if ((rV = pSampler))
+	do {
+	  RuntimeVariable::mem::tv *rT;
+	  if ((rT = rV->vals.state))
+	    do {
+	      StateDevice->SetSamplerState(rV->offset, rT->Type, rT->Value);
+	    } while ((++rT)->Type);
+	} while ((++rV)->length);
+    }
+    else if (iType == SHADER_PIXEL) {
+      RuntimeVariable *rV;
+      if ((rV = pBool))
+	do {
+	  StateDevice->SetPixelShaderConstantB(rV->offset, (const BOOL *)&rV->vals.condition, rV->length);
+	} while ((++rV)->length);
+      if ((rV = pInt4))
+	do {
+	  StateDevice->SetPixelShaderConstantI(rV->offset, (const int *)rV->vals.integer, rV->length);
+	} while ((++rV)->length);
+      if ((rV = pFloat4))
+	do {
+	  StateDevice->SetPixelShaderConstantF(rV->offset, (const float *)rV->vals.floating, rV->length);
+	} while ((++rV)->length);
+      if ((rV = pTexture))
+	do {
+	  StateDevice->SetTexture(rV->offset, rV->vals.texture);
+	} while ((++rV)->length);
+      if ((rV = pSampler))
+	do {
+	  RuntimeVariable::mem::tv *rT;
+	  if ((rT = rV->vals.state))
+	    do {
+	      StateDevice->SetSamplerState(rV->offset, rT->Type, rT->Value);
+	    } while ((++rT)->Type);
+	} while ((++rV)->length);
+    }
+  }
+}
+
+inline bool RuntimeShaderRecord::SetShaderConstantB(const char *name, bool value) {
+  RuntimeVariable *rV;
+  if ((rV = pBool))
+    do {
+      if (!stricmp(rV->name, name)) {
+      	rV->vals.condition = value;
+      	return true;
+      }
+    } while ((++rV)->length);
+  return false;
+}
+
+inline bool RuntimeShaderRecord::SetShaderConstantI(const char *name, int *values) {
+  RuntimeVariable *rV;
+  if ((rV = pInt4))
+    do {
+      if (!stricmp(rV->name, name)) {
+      	memcpy(rV->vals.integer, values, sizeof(int) * 4);
+      	return true;
+      }
+    } while ((++rV)->length);
+  return false;
+}
+
+inline bool RuntimeShaderRecord::SetShaderConstantF(const char *name, float *values) {
+  RuntimeVariable *rV;
+  if ((rV = pFloat4))
+    do {
+      if (!stricmp(rV->name, name)) {
+      	memcpy(rV->vals.floating, values, sizeof(float) * 4);
+      	return true;
+      }
+    } while ((++rV)->length);
+  return false;
+}
+
+bool RuntimeShaderRecord::SetShaderSamplerTexture(const char *name, int TextureNum) {
+  RuntimeVariable *rV;
+  if ((rV = pTexture))
+    do {
+      if (!stricmp(rV->name, name)) {
+        TextureManager *TexMan = TextureManager::GetSingleton();
+        TextureRecord *NewTexture = TexMan->GetTexture(TextureNum);
+
+        if (rV->vals.texture)
+          TexMan->ReleaseTexture(rV->vals.texture);
+        if (!NewTexture)
+          return false;
+
+        rV->vals.texture = NewTexture->GetTexture();
+      	return true;
+      }
+    } while ((++rV)->length);
+  return false;
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -717,7 +1381,11 @@ bool RuntimeShaderRecord::AssignShader(IUnknown *Shader, ShaderRecord *Associate
     pAssociate->pAssociate = this;
 
     /* the same binary Oblivion gets into it's hands */
+    iType = pAssociate->iType;
     pFunction = pAssociate->pOblivionBinary;
+
+    /* and it's constant-table */
+    CreateRuntimeParams(pAssociate->pOblivionConTab);
   }
 
   return bActive;
@@ -726,7 +1394,8 @@ bool RuntimeShaderRecord::AssignShader(IUnknown *Shader, ShaderRecord *Associate
 bool RuntimeShaderRecord::ActivateShader(char which) {
   /* create the necessary resources, to incorporate them at any time */
   if ((bActive = (pAssociate && pAssociate->ConstructDX9Shader(which))))
-    bActive = ((pShader = pAssociate->pDX9ShaderClss) != NULL);
+    if ((bActive = ((pShader = pAssociate->pDX9ShaderClss) != NULL)))
+      CreateRuntimeParams(pAssociate->pDX9ShaderCoTa);
 
   /* for now we don't want any replacement */
   if (!::RuntimeSources.Get())
@@ -738,7 +1407,7 @@ bool RuntimeShaderRecord::ActivateShader(char which) {
 /* -------------------------------------------------------------------------------------------------
  */
 
-IDirect3DPixelShader9 *RuntimeShaderRecord::GetRuntimeShader(IDirect3DPixelShader9 *Shader) const {
+IDirect3DPixelShader9 *RuntimeShaderRecord::GetShader(IDirect3DPixelShader9 *Shader) const {
   /* for now we don't want any replacement (return Oblivion's own shader class) */
   if (!::RuntimeSources.Get())
     return Shader;
@@ -753,7 +1422,7 @@ IDirect3DPixelShader9 *RuntimeShaderRecord::GetRuntimeShader(IDirect3DPixelShade
   return Shader;
 }
 
-IDirect3DVertexShader9 *RuntimeShaderRecord::GetRuntimeShader(IDirect3DVertexShader9 *Shader) const {
+IDirect3DVertexShader9 *RuntimeShaderRecord::GetShader(IDirect3DVertexShader9 *Shader) const {
   /* for now we don't want any replacement (return Oblivion's own shader class) */
   if (!::RuntimeSources.Get())
     return Shader;
@@ -774,7 +1443,9 @@ IDirect3DVertexShader9 *RuntimeShaderRecord::GetRuntimeShader(IDirect3DVertexSha
 ShaderManager *ShaderManager::Singleton = NULL;
 
 ShaderManager::ShaderManager() {
+#ifdef	OBGE_DEVLING
   Clear();
+#endif
 }
 
 ShaderManager::~ShaderManager() {
@@ -790,8 +1461,6 @@ ShaderManager *ShaderManager::GetSingleton() {
     if (GetFileAttributes(::ShaderOverrideDirectory.Get()) == INVALID_FILE_ATTRIBUTES) {
       _MESSAGE("Override directory %s doesn't exist, deactivating feature.", ::ShaderOverrideDirectory.Get());
       ::UseShaderOverride.Set(false);
-
-      return NULL;
     }
   }
 
@@ -799,6 +1468,74 @@ ShaderManager *ShaderManager::GetSingleton() {
     ShaderManager::Singleton = new ShaderManager();
 
   return ShaderManager::Singleton;
+}
+
+void ShaderManager::Reset() {
+  BuiltInShaders.clear();
+  RuntimeShaders.clear();
+  Shaders.clear();
+
+#ifdef	OBGE_DEVLING
+  Clear();
+#endif
+}
+
+void ShaderManager::OnReleaseDevice() {
+  RuntimeShaderList::iterator RShader = RuntimeShaders.begin();
+
+  while (RShader != RuntimeShaders.end()) {
+    delete (*RShader);
+    RShader++;
+  }
+
+  BuiltInShaderList::iterator BShader = BuiltInShaders.begin();
+
+  while (BShader != BuiltInShaders.end()) {
+    delete (*BShader);
+    BShader++;
+  }
+
+  Reset();
+}
+
+void ShaderManager::OnLostDevice() {
+  RuntimeShaderList::iterator RShader = RuntimeShaders.begin();
+
+  while (RShader != RuntimeShaders.end()) {
+    (*RShader)->OnLostDevice();
+    RShader++;
+  }
+}
+
+void ShaderManager::OnResetDevice() {
+  RuntimeShaderList::iterator RShader = RuntimeShaders.begin();
+
+  while (RShader != RuntimeShaders.end()) {
+    (*RShader)->OnResetDevice();
+
+    RShader++;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ */
+
+void ShaderManager::UpdateFrameConstants() {
+  v1_2_416::NiDX9Renderer *Renderer = v1_2_416::GetRenderer();
+  float (_cdecl * GetTimer)(bool, bool) = (float( *)(bool, bool))0x0043F490; // (TimePassed,GameTime)
+  OBGEfork::Sun *pSun = OBGEfork::Sky::GetSingleton()->sun;
+
+  ShaderConst.GameTime.x = GetTimer(0, 1);
+  ShaderConst.GameTime.w = ((int)ShaderConst.GameTime.x     ) % 60;
+  ShaderConst.GameTime.z = ((int)ShaderConst.GameTime.x / 60) % 60;
+  ShaderConst.GameTime.y = ((int)ShaderConst.GameTime.x / 60) / 60; // [-PI,0,+PI]
+  ShaderConst.GameTime.x = M_PI * (ShaderConst.GameTime.x - (12 * 60 * 60)) / (12 * 60 * 60);
+
+  v1_2_416::NiNode *SunContainer = pSun->SunBillboard.Get()->ParentNode;
+  ShaderConst.SunDir.x = SunContainer->m_localTranslate.x;
+  ShaderConst.SunDir.y = SunContainer->m_localTranslate.y;
+  ShaderConst.SunDir.z = SunContainer->m_localTranslate.z;
+  ShaderConst.SunDir.Normalize3();
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -843,7 +1580,7 @@ ShaderRecord *ShaderManager::GetBuiltInShader(const DWORD *Function) {
   return NULL;
 }
 
-RuntimeShaderRecord *ShaderManager::GetRuntimeShader(const DWORD *Function, IUnknown *Shader) {
+RuntimeShaderRecord *ShaderManager::SetRuntimeShader(const DWORD *Function, IUnknown *Shader) {
   /* search for an entry with the same function, this list is constructed on demand and
    * it's faster to search it first
    */
@@ -875,7 +1612,26 @@ RuntimeShaderRecord *ShaderManager::GetRuntimeShader(const DWORD *Function, IUnk
   return NewShader;
 }
 
-IDirect3DPixelShader9 *ShaderManager::GetRuntimeShader(IDirect3DPixelShader9 *Shader) {
+RuntimeShaderRecord *ShaderManager::GetRuntimeShader(const char *Name) {
+  /* search for an entry with the same name, this actually shouldn't
+   * really happen (no double shader-allocation)
+   */
+  RuntimeShaderList::iterator RShader = RuntimeShaders.begin();
+  while (RShader != RuntimeShaders.end()) {
+    /* identify by the same binary Oblivions got into it's hands */
+    if ((*RShader)->pAssociate && !stricmp((*RShader)->pAssociate->Name, Name))
+      return (*RShader);
+
+    RShader++;
+  }
+
+  return NULL;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ */
+
+IDirect3DPixelShader9 *ShaderManager::GetShader(IDirect3DPixelShader9 *Shader) {
   /* for now we don't want any replacement (return Oblivion's own shader class) */
   if (!::RuntimeSources.Get())
     return Shader;
@@ -883,13 +1639,13 @@ IDirect3DPixelShader9 *ShaderManager::GetRuntimeShader(IDirect3DPixelShader9 *Sh
   /* we have some replacement resource directly from the LUT, and we're going to pass that */
   RuntimeShaderRecord *hit = Shaders[(IUnknown *)Shader];
   if (hit)
-    return hit->GetRuntimeShader(Shader);
+    return hit->GetShader(Shader);
 
   /* that didn't go so well */
   return Shader;
 }
 
-IDirect3DVertexShader9 *ShaderManager::GetRuntimeShader(IDirect3DVertexShader9 *Shader) {
+IDirect3DVertexShader9 *ShaderManager::GetShader(IDirect3DVertexShader9 *Shader) {
   /* for now we don't want any replacement (return Oblivion's own shader class) */
   if (!::RuntimeSources.Get())
     return Shader;
@@ -897,10 +1653,57 @@ IDirect3DVertexShader9 *ShaderManager::GetRuntimeShader(IDirect3DVertexShader9 *
   /* we have some replacement resource directly from the LUT, and we're going to pass that */
   RuntimeShaderRecord *hit = Shaders[(IUnknown *)Shader];
   if (hit)
-    return hit->GetRuntimeShader(Shader);
+    return hit->GetShader(Shader);
 
   /* that didn't go so well */
   return Shader;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ */
+
+bool ShaderManager::SetShaderConstantB(const char *ShaderName, char *name, bool value) {
+  RuntimeShaderRecord *pShader;
+
+  if ((pShader = GetRuntimeShader(ShaderName))) {
+    char nm[256]; sprintf(nm, "cust_%s", name);
+    return pShader->SetShaderConstantB(nm, value);
+  }
+
+  return false;
+}
+
+bool ShaderManager::SetShaderConstantI(const char *ShaderName, char *name, int *values) {
+  RuntimeShaderRecord *pShader;
+
+  if ((pShader = GetRuntimeShader(ShaderName))) {
+    char nm[256]; sprintf(nm, "cust_%s", name);
+    return pShader->SetShaderConstantI(nm, values);
+  }
+
+  return false;
+}
+
+bool ShaderManager::SetShaderConstantF(const char *ShaderName, char *name, float *values) {
+  RuntimeShaderRecord *pShader;
+
+  if ((pShader = GetRuntimeShader(ShaderName))) {
+    char nm[256]; sprintf(nm, "cust_%s", name);
+    return pShader->SetShaderConstantF(nm, values);
+  }
+
+  return false;
+}
+
+bool ShaderManager::SetShaderSamplerTexture(const char *ShaderName, char *name, int TextureNum) {
+  RuntimeShaderRecord *pShader;
+
+  if ((pShader = GetRuntimeShader(ShaderName))) {
+    char nm[256]; sprintf(nm, "cust_%s", name);
+    return pShader->SetShaderSamplerTexture(nm, TextureNum);
+  }
+
+  return false;
 }
 
 /* -------------------------------------------------------------------------------------------------

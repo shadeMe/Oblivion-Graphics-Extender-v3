@@ -1,250 +1,164 @@
 #include "Commands_Shaders.h"
 #include "Commands_Misc.h"
 #include "Commands_Params.h"
-#include "EffectManager.h"
+#include "ShaderManager.h"
 #include "Script.h"
 #include "OBSEShaderInterface.h"
 
-static bool LoadEffect_Execute(COMMAND_ARGS)
-{
-	*result=0;
-	
-	char path[256];
-	int AllowDuplicates=0;
+static bool SetShaderConstantB_Execute(COMMAND_ARGS) {
+  *result = 0;
 
-	if(!ExtractArgs(EXTRACTARGS, &path, &AllowDuplicates)) return true;
+  char name[256];
+  char var[256];
+  int b;
 
-	if(IsEnabled())
-	{
-		_MESSAGE("Shader (%s) - Script refID = %x %s",path,scriptObj->refID,(scriptObj->refID==0)?"(Error NULL refID)":" ");
-		*result = EffectManager::GetSingleton()->AddEffect(path,AllowDuplicates!=0,scriptObj->refID);
-	}
+  if (!ExtractArgs(EXTRACTARGS, &name, &var, &b))
+    return true;
 
-	return true;
+  if (!IsEnabled())
+    return true;
+
+#ifndef	NDEBUG
+  if (!name[0]) {
+    Console_Print("Shader-name is invalid");
+    *result = -1; return true;
+  }
+#endif
+
+  ShaderManager::GetSingleton()->SetShaderConstantB(name, var, !!b);
+  return true;
 }
 
-static bool ApplyFullscreenShader_Execute(COMMAND_ARGS)
-{
-	*result=0;
+static bool SetShaderConstantI_Execute(COMMAND_ARGS) {
+  *result = 0;
 
-	DWORD id, HUD;
-	if(!ExtractArgs(EXTRACTARGS, &id, &HUD)) return true;
+  char name[256];
+  char var[256];
+  int i[4];
 
-	if(!IsEnabled() || !EffectManager::GetSingleton()->EnableEffect(id,true))
-		*result=-1;
+  if (!ExtractArgs(EXTRACTARGS, &name, &var, &i[0], &i[1], &i[2], &i[3]))
+    return true;
 
-	return true;
-}
-static bool RemoveFullscreenShader_Execute(COMMAND_ARGS)
-{
-	*result = 0;
-	
-	DWORD id;
-	int Delete=0;
+  if (!IsEnabled())
+    return true;
 
-	if(!ExtractArgs(EXTRACTARGS, &id, &Delete)) return true;
-	
-	if(IsEnabled())
-	{
-		if(!Delete)
-		{
-			if(!EffectManager::GetSingleton()->EnableEffect(id,false))
-			{
-				*result=-1;
-			}
-		}
-		else
-			if(!EffectManager::GetSingleton()->RemoveEffect(id))
-			{
-				*result=-1;
-			}
-	}
-	else
-		*result=-1;
-	return true;
+#ifndef	NDEBUG
+  if (!name[0]) {
+    Console_Print("Shader-name is invalid");
+    *result = -1; return true;
+  }
+#endif
+
+  ShaderManager::GetSingleton()->SetShaderConstantI(name, var, i);
+
+  return true;
 }
 
-static bool SetEffectInt_Execute(COMMAND_ARGS)
-{
-	*result = 0;
-	
-	DWORD id;
-	char var[256];
-	int i;
-	if(!ExtractArgs(EXTRACTARGS, &id, &var, &i)) return true;
+static bool SetShaderConstantF_Execute(COMMAND_ARGS) {
+  *result = 0;
 
-	if(IsEnabled())
-		EffectManager::GetSingleton()->SetEffectInt(id,var,i);
+  char name[256];
+  char var[256];
+  float f[4];
 
-	return true;
-}
-static bool SetEffectFloat_Execute(COMMAND_ARGS)
-{
-	*result = 0;
-	
-	DWORD id;
-	char var[256];
-	float f;
-	if(!ExtractArgs(EXTRACTARGS, &id, &var, &f)) return true;
+  if (!ExtractArgs(EXTRACTARGS, &name, &var, &f[0], &f[1], &f[2], &f[3]))
+    return true;
 
-	if(IsEnabled())
-		EffectManager::GetSingleton()->SetEffectFloat(id,var,f);
-	
+  if (!IsEnabled())
+    return true;
 
-	return true;
-}
-static bool SetEffectVector_Execute(COMMAND_ARGS)
-{
-	*result = 0;
-	
-	DWORD id;
-	char var[256];
-	v1_2_416::NiVector4 v;
-	if(!ExtractArgs(EXTRACTARGS, &id, &var, &v[0], &v[1], &v[2], &v[3])) return true;
+#ifndef	NDEBUG
+  if (!name[0]) {
+    Console_Print("Shader-name is invalid");
+    *result = -1; return true;
+  }
+#endif
 
-	if(IsEnabled())
-		EffectManager::GetSingleton()->SetEffectVector(id,var,&v);
-	
-	return true;
-}
-static bool SetEffectTexture_Execute(COMMAND_ARGS)
-{
-	*result = 0;
-
-	DWORD id;
-	char var[256];
-	DWORD i;
-	if(!ExtractArgs(EXTRACTARGS, &id, &var, &i)) return true;
-
-	if(IsEnabled())
-		EffectManager::GetSingleton()->SetEffectTexture(id,var,i);
-
-	return true;
+  ShaderManager::GetSingleton()->SetShaderConstantF(name, var, f);
+  return true;
 }
 
-static bool IsEffectEnabled_Execute(COMMAND_ARGS)
-{
-	*result=0;
-	DWORD id;
-	
-	if(!ExtractArgs(EXTRACTARGS, &id)) return true;
-	*result=EffectManager::GetSingleton()->GetEffectState(id);
-	return true;
+static bool SetShaderSamplerTexture_Execute(COMMAND_ARGS) {
+  *result = 0;
+
+  char name[256];
+  char var[256];
+  DWORD t;
+
+  if (!ExtractArgs(EXTRACTARGS, &name, &var, &t))
+    return true;
+
+  if (!IsEnabled())
+    return true;
+
+#ifndef	NDEBUG
+  if (!name[0]) {
+    Console_Print("Shader-name is invalid");
+    *result = -1; return true;
+  }
+
+  if (t < 0) {
+    Console_Print("Texture-ID %i is invalid", t);
+    *result = -1; return true;
+  }
+#endif
+
+  ShaderManager::GetSingleton()->SetShaderSamplerTexture(name, var, t);
+  return true;
 }
 
-CommandInfo kCommandInfo_LoadEffect =
-{
-	"LoadShader",
-	"",
-	0,
-	"Loads an effect file. (Must be in the .fx format)",
-	0,
-	2,
-	kParams_StringOptInt,
-	LoadEffect_Execute,
-	0,
-	0,
-	0
+CommandInfo kCommandInfo_SetShaderConstantB = {
+  "SetShaderConstantB",
+  "",
+  0,
+  "Sets an boolean variable in a built-in shader",
+  0,
+  3,
+  kParams_StringStringInt,
+  SetShaderConstantB_Execute,
+  0,
+  0,
+  0
 };
 
-CommandInfo kCommandInfo_ApplyFullscreenShader =
-{
-	"ApplyFullscreenShader",
-	"",
-	0,
-	"Applies a fullscreen shader to oblivion",
-	0,
-	2,
-	kParams_OneIntOneOptInt,
-	ApplyFullscreenShader_Execute,
-	0,
-	0,
-	0
+CommandInfo kCommandInfo_SetShaderConstantI = {
+  "SetShaderConstantI",
+  "",
+  0,
+  "Sets an integer-vector variable in a built-in shader",
+  0,
+  6,
+  kParams_StringStringInt4,
+  SetShaderConstantI_Execute,
+  0,
+  0,
+  0
 };
 
-CommandInfo kCommandInfo_RemoveFullscreenShader =
-{
-	"RemoveFullscreenShader",
-	"",
-	0,
-	"Removes a fullscreen shader from oblivion",
-	0,
-	2,
-	kParams_OneIntOneOptInt,
-	RemoveFullscreenShader_Execute,
-	0,
-	0,
-	0
+CommandInfo kCommandInfo_SetShaderConstantF = {
+  "SetShaderConstantF",
+  "",
+  0,
+  "Sets an float-vector variable in a built-in shader",
+  0,
+  6,
+  kParams_StringStringFloat4,
+  SetShaderConstantF_Execute,
+  0,
+  0,
+  0
 };
 
-CommandInfo kCommandInfo_SetEffectInt =
-{
-	"SetShaderInt",
-	"",
-	0,
-	"Sets an integer variable in a fullscreen shader",
-	0,
-	3,
-	kParams_SetFullscreenShaderInt,
-	SetEffectInt_Execute,
-	0,
-	0,
-	0
-};
-CommandInfo kCommandInfo_SetEffectFloat =
-{
-	"SetShaderFloat",
-	"",
-	0,
-	"Sets a float variable in a fullscreen shader",
-	0,
-	3,
-	kParams_SetFullscreenShaderFloat,
-	SetEffectFloat_Execute,
-	0,
-	0,
-	0
-};
-CommandInfo kCommandInfo_SetEffectVector =
-{
-	"SetShaderVector",
-	"",
-	0,
-	"Sets an array of 4 floats in a fullscreen shader",
-	0,
-	6,
-	kParams_SetFullscreenShaderVector,
-	SetEffectVector_Execute,
-	0,
-	0,
-	0
-};
-CommandInfo kCommandInfo_SetEffectTexture =
-{
-	"SetShaderTexture",
-	"",
-	0,
-	"Sets a texture variable in a fullscreen shader",
-	0,
-	3,
-	kParams_SetFullscreenShaderInt,
-	SetEffectTexture_Execute,
-	0,
-	0,
-	0
-};
-
-CommandInfo kCommandInfo_IsEffectEnabled =
-{
-	"IsShaderEnabled",
-	"",
-	0,
-	"Returns the state of the loaded shader",
-	0,
-	1,
-	kParams_OneInt,
-	IsEffectEnabled_Execute,
-	0,
-	0,
-	0
+CommandInfo kCommandInfo_SetShaderSamplerTexture = {
+  "SetShaderSamplerTexture",
+  "",
+  0,
+  "Sets a sampler-texture variable in a built-in shader",
+  0,
+  3,
+  kParams_StringStringInt,
+  SetShaderSamplerTexture_Execute,
+  0,
+  0,
+  0
 };

@@ -21,12 +21,15 @@ public:
 	TextureRecord();
 	~TextureRecord();
 
-	void SetTexture(IDirect3DTexture9* tex, const char* fp, bool ff = false);
-	void SetTexture(IDirect3DCubeTexture9* tex, const char* fp, bool ff = false);
-	void SetTexture(IDirect3DVolumeTexture9* tex, const char* fp, bool ff = false);
+	bool LoadTexture(TextureRecordType type, const char *fp, bool NONPOW2 = true, bool Private = false);
+
+	void SetTexture(IDirect3DTexture9* tex, const char *fp, bool NONPOW2 = true, bool Private = false);
+	void SetTexture(IDirect3DCubeTexture9* tex, const char *fp, bool NONPOW2 = true, bool Private = false);
+	void SetTexture(IDirect3DVolumeTexture9* tex, const char *fp, bool NONPOW2 = true, bool Private = false);
 
 	IDirect3DBaseTexture9* GetTexture() const;
 
+	bool HasTexture(char *path) const;
 	bool HasTexture(IDirect3DBaseTexture9* tex) const;
 	bool HasTexture(IDirect3DTexture9* tex) const;
 	bool HasTexture(IDirect3DCubeTexture9* tex) const;
@@ -37,38 +40,43 @@ public:
 	bool IsType(TextureRecordType type) const;
 
 	const char *GetPath() const;
-	bool IsFromFile() const;
+	bool IsNONPOW2() const;
+	bool IsPrivate() const;
 
-	void Release();
+public:
 	void Purge();
+	void Kill();
 
 private:
-	TextureRecordType type;
+	char				Filepath[MAX_PATH];
+	bool				Private;
+	UINT32				ParentRefID;
+	// Associates a effect with the esp/esm file the script the effect was created in.
+
+	bool				NONPOW2;
+	TextureRecordType		type;
 	union {
 	  IDirect3DBaseTexture9*	texture;
 	  IDirect3DTexture9*		textureP;
 	  IDirect3DCubeTexture9*	textureC;
 	  IDirect3DVolumeTexture9*	textureV;
 	};
-
-	char				Filepath[260];
-	bool				FromFile;
 };
 
-class StaticTextureRecord : public TextureRecord
+class ManagedTextureRecord : public TextureRecord
 {
 public:
-	StaticTextureRecord();
-	~StaticTextureRecord();
+	ManagedTextureRecord();
+	~ManagedTextureRecord();
 
 	int AddRef();
 	int Release();
-
-	int				RefCount;
+	int RefCount;
 };
 
-typedef std::vector<TextureRecord*> TextureList;
-typedef std::vector<StaticTextureRecord*> StaticTextureList;
+//pedef std::vector<TextureRecord *> TextureList;
+typedef std::vector<ManagedTextureRecord *> ManagedTextureList;
+typedef std::map<int, ManagedTextureRecord *> TextureRegistry;
 
 class TextureManager
 {
@@ -76,42 +84,32 @@ public:
 	TextureManager();
 	~TextureManager();
 
-	static TextureManager*	GetSingleton();
-	static TextureManager*	Singleton;
+	static TextureManager *GetSingleton();
+	static TextureManager *Singleton;
 
-	void				InitialiseFrameTextures(void);
-	void				DeviceRelease(void);
-	int				LoadTexture(char *Filename, TextureRecordType type, DWORD FromFile);
-	StaticTextureRecord*		LoadStaticTexture(char *Filename, TextureRecordType type);
-	void				NewGame(void);
-	void				LoadGame(OBSESerializationInterface *Interface);
-	void				SaveGame(OBSESerializationInterface *Interface);
-	bool				IsValidTexture(int TextureNum);
-	TextureRecord*			GetTexture(int TextureNum);
-	void				FreeTexture(int index);
-	template<class IDirect3DTextureType9>
-	void				ReleaseTexture(IDirect3DTextureType9* texture);
-	template<class IDirect3DTextureType9>
-	int				FindTexture(IDirect3DTextureType9* texture);
+	void						NewGame(void);
+	void						LoadGame(OBSESerializationInterface *Interface);
+	void						SaveGame(OBSESerializationInterface *Interface);
 
-	TextureList			Textures;
-	StaticTextureList		StaticTextures;
+private:
+	void						Clear();
 
-	IDirect3DTexture9*		thisframeTex;						
-	IDirect3DSurface9*		thisframeSurf;
+public:
+	int						LoadPrivateTexture(const char *Filename, TextureRecordType type, bool NONPOW2 = true);
+	int						LoadManagedTexture(const char *Filename, TextureRecordType type, bool NONPOW2 = true);
+	inline bool					IsTextureValid(int TextureNum) const { return Textures.count(TextureNum) != 0; };
+	inline ManagedTextureRecord *			GetTexture(int TextureNum) { return (IsTextureValid(TextureNum) ? Textures[TextureNum] : NULL); };
+	bool						ReleaseTexture(int TextureNum);
+	void						FreeTexture(int TextureNum);
+	template<class IDirect3DTextureType9> bool	ReleaseTexture(IDirect3DTextureType9 *texture);
+	template<class IDirect3DTextureType9> int	FindTexture(IDirect3DTextureType9 *texture);
 
-	IDirect3DTexture9*		lastpassTex;						
-	IDirect3DSurface9*		lastpassSurf;					
-	
-	IDirect3DTexture9*		lastframeTex;
-	IDirect3DSurface9*		lastframeSurf;
-	
-	bool				HasDepth;
-	
-	IDirect3DTexture9*		depth;
-	IDirect3DSurface9*		depthSurface;
-	IDirect3DTexture9*		depthRAWZ;
-	
-	bool				RAWZflag;
+private:
+	int						TextureIndex;
+	int						MaxTextureIndex;
+
+	TextureRegistry					Textures;
+//	EffectList					Textures;
+	ManagedTextureList				ManagedTextures;
 };
 

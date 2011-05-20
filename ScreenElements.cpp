@@ -69,7 +69,7 @@ void	Sprite::Render(ID3DXSprite *sprite)
 {
 	TextureManager *TexMan = TextureManager::GetSingleton();
 
-	if (enabled&&TexMan->IsValidTexture(tex))
+	if (enabled && TexMan->IsTextureValid(tex))
 	{
 		TextureRecord *TexRec = TexMan->GetTexture(tex);
 
@@ -112,13 +112,16 @@ Sprite	*HUDManager::index(int ind)
 
 void	HUDManager::PurgeTexture(int TextureIndex)
 {
-	for(int i=0; i<ScreenElementList.size()-1; i++)
-	{
-		if(ScreenElementList[i]->GetTexture()==TextureIndex)
-		{
-			ScreenElementList[i]->SetTexture(-1);
-			//ScreenElementList[i]->enabled=false;
-		}
+	/* release previous texture */
+	std::vector<Sprite *>::iterator SE = ScreenElementList.begin();
+
+	while (SE != ScreenElementList.end()) {
+	  if ((*SE)->GetTexture() == TextureIndex) {
+	    (*SE)->SetTexture(-1);
+	  //(*SE)->enabled = false;
+	  }
+
+	  SE++;
 	}
 }
 
@@ -147,7 +150,7 @@ void	HUDManager::Render()
 
 	sprite->Begin(0);
 	
-	for(::std::vector<Sprite*>::iterator i=ScreenElementList.begin(); i!=ScreenElementList.end(); i++)
+	for(std::vector<Sprite*>::iterator i=ScreenElementList.begin(); i!=ScreenElementList.end(); i++)
 	{
 		(*i)->Render(sprite);
 	}

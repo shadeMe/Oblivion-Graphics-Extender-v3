@@ -64,7 +64,7 @@
 //	SURFACE_ID_WATER6		0x0049DBC3     = static	6	0			100x100
 //	SURFACE_ID_WATER6		0x007EA020     = static	6	0			0
 	SURFACE_ID_WATER6  = 6,		// Water-Displacement	6	D3DFMT_A32B32G32R32F	100x100	->	256x256		<-	WaterSurfaceResolution 100|80 HiRes.ini
-	SURFACE_ID_WATER7  = 7,		//			6				100x100	->	256x256
+	SURFACE_ID_WATER7  = 7,		//			6				100x100	->	256x256		<-	displacement
 //	SURFACE_ID_WATER8		0x0049DAE7     = query	--	--------------------	-------
 	SURFACE_ID_WATER8  = 8,		// Water-Surface	6				80x80	->	128x128
 	SURFACE_ID_WATER9  = 9,		//			C	D3DFMT_L16		100x1	->	256x1		<-	WaterSurfaceResolution 100|80 HiRes.ini

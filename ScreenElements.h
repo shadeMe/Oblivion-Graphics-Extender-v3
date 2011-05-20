@@ -54,10 +54,10 @@ public:
 class HUDManager
 {
 public:
-	static	HUDManager*				Singleton;
-	::std::vector<Sprite*>			ScreenElementList;
-	int								NextElementIndex;
-	LPD3DXSPRITE					sprite;
+	static	HUDManager*			Singleton;
+	std::vector<Sprite*>			ScreenElementList;
+	int					NextElementIndex;
+	LPD3DXSPRITE				sprite;
 
 private:
 	HUDManager();									// Declare as private. Use GetSingleton to initialise HUDManager.

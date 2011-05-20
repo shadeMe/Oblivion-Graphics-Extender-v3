@@ -1,14 +1,25 @@
-#include "D3D9.hpp"
 #include "RenderSurfaceParametersHook.hpp"
 #include "windows.h"
 #include "obse_common/SafeWrite.h"
 #include "GlobalSettings.h"
+#include "D3D9.hpp"
+#include "D3D9Identifiers.hpp"
+#include "OBSEShaderInterface.h"
+
 #include <assert.h>
 
 #include "Hooking/detours/detours.h"
 
 static global<int> ReflectionMapSize(256, NULL, "ScreenBuffers", "iReflectionMapSize");
+static global<int> WaterHeightMapSize(512, NULL, "ScreenBuffers", "iWaterHeightMapSize");
+static global<int> WaterDisplacementMapSize(256, NULL, "ScreenBuffers", "iWaterDisplacementMapSize");
 static global<int> RendererWidth(0, "Oblivion.ini", "Display", "iSize W");
+static global<bool> UseWaterReflectionsMisc(0, "Oblivion.ini", "Water", "bUseWaterReflectionsMisc");
+static global<bool> UseWaterReflectionsStatics(0, "Oblivion.ini", "Water", "bUseWaterReflectionsStatics");
+static global<bool> UseWaterReflectionsTrees(0, "Oblivion.ini", "Water", "bUseWaterReflectionsTrees");
+static global<bool> UseWaterReflectionsActors(0, "Oblivion.ini", "Water", "bUseWaterReflectionsActors");
+static global<int> SurfaceTextureSize(128, "Oblivion.ini", "Water", "uSurfaceTextureSize");
+static global<bool> UseWaterHiRes(0, "Oblivion.ini", "Water", "bUseWaterHiRes");
 
 /* ------------------------------------------------------------------------------------------------- */
 
@@ -17,6 +28,7 @@ class Anonymous {
 public:
   void TrackCombinerPass(int unk1);
 
+  void TrackReflectionCull(int unk1);
   void TrackReflectionPass(int unk1, int unk2);
   void TrackWaterSurfacePass();
   void TrackWaterSurfaceLoop();
@@ -40,10 +52,15 @@ public:
 
   bool TrackVideoPass(int unk1, int unk2);
   void TrackMiscPass(int unk1);
+
+public:
+  void *TrackRenderedSurface(v1_2_416::NiDX9Renderer *renderer, int Width, int Height, int Flags, D3DFORMAT Format, enum SurfaceIDs SurfaceTypeID);
 };
 
 void (__thiscall Anonymous::* CombinerPass)(int)/* =
 	(void (__thiscall TES::*)(int, int))0040C830*/;
+void (__thiscall Anonymous::* ReflectionCull)(int)/* =
+	(void (__thiscall TES::*)(int, int))0049CBF0*/;
 void (__thiscall Anonymous::* ReflectionPass)(int, int)/* =
 	(void (__thiscall TES::*)(int, int))0x0049BEF0*/;
 void (__thiscall Anonymous::* WaterSurfaceLoop)()/* =
@@ -84,6 +101,8 @@ void (__cdecl * IdlePass)(int, int)/* =
 
 void (__thiscall Anonymous::* TrackCombinerPass)(int)/* =
 	(void (__thiscall TES::*)(int, int))0040C830*/;
+void (__thiscall Anonymous::* TrackReflectionCull)(int)/* =
+	(void (__thiscall TES::*)(int, int))0049CBF0*/;
 void (__thiscall Anonymous::* TrackReflectionPass)(int, int)/* =
 	(void (__thiscall TES::*)(int, int))0x0049BEF0*/;
 void (__thiscall Anonymous::* TrackWaterSurfaceLoop)()/* =
@@ -121,6 +140,15 @@ void (__thiscall Anonymous::* TrackMiscPass)(int)/* =
 
 static enum OBGEPass previousPass;
 
+void Anonymous::TrackReflectionCull(int unk1) {
+	*((char *)0x00B07068) = UseWaterReflectionsActors.Get();	// boolUseWaterReflectionsActors
+	*((char *)0x00B07070) = UseWaterReflectionsTrees.Get();		// boolUseWaterReflectionsTrees
+	*((char *)0x00B07078) = UseWaterReflectionsStatics.Get();	// boolUseWaterReflectionsStatics
+	*((char *)0x00B07080) = UseWaterReflectionsMisc.Get();	        // boolUseWaterReflectionsMisc
+
+	(this->*ReflectionCull)(unk1);
+}
+
 void Anonymous::TrackCombinerPass(int unk1) {
 	previousPass = currentPass;
 	currentPass = OBGEPASS_MAIN;
@@ -129,6 +157,12 @@ void Anonymous::TrackCombinerPass(int unk1) {
 		frame_log->Message("OD3D9: CombinerPass started");
 //	else
 //		_MESSAGE("OD3D9: CombinerPass started");
+
+	{
+		/* right location? */
+		ShaderManager *sm = ShaderManager::GetSingleton();
+		sm->UpdateFrameConstants();
+	}
 
 	(this->*CombinerPass)(unk1);
 
@@ -454,7 +488,8 @@ void Anonymous::TrackMiscPass(int unk1) {
 	/* occurs as early as the splash-video
 	 */
 	previousPass = currentPass;
-	currentPass = OBGEPASS_UNKNOWN;
+//	currentPass = OBGEPASS_UNKNOWN;
+	currentPass = OBGEPASS_MAIN;
 
 	if (frame_log)
 		frame_log->Message("OD3D9: MiscPass started");
@@ -475,13 +510,15 @@ void __cdecl TrackIdlePass(int unk1, int unk2) {
 	/* occurs as early as the menu
 	 */
 	previousPass = currentPass;
-	currentPass = OBGEPASS_UNKNOWN;
+//	currentPass = OBGEPASS_UNKNOWN;
+	currentPass = OBGEPASS_ANY;
 
 	if (frame_log)
 		frame_log->Message("OD3D9: IdlePass started");
 //	else
 //		_MESSAGE("OD3D9: IdlePass started");
 
+	// Menu?
 	IdlePass(unk1, unk2);
 
 	if (frame_log)
@@ -494,16 +531,18 @@ void __cdecl TrackIdlePass(int unk1, int unk2) {
 
 /* ------------------------------------------------------------------------------------------------- */
 
-void (__stdcall * GetRenderedSurfaceParameters)(v1_2_416::NiDX9Renderer *, enum SurfaceIDs SurfaceTypeID, int *pWidth, int *pHeight, int, int *, int *pFormat) =
-	(void (__stdcall *)(v1_2_416::NiDX9Renderer *, enum SurfaceIDs SurfaceTypeID, int *pWidth, int *pHeight, int, int *, int *pFormat))0x007C0D10;
+void *(__thiscall Anonymous::* GetRenderedSurface)(v1_2_416::NiDX9Renderer *, int Width, int Height, int Flags, D3DFORMAT Format, enum SurfaceIDs SurfaceTypeID)/* =
+	(void *(__thiscall *)(v1_2_416::NiDX9Renderer *, int Width, int Height, int Flags, int Format, enum SurfaceIDs SurfaceTypeID))0x007C1B50*/;
 
+void *(__thiscall Anonymous::* TrackRenderedSurface)(v1_2_416::NiDX9Renderer *renderer, int Width, int Height, int Flags, D3DFORMAT Format, enum SurfaceIDs SurfaceTypeID)/* =
+	(void (__thiscall *)(v1_2_416::NiDX9Renderer *renderer, int Width, int Height, int Flags, int Format, enum SurfaceIDs SurfaceTypeID))0x007C1B50*/;
 
-void __stdcall TrackRenderedSurfaceParameters(v1_2_416::NiDX9Renderer *renderer, enum SurfaceIDs SurfaceTypeID, int *pWidth, int *pHeight, int unk1, int *unk2, int *pFormat) {
+void *Anonymous::TrackRenderedSurface(v1_2_416::NiDX9Renderer *renderer, int Width, int Height, int Flags, D3DFORMAT Format, enum SurfaceIDs SurfaceTypeID) {
 //	assert(false);
 
-	GetRenderedSurfaceParameters(renderer, SurfaceTypeID, pWidth, pHeight, unk1, unk2, pFormat);
-
-#if 0	/* currently of no use ... maybe you find one :^) */
+#if 1	/* apparently the surface-type is always 0 here! Oblivion does not pass any!
+         * lok at the parameters function below to detect surface-types
+         */
 	const char *SurfaceTypeName = "unknown";
 	switch (SurfaceTypeID) {
 		case SURFACE_ID_HDR0: SurfaceTypeName = "HDR-BoxSample Surface"; break;
@@ -514,8 +553,8 @@ void __stdcall TrackRenderedSurfaceParameters(v1_2_416::NiDX9Renderer *renderer,
 
 		case SURFACE_ID_UNK5: break;
 
-		case SURFACE_ID_WATER6: SurfaceTypeName = "Water[6] Surface"; break;
-		case SURFACE_ID_WATER7: SurfaceTypeName = "Water[7] Surface"; break;
+		case SURFACE_ID_WATER6: SurfaceTypeName = "Water pre-heightmap Surface"; break;
+		case SURFACE_ID_WATER7: SurfaceTypeName = "Water pre-displacement Surface"; break;
 		case SURFACE_ID_WATER8: SurfaceTypeName = "Water[8] Surface"; break;
 		case SURFACE_ID_WATER9: SurfaceTypeName = "Water[9] Surface"; break;
 		case SURFACE_ID_WATER10: SurfaceTypeName = "Water[10] Surface"; break;
@@ -539,17 +578,181 @@ void __stdcall TrackRenderedSurfaceParameters(v1_2_416::NiDX9Renderer *renderer,
 		case SURFACE_ID_SHADOW24: SurfaceTypeName = "Second Shadowmap Surface"; break;
 	}
 
-	_MESSAGE("OD3D9: Intercepted GetRenderedSurfaceParameters():");
-	_MESSAGE("OD3D9: Intercepted Purpose: %s [0x%02x]", SurfaceTypeName, SurfaceTypeID);
-	_MESSAGE("OD3D9: Intercepted Format-Flags: 0x%08x", *pFormat);
-	_MESSAGE("OD3D9: Intercepted {W,H} before: {%d,%d}", *pWidth, *pHeight);
+	_DMESSAGE("OD3D9: Intercepted GetRenderedSurface():");
+	_DMESSAGE("OD3D9: Intercepted Purpose: %s [0x%02x]", SurfaceTypeName, SurfaceTypeID);
+	_DMESSAGE("OD3D9: Intercepted Flags: 0x%08x", Flags);
+	_DMESSAGE("OD3D9: Intercepted Format: %s", findFormat(Format));
+	_DMESSAGE("OD3D9: Intercepted {W,H}: {%d,%d}", Width, Height);
+#endif
 
-//	switch (SurfaceTypeID) {
-//		case SURFACE_ID_REFL13: *pWidth = *pHeight = 1024; break;
-//		case SURFACE_ID_REFL14: *pWidth = *pHeight = 1024; break;
-//	}
+	UInt32 rWidth = v1_2_416::GetRenderer()->SizeWidth;
+	UInt32 rHeight = v1_2_416::GetRenderer()->SizeHeight;
 
-	_MESSAGE("OD3D9: Intercepted {W,H} after: {%d,%d}", *pWidth, *pHeight);
+	/* these aren't well autodetected by Oblivion, they are
+	 * intermediate render-targets for passing data between the
+	 * main-pass and post-passes
+	 */
+	if ((Width == rWidth) && (Height == rHeight) && !Format) {
+          if (IsHDR())
+	    Format = D3DFMT_A16B16G16R16F;
+          else
+	    Format = D3DFMT_A8R8G8B8;
+	}
+
+	return (this->*GetRenderedSurface)(renderer, Width, Height, Flags, Format, SurfaceTypeID);
+
+//	assert(NULL);
+}
+
+/* ------------------------------------------------------------------------------------------------- */
+
+void (__stdcall * GetRenderedSurfaceParameters)(v1_2_416::NiDX9Renderer *, enum SurfaceIDs SurfaceTypeID, int *pWidth, int *pHeight, int, int *, D3DFORMAT *pFormat) =
+	(void (__stdcall *)(v1_2_416::NiDX9Renderer *, enum SurfaceIDs SurfaceTypeID, int *pWidth, int *pHeight, int, int *, D3DFORMAT *pFormat))0x007C0D10;
+
+
+void __stdcall TrackRenderedSurfaceParameters(v1_2_416::NiDX9Renderer *renderer, enum SurfaceIDs SurfaceTypeID, int *pWidth, int *pHeight, int unk1, int *unk2, D3DFORMAT *pFormat) {
+//	assert(false);
+
+	GetRenderedSurfaceParameters(renderer, SurfaceTypeID, pWidth, pHeight, unk1, unk2, pFormat);
+
+//	assert(NULL);
+
+#if 1	/* currently of no use ... maybe you find one :^) */
+	const char *SurfaceTypeName = "unknown";
+	switch (SurfaceTypeID) {
+		case SURFACE_ID_HDR0: SurfaceTypeName = "HDR-BoxSample Surface"; break;
+		case SURFACE_ID_HDR1: SurfaceTypeName = "HDR-PointSample Surface"; break;
+		case SURFACE_ID_HDR2: SurfaceTypeName = "HDR-Intermediate Surface"; break;
+		case SURFACE_ID_HDR3: SurfaceTypeName = "HDR-Origin Surface"; break;
+		case SURFACE_ID_HDR4: SurfaceTypeName = "HDR-Destination Surface"; break;
+
+		case SURFACE_ID_UNK5: break;
+
+		case SURFACE_ID_WATER6: SurfaceTypeName = "Water pre-heightmap Surface"; break;
+		case SURFACE_ID_WATER7: SurfaceTypeName = "Water pre-displacement Surface"; break;
+		case SURFACE_ID_WATER8: SurfaceTypeName = "Water[8] Surface"; break;
+		case SURFACE_ID_WATER9: SurfaceTypeName = "Water[9] Surface"; break;
+		case SURFACE_ID_WATER10: SurfaceTypeName = "Water[10] Surface"; break;
+		case SURFACE_ID_WATER11: SurfaceTypeName = "Water[11] Surface"; break;
+		case SURFACE_ID_WATER12: SurfaceTypeName = "Water[12] Surface"; break;
+
+		case SURFACE_ID_REFL13: SurfaceTypeName = "First Reflection Surface"; break;
+		case SURFACE_ID_REFL14: SurfaceTypeName = "Second Reflection Surface"; break;
+
+		case SURFACE_ID_NONHDR15: break;
+		case SURFACE_ID_NONHDR16: break;
+		case SURFACE_ID_NONHDR17: break;
+		case SURFACE_ID_NONHDR18: break;
+		case SURFACE_ID_NONHDR19: break;
+
+		case SURFACE_ID_UNK20: break;
+		case SURFACE_ID_UNK21: break;
+		case SURFACE_ID_UNK22: break;
+
+		case SURFACE_ID_SHADOW23: SurfaceTypeName = "First Shadowmap Surface"; break;
+		case SURFACE_ID_SHADOW24: SurfaceTypeName = "Second Shadowmap Surface"; break;
+	}
+
+	_DMESSAGE("OD3D9: Intercepted GetRenderedSurfaceParameters():");
+	_DMESSAGE("OD3D9: Intercepted Purpose: %s [0x%02x]", SurfaceTypeName, SurfaceTypeID);
+//	_DMESSAGE("OD3D9: Intercepted Flags: 0x%08x", Flags);
+	_DMESSAGE("OD3D9: Intercepted Format: %s", findFormat(*pFormat));
+	_DMESSAGE("OD3D9: Intercepted {W,H} before: {%d,%d}", *pWidth, *pHeight);
+
+	/* turn off automipmapping */
+	specialUsage = 0;
+
+	switch (SurfaceTypeID) {
+#if	1
+		case SURFACE_ID_WATER6:
+		  /* Water heightmap */
+		  if (UseWaterHiRes.Get()) {
+		    if (WaterHeightMapSize.Get()) {
+		      *pWidth = *pHeight = WaterHeightMapSize.Get();
+		    }
+		    else {
+		      *pWidth = *pHeight = 256;
+		    }
+		  }
+		  else {
+		    if (WaterHeightMapSize.Get()) {
+		      *pWidth = *pHeight = WaterHeightMapSize.Get();
+		    }
+		    else {
+		      *pWidth = *pHeight = 128;
+		    }
+		  }
+
+		  {
+		    ShaderManager *sm = ShaderManager::GetSingleton();
+		    const float W = (float)*pWidth;
+		    const float H = (float)*pHeight;
+
+		    /* record constants */
+		    sm->ShaderConst.rcpresh[0] = 1.0f / W;
+		    sm->ShaderConst.rcpresh[1] = 1.0f / H;
+		    sm->ShaderConst.rcpresh[2] = W / H;
+		    sm->ShaderConst.rcpresh[3] = W * H;
+		  }
+		  break;
+		case SURFACE_ID_WATER7:
+		  /* Water displacement */
+		  if (UseWaterHiRes.Get()) {
+		    if (WaterDisplacementMapSize.Get()) {
+		      *pWidth = *pHeight = WaterDisplacementMapSize.Get();
+		    }
+		    else {
+		      *pWidth = *pHeight = 256;
+		    }
+		  }
+		  else {
+		    if (WaterDisplacementMapSize.Get()) {
+		      *pWidth = *pHeight = WaterDisplacementMapSize.Get();
+		    }
+		    else {
+		      *pWidth = *pHeight = 256;
+		    }
+		  }
+
+		  {
+		    ShaderManager *sm = ShaderManager::GetSingleton();
+		    const float W = (float)*pWidth;
+		    const float H = (float)*pHeight;
+
+		    /* record constants */
+		    sm->ShaderConst.rcpresd[0] = 1.0f / W;
+		    sm->ShaderConst.rcpresd[1] = 1.0f / H;
+		    sm->ShaderConst.rcpresd[2] = W / H;
+		    sm->ShaderConst.rcpresd[3] = W * H;
+		  }
+		  break;
+	//	case SURFACE_ID_WATER12: *pWidth = *pHeight = 256; break;
+
+		/* are these the reflection-rendertargets or water surfaces? */
+		case SURFACE_ID_REFL13:
+		case SURFACE_ID_REFL14:
+		  /* Reflection Render-Surface Dimension (square) */
+		  if ((ReflectionMapSize.data >= 256) &&
+		      (ReflectionMapSize.data <= 2560)) {
+
+		      *pWidth = *pHeight = ReflectionMapSize.data;
+		  }
+		  else if ((ReflectionMapSize.data == 0) &&
+			   (RendererWidth.data >= 256) &&
+			   (RendererWidth.data <= 2560)) {
+
+		      *pWidth = *pHeight = RendererWidth.data;
+		  }
+
+#if	defined(OBGE_AUTOMIPMAP)
+		  /* let's try mipmapping this fella */
+		  specialUsage |= D3DUSAGE_AUTOGENMIPMAP;
+#endif
+		  break;
+#endif
+	}
+
+	_DMESSAGE("OD3D9: Intercepted {W,H} after: {%d,%d}", *pWidth, *pHeight);
 #endif
 }
 
@@ -562,6 +765,7 @@ void CreateRenderSurfaceHook(void) {
 
 	/* ReflectionPass */
 	*((int *)&CombinerPass)          = 0x0040C830;
+	*((int *)&ReflectionCull)        = 0x0049CBF0;
 	*((int *)&ReflectionPass)        = 0x0049BEF0;
 	*((int *)&WaterSurfaceLoop)      = 0x0049A200;
 	*((int *)&WaterSurfacePass)      = 0x0049D7B0;  // broken sub esp 8
@@ -583,7 +787,9 @@ void CreateRenderSurfaceHook(void) {
 	*((int *)&VideoPass)             = 0x004106C0;
 	*((int *)&MiscPass)              = 0x0057F170;
 
+
 	TrackCombinerPass          = &Anonymous::TrackCombinerPass;
+	TrackReflectionCull        = &Anonymous::TrackReflectionCull;
 	TrackReflectionPass        = &Anonymous::TrackReflectionPass;
 	TrackWaterSurfaceLoop      = &Anonymous::TrackWaterSurfaceLoop;		// ?
 	TrackWaterSurfacePass      = &Anonymous::TrackWaterSurfacePass;		// ?
@@ -607,12 +813,16 @@ void CreateRenderSurfaceHook(void) {
 
 	*((int *)&IdlePass) = 0x007D71C0;
 	/* GetRenderedSurfaceParameters */
+	*((int *)&GetRenderedSurface          ) = 0x007C1B50;
 	*((int *)&GetRenderedSurfaceParameters) = 0x007C0D10;
+
+	TrackRenderedSurface       = &Anonymous::TrackRenderedSurface;
 
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
 
 	DetourAttach(&(PVOID&)CombinerPass,          *((PVOID *)&TrackCombinerPass));
+	DetourAttach(&(PVOID&)ReflectionCull,        *((PVOID *)&TrackReflectionCull));
 	DetourAttach(&(PVOID&)ReflectionPass,        *((PVOID *)&TrackReflectionPass));
 //	DetourAttach(&(PVOID&)WaterSurfaceLoop,      *((PVOID *)&TrackWaterSurfaceLoop));
 //	DetourAttach(&(PVOID&)WaterSurfacePass,      *((PVOID *)&TrackWaterSurfacePass));
@@ -635,7 +845,8 @@ void CreateRenderSurfaceHook(void) {
 	DetourAttach(&(PVOID&)MiscPass,              *((PVOID *)&TrackMiscPass));
 
 	DetourAttach(&(PVOID&)IdlePass, TrackIdlePass);
-	DetourAttach(&(PVOID&)GetRenderedSurfaceParameters, TrackRenderedSurfaceParameters);
+	DetourAttach(&(PVOID&)GetRenderedSurface, *((PVOID *)&TrackRenderedSurface         ));
+	DetourAttach(&(PVOID&)GetRenderedSurfaceParameters,   TrackRenderedSurfaceParameters);
         LONG error = DetourTransactionCommit();
 
 //	*((int *)&WaterSurfacePass) += 2;  // broken sub esp 8, prefixes 2 bytes before instructions
@@ -648,17 +859,118 @@ void CreateRenderSurfaceHook(void) {
         }
 
 	/* Reflection Render-Surface Dimension (square) */
-	if ((ReflectionMapSize.data >= 256) &&
-	    (ReflectionMapSize.data <= 2560)) {
+	if ((ReflectionMapSize.Get() >= 256) &&
+	    (ReflectionMapSize.Get() <= 2560)) {
 
-		SafeWrite32(0x0049BFAF, ReflectionMapSize.data);
+		SafeWrite32(0x0049BFAF, ReflectionMapSize.Get());
 	}
-	else if ((ReflectionMapSize.data == 0) &&
-	         (RendererWidth.data >= 256) &&
-	         (RendererWidth.data <= 2560)) {
+	else if ((ReflectionMapSize.Get() == 0) &&
+	         (RendererWidth.Get() >= 256) &&
+	         (RendererWidth.Get() <= 2560)) {
 
-		SafeWrite32(0x0049BFAF, RendererWidth.data);
+		SafeWrite32(0x0049BFAF, RendererWidth.Get());
 	}
+
+	//00B07058	// flagUseWaterHiRes
+	//00B45FD0	// OneIfWaterHiRes
+	//00B45FC8	// WaterSurfaceResolution
+	//00B45FCC	// widthStaticSquareForSomeSurface2log2
+	if (UseWaterHiRes.Get()) {
+		SafeWrite32(0x00B45FD0, 1);
+		SafeWrite32(0x00B45FC8, 256);
+		SafeWrite32(0x00B45FCC, 8);
+
+		if ((WaterHeightMapSize.Get() >= 256) &&
+		    (WaterHeightMapSize.Get() <= 1024)) {
+		    	int l = 8;
+		    	while ((1 << l) < WaterHeightMapSize.Get())
+		    	  l++;
+
+			SafeWrite32(0x00499F0A, 1 << l);	// SetWaterResolution
+			SafeWrite32(0x00499F14, l);		// SetWaterResolution
+			SafeWrite32(0x007E1092, 1 << l);	// Heightmap constructor
+			SafeWrite32(0x007E109C, l);		// Heightmap constructor
+
+			SafeWrite32(0x0049D9A8, 1 << l);	// R32F
+			SafeWrite32(0x0049D9C5, 1 << l);	// A8R8G8B8
+
+			WaterHeightMapSize.Set(1 << l);
+		}
+		else
+			WaterHeightMapSize.Set(0);
+	}
+	else {
+		SafeWrite32(0x00B45FD0, 0);
+		SafeWrite32(0x00B45FC8, 128);
+		SafeWrite32(0x00B45FCC, 1);
+
+		if ((WaterHeightMapSize.Get() >= 32) &&
+		    (WaterHeightMapSize.Get() <= 128)) {
+		    	int l = 7;
+		    	while ((1 << l) > WaterHeightMapSize.Get())
+		    	  l--;
+
+			SafeWrite32(0x00499F20, 1 << l);	// SetWaterResolution
+			SafeWrite32(0x00499F2A, l);		// SetWaterResolution
+			SafeWrite32(0x007E10A8, 1 << l);	// Heightmap constructor
+			SafeWrite32(0x007E10B2, l);		// Heightmap constructor
+
+			SafeWrite32(0x0049D9D3, 1 << l);	// R32F
+			SafeWrite32(0x0049D9EF, 1 << l);	// A8R8G8B8
+
+			WaterHeightMapSize.Set(1 << l);
+		}
+		else
+			WaterHeightMapSize.Set(0);
+	}
+
+	//00B07058	// flagUseWaterHiRes
+	//00B45FD0	// OneIfWaterHiRes
+	//00B45FC8	// WaterSurfaceResolution
+	//00B45FCC	// widthStaticSquareForSomeSurface2log2
+	if (UseWaterHiRes.Get()) {
+		if ((WaterDisplacementMapSize.Get() >= 256) &&
+		    (WaterDisplacementMapSize.Get() <= 1024)) {
+		    	int l = 8;
+		    	while ((1 << l) < WaterDisplacementMapSize.Get())
+		    	  l++;
+
+			SafeWrite32(0x0049DBC4, 1 << l);	// Wading water? (always 256)
+			SafeWrite32(0x0049E82B, 1 << l);	// Displacementmap constructor (always 256)
+
+			SafeWrite32(0x004D0225, 1 << l);	// ????? (always 256)
+			SafeWrite32(0x004D0260, 1 << l);	// ????? (always 256)
+			SafeWrite32(0x004D0299, 1 << l);	// ????? (always 256)
+
+			WaterDisplacementMapSize.Set(1 << l);
+		}
+		else
+			WaterDisplacementMapSize.Set(0);
+	}
+	else {
+		if ((WaterDisplacementMapSize.Get() >= 32) &&
+		    (WaterDisplacementMapSize.Get() <= 128)) {
+		    	int l = 7;
+		    	while ((1 << l) > WaterDisplacementMapSize.Get())
+		    	  l--;
+
+			SafeWrite32(0x0049DBC4, 1 << l);	// Wading water?
+			SafeWrite32(0x0049E82B, 1 << l);	// Displacementmap constructor (always 256)
+
+			SafeWrite32(0x004D0225, 1 << l);	// ????? (always 256)
+			SafeWrite32(0x004D0260, 1 << l);	// ????? (always 256)
+			SafeWrite32(0x004D0299, 1 << l);	// ????? (always 256)
+
+			WaterDisplacementMapSize.Set(1 << l);
+		}
+		else
+			WaterDisplacementMapSize.Set(0);
+	}
+
+//	SafeWrite8(0x00B07068, UseWaterReflectionsActors.Get());	// boolUseWaterReflectionsActors
+//	SafeWrite8(0x00B07070, UseWaterReflectionsTrees.Get());		// boolUseWaterReflectionsTrees
+//	SafeWrite8(0x00B07078, UseWaterReflectionsStatics.Get());	// boolUseWaterReflectionsStatics
+//	SafeWrite8(0x00B07080, UseWaterReflectionsMisc.Get());		// boolUseWaterReflectionsMisc
 
 	return;
 }

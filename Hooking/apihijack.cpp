@@ -61,7 +61,7 @@ PIMAGE_IMPORT_DESCRIPTOR g_pFirstImportDesc;
 PIMAGE_NT_HEADERS PEHeaderFromHModule(HMODULE hModule)
 {
     PIMAGE_NT_HEADERS pNTHeader = 0;
-    
+
     __try
     {
         if ( PIMAGE_DOS_HEADER(hModule)->e_magic != IMAGE_DOS_SIGNATURE )
@@ -69,12 +69,12 @@ PIMAGE_NT_HEADERS PEHeaderFromHModule(HMODULE hModule)
 
         pNTHeader = PIMAGE_NT_HEADERS(PBYTE(hModule)
                     + PIMAGE_DOS_HEADER(hModule)->e_lfanew);
-        
+
         if ( pNTHeader->Signature != IMAGE_NT_SIGNATURE )
             pNTHeader = 0;
     }
     __except( EXCEPTION_EXECUTE_HANDLER )
-    {       
+    {
     }
 
     return pNTHeader;
@@ -90,7 +90,7 @@ bool RedirectIAT( SDLLHook* DLLHook, PIMAGE_IMPORT_DESCRIPTOR pImportDesc, PVOID
     PIMAGE_THUNK_DATA pIteratingIAT;
 
     // Figure out which OS platform we're on
-    OSVERSIONINFO osvi; 
+    OSVERSIONINFO osvi;
     osvi.dwOSVersionInfoSize = sizeof(osvi);
     GetVersionEx( &osvi );
 
@@ -117,15 +117,15 @@ bool RedirectIAT( SDLLHook* DLLHook, PIMAGE_IMPORT_DESCRIPTOR pImportDesc, PVOID
     // which is often in a read-only section in the EXE.
     DWORD flOldProtect, flNewProtect, flDontCare;
     MEMORY_BASIC_INFORMATION mbi;
-    
-    // Get the current protection attributes                            
+
+    // Get the current protection attributes
     VirtualQuery( pIAT, &mbi, sizeof(mbi) );
-    
+
     // remove ReadOnly and ExecuteRead attributes, add on ReadWrite flag
     flNewProtect = mbi.Protect;
     flNewProtect &= ~(PAGE_READONLY | PAGE_EXECUTE_READ);
     flNewProtect |= (PAGE_READWRITE);
-    
+
     if ( !VirtualProtect(   pIAT, sizeof(PVOID) * cFuncs,
                             flNewProtect, &flOldProtect) )
     {
@@ -228,7 +228,7 @@ bool RedirectIAT( SDLLHook* DLLHook, PIMAGE_IMPORT_DESCRIPTOR pImportDesc, PVOID
 
     // Put the page attributes back the way they were.
     VirtualProtect( pIAT, sizeof(PVOID) * cFuncs, flOldProtect, &flDontCare);
-    
+
     return true;
 }
 
@@ -245,31 +245,29 @@ void* RedirectPA( SDLLHook* DLLHook, LPCSTR lpProcName, FARPROC fnc )
         //  _MESSAGE( "Hooked function: " );
         //  _MESSAGE( lpProcName );
         //  _MESSAGE( "\n" );
-    
+
             // Save the old function in the SFunctionHook structure and get the new one.
             FHook->OrigFn = fnc;
             HookFn = FHook->HookFn;
-            
+
             return HookFn;
         }
-    
+
         FHook++;
     }
-    
+
     return NULL;
 }
 
 //===========================================================================
 // Top level routine to find the EXE's imports, and redirect them
-bool HookAPICalls( SDLLHook* Hook )
+bool HookAPICalls( SDLLHook* Hook, HMODULE hModEXE )
 {
     if ( !Hook )
         return false;
 
-    HMODULE hModEXE = GetModuleHandle( 0 );
-    
     PIMAGE_NT_HEADERS pExeNTHdr = PEHeaderFromHModule( hModEXE );
-    
+
     if ( !pExeNTHdr )
         return false;
 
@@ -283,29 +281,40 @@ bool HookAPICalls( SDLLHook* Hook )
                                                     hModEXE, importRVA );
 
     // Save off imports address in a global for later use
-    g_pFirstImportDesc = pImportDesc;   
+    g_pFirstImportDesc = pImportDesc;
 
     // Iterate through each import descriptor, and redirect if appropriate
     while ( pImportDesc->FirstThunk )
     {
         PSTR pszImportModuleName = MakePtr( PSTR, hModEXE, pImportDesc->Name);
 
-        if ( lstrcmpi( pszImportModuleName, Hook->Name ) == 0 )
+	if ( lstrcmpi( pszImportModuleName, Hook->Name ) == 0 )
         {
-	    Hook->hMod = hModEXE;
+	  Hook->hMod = hModEXE;
 
-        //  _MESSAGE( "Found " );
-        //  _MESSAGE( Hook->Name );
-        //  _MESSAGE( "..." );
+	  _MESSAGE( "Hooked: %s", Hook->Name );
 
-            RedirectIAT( Hook, pImportDesc, (PVOID)hModEXE );
-        }
-        
+          RedirectIAT( Hook, pImportDesc, (PVOID)hModEXE );
+	}
+
         pImportDesc++;  // Advance to next import descriptor
     }
 
 //  _MESSAGE( "Done Hooking APICalls" );
 
     return true;
+}
+
+bool HookAPICalls( SDLLHook* Hook ) {
+
+  HINSTANCE exe = GetModuleHandle(NULL);
+
+  HookAPICalls( Hook, exe );
+
+  HINSTANCE dll = GetModuleHandle("OBGEv2.dll");
+
+  HookAPICalls( Hook, dll );
+
+  return true;
 }
 

@@ -5,6 +5,53 @@
 #include <assert.h>
 #include "D3D9Identifiers.hpp"
 
+const char *passNames[OBGEPASS_NUM] = {
+  "0. No particular pass",
+  "1. Reflection pass (off-screen)",
+  "2. Water aux pass (off-screen)",
+  "3. Water heightmap pass (off-screen)",
+  "4. Water displacement pass (off-screen)",
+  "5. Shadow pass (off-screen)",
+  "6. Main pass (screen-space)",
+  "7. Effects pass (screen-space)",
+  "8. HDR pass (screen-space)",
+  "9. Post pass (screen-space)",
+
+  "-. Video pass",
+  "-. Unknown pass",
+};
+
+const char *passScens[OBGEPASS_NUM][16] = {
+  /* OBGEPASS_ANY		*/
+  {},
+
+  /* OBGEPASS_REFLECTION	*/
+  {},
+  /* OBGEPASS_WATER	 	*/
+  {},
+  /* OBGEPASS_WATERHEIGHTMAP	*/
+  {},
+  /* OBGEPASS_WATERDISPLACEMENT */
+  {},
+  /* OBGEPASS_SHADOW		*/
+  {},
+  /* OBGEPASS_MAIN		*/
+  {},
+  /* OBGEPASS_EFFECTS		*/
+  {},
+  /* OBGEPASS_HDR		*/
+  {
+  	"",
+  },
+  /* OBGEPASS_POST		*/
+  {},
+
+  /* OBGEPASS_VIDEO		*/
+  {},
+  /* OBGEPASS_UNKNOWN		*/
+  {},
+};
+
 /* Shader-tandems:
  *
  * STLEAF000.vso + STLEAF2000.pso
@@ -934,6 +981,11 @@ const struct formatID {
 { D3DFMT_DXT4               , "DXT4" },
 { D3DFMT_DXT5               , "DXT5" },
 
+{ (D3DFORMAT)MAKEFOURCC('I','N','T','Z'), "INTZ" },
+{ (D3DFORMAT)MAKEFOURCC('D','F','2','4'), "DF24" },
+{ (D3DFORMAT)MAKEFOURCC('D','F','1','6'), "DF16" },
+{ (D3DFORMAT)MAKEFOURCC('R','A','W','Z'), "RAWZ" },
+
 };
 
 const char *findFormat(D3DFORMAT fmt) {
@@ -1051,6 +1103,63 @@ const char *findSamplerState(D3DSAMPLERSTATETYPE sstate) {
   }
 
   return "unknown";
+}
+
+const char *findSamplerStateValue(D3DSAMPLERSTATETYPE sstate, DWORD svalue) {
+  static char buf[256];
+
+	      switch ((D3DSAMPLERSTATETYPE)sstate) {
+	      	case D3DSAMP_ADDRESSU:
+	      	case D3DSAMP_ADDRESSV:
+		case D3DSAMP_ADDRESSW:
+		  switch ((D3DTEXTUREADDRESS)svalue) {
+		    case D3DTADDRESS_WRAP:       strcpy(buf, "WRAP"); break;
+		    case D3DTADDRESS_MIRROR:     strcpy(buf, "MIRROR"); break;
+		    case D3DTADDRESS_CLAMP:      strcpy(buf, "CLAMP"); break;
+		    case D3DTADDRESS_BORDER:     strcpy(buf, "BORDER"); break;
+		    case D3DTADDRESS_MIRRORONCE: strcpy(buf, "MIRRORONCE"); break;
+		    default: sprintf(buf, "%d", svalue); break;
+		  }
+	      	  break;
+	      	// hex
+	      	case D3DSAMP_BORDERCOLOR:
+	          sprintf(buf, "0x%08x", svalue);
+	      	  break;
+	      	case D3DSAMP_MAGFILTER:
+	      	case D3DSAMP_MINFILTER:
+	      	case D3DSAMP_MIPFILTER:
+		  switch ((D3DTEXTUREFILTERTYPE)svalue) {
+		    case D3DTEXF_NONE:          strcpy(buf, "NONE"); break;
+		    case D3DTEXF_POINT:         strcpy(buf, "POINT"); break;
+		    case D3DTEXF_LINEAR:        strcpy(buf, "LINEAR"); break;
+		    case D3DTEXF_ANISOTROPIC:   strcpy(buf, "ANISOTROPIC"); break;
+		    case D3DTEXF_PYRAMIDALQUAD: strcpy(buf, "PYRAMIDALQUAD"); break;
+		    case D3DTEXF_GAUSSIANQUAD:  strcpy(buf, "GAUSSIANQUAD"); break;
+		    default: sprintf(buf, "%d", svalue); break;
+		  }
+	      	  break;
+	      	// float
+	      	case D3DSAMP_MIPMAPLODBIAS:	// deviation <>1.0
+	      	case D3DSAMP_SRGBTEXTURE:	// gamma <>1.0
+	          sprintf(buf, "%f", *((float *)&svalue));
+	      	  break;
+	      	// int
+	      	case D3DSAMP_MAXMIPLEVEL:
+	      	case D3DSAMP_MAXANISOTROPY:
+	      	case D3DSAMP_ELEMENTINDEX:
+	          sprintf(buf, "%d", svalue);
+	      	  break;
+	      	// long
+	      	case D3DSAMP_DMAPOFFSET:
+	          sprintf(buf, "%d", svalue);
+	      	  break;
+	      	// unknown
+	      	default:
+	          sprintf(buf, "0x%08x", svalue);
+	      	  break;
+	      }
+
+  return buf;
 }
 
 const struct renderstateID {
@@ -1171,4 +1280,192 @@ const char *findRenderState(D3DRENDERSTATETYPE rstate) {
   }
 
   return "unknown";
+}
+
+const char *findRenderStateValue(D3DRENDERSTATETYPE rstate, DWORD rvalue) {
+  static char buf[256];
+
+	  switch ((D3DRENDERSTATETYPE)rstate) {
+	    case D3DRS_ZENABLE:
+	      switch ((D3DZBUFFERTYPE)rvalue) {
+		case D3DZB_FALSE: strcpy(buf, "FALSE"); break;
+		case D3DZB_TRUE:  strcpy(buf, "TRUE"); break;
+		case D3DZB_USEW:  strcpy(buf, "USEW"); break;
+		default: sprintf(buf, "%d", rvalue); break;
+	      }
+	      break;
+	    case D3DRS_FILLMODE:
+	      switch ((D3DFILLMODE)rvalue) {
+		case D3DFILL_POINT:     strcpy(buf, "POINT"); break;
+		case D3DFILL_WIREFRAME: strcpy(buf, "WIREFRAME"); break;
+		case D3DFILL_SOLID:     strcpy(buf, "SOLID"); break;
+		default: sprintf(buf, "%d", rvalue); break;
+	      }
+	      break;
+	    case D3DRS_SHADEMODE:
+	      switch ((D3DSHADEMODE)rvalue) {
+		case D3DSHADE_FLAT:    strcpy(buf, "FLAT"); break;
+		case D3DSHADE_GOURAUD: strcpy(buf, "GOURAUD"); break;
+		case D3DSHADE_PHONG:   strcpy(buf, "PHONG"); break;
+		default: sprintf(buf, "%d", rvalue); break;
+	      }
+	      break;
+	    case D3DRS_SRCBLEND:
+	    case D3DRS_DESTBLEND:
+	      switch ((D3DBLEND)rvalue) {
+	        case D3DBLEND_ZERO           : strcpy(buf, "ZERO"); break;
+	        case D3DBLEND_ONE            : strcpy(buf, "ONE"); break;
+	        case D3DBLEND_SRCCOLOR       : strcpy(buf, "SRCCOLOR"); break;
+	        case D3DBLEND_INVSRCCOLOR    : strcpy(buf, "INVSRCCOLOR"); break;
+	        case D3DBLEND_SRCALPHA       : strcpy(buf, "SRCALPHA"); break;
+	        case D3DBLEND_INVSRCALPHA    : strcpy(buf, "INVSRCALPHA"); break;
+	        case D3DBLEND_DESTALPHA      : strcpy(buf, "DESTALPHA"); break;
+	        case D3DBLEND_INVDESTALPHA   : strcpy(buf, "INVDESTALPHA"); break;
+	        case D3DBLEND_DESTCOLOR      : strcpy(buf, "DESTCOLOR"); break;
+	        case D3DBLEND_INVDESTCOLOR   : strcpy(buf, "INVDESTCOLOR"); break;
+	        case D3DBLEND_SRCALPHASAT    : strcpy(buf, "SRCALPHASAT"); break;
+	        case D3DBLEND_BOTHSRCALPHA   : strcpy(buf, "BOTHSRCALPHA"); break;
+	        case D3DBLEND_BOTHINVSRCALPHA: strcpy(buf, "BOTHINVSRCALPHA"); break;
+	        case D3DBLEND_BLENDFACTOR    : strcpy(buf, "BLENDFACTOR"); break;
+	        case D3DBLEND_INVBLENDFACTOR : strcpy(buf, "INVBLENDFACTOR"); break;
+	        case D3DBLEND_SRCCOLOR2      : strcpy(buf, "SRCCOLOR2"); break;
+	        case D3DBLEND_INVSRCCOLOR2   : strcpy(buf, "INVSRCCOLOR2"); break;
+		default: sprintf(buf, "%d", rvalue); break;
+	      }
+	      break;
+	    case D3DRS_CULLMODE:
+	      switch ((D3DCULL)rvalue) {
+		case D3DCULL_NONE: strcpy(buf, "NONE"); break;
+		case D3DCULL_CW:   strcpy(buf, "CW"); break;
+		case D3DCULL_CCW:  strcpy(buf, "CCW"); break;
+		default: sprintf(buf, "%d", rvalue); break;
+	      }
+	      break;
+	    case D3DRS_FOGTABLEMODE:
+	    case D3DRS_FOGVERTEXMODE:
+	      switch ((D3DFOGMODE)rvalue) {
+		case D3DFOG_NONE:   strcpy(buf, "NONE"); break;
+		case D3DFOG_EXP:    strcpy(buf, "EXP"); break;
+		case D3DFOG_EXP2:   strcpy(buf, "EXP2"); break;
+		case D3DFOG_LINEAR: strcpy(buf, "LINEAR"); break;
+		default: sprintf(buf, "%d", rvalue); break;
+	      }
+	      break;
+	    case D3DRS_ZFUNC:
+	    case D3DRS_ALPHAFUNC:
+	    case D3DRS_STENCILFUNC:
+	    case D3DRS_CCW_STENCILFUNC:
+	      switch ((D3DCMPFUNC)rvalue) {
+		case D3DCMP_NEVER       : strcpy(buf, "NEVER"); break;
+		case D3DCMP_LESS        : strcpy(buf, "LESS"); break;
+		case D3DCMP_EQUAL       : strcpy(buf, "EQUAL"); break;
+		case D3DCMP_LESSEQUAL   : strcpy(buf, "LESSEQUAL"); break;
+		case D3DCMP_GREATER     : strcpy(buf, "GREATER"); break;
+		case D3DCMP_NOTEQUAL    : strcpy(buf, "NOTEQUAL"); break;
+		case D3DCMP_GREATEREQUAL: strcpy(buf, "GREATEREQUAL"); break;
+		case D3DCMP_ALWAYS      : strcpy(buf, "ALWAYS"); break;
+		default: sprintf(buf, "%d", rvalue); break;
+	      }
+	      break;
+	    case D3DRS_BLENDOP:
+	    case D3DRS_SRCBLENDALPHA:
+	    case D3DRS_DESTBLENDALPHA:
+	    case D3DRS_BLENDOPALPHA:
+	      switch ((D3DBLENDOP)rvalue) {
+	        case D3DBLENDOP_ADD        : strcpy(buf, "ADD"); break;
+	        case D3DBLENDOP_SUBTRACT   : strcpy(buf, "SUBTRACT"); break;
+	        case D3DBLENDOP_REVSUBTRACT: strcpy(buf, "REVSUBTRACT"); break;
+	        case D3DBLENDOP_MIN        : strcpy(buf, "MIN"); break;
+	        case D3DBLENDOP_MAX        : strcpy(buf, "MAX"); break;
+		default: sprintf(buf, "%d", rvalue); break;
+	      }
+	      break;
+	    case D3DRS_STENCILFAIL:
+	    case D3DRS_STENCILZFAIL:
+	    case D3DRS_STENCILPASS:
+	    case D3DRS_CCW_STENCILFAIL:
+	    case D3DRS_CCW_STENCILZFAIL:
+	    case D3DRS_CCW_STENCILPASS:
+	      switch ((D3DSTENCILOP)rvalue) {
+	        case D3DSTENCILOP_KEEP   : strcpy(buf, "KEEP"); break;
+	        case D3DSTENCILOP_ZERO   : strcpy(buf, "ZERO"); break;
+	        case D3DSTENCILOP_REPLACE: strcpy(buf, "REPLACE"); break;
+	        case D3DSTENCILOP_INCRSAT: strcpy(buf, "INCRSAT"); break;
+	        case D3DSTENCILOP_DECRSAT: strcpy(buf, "DECRSAT"); break;
+	        case D3DSTENCILOP_INVERT : strcpy(buf, "INVERT"); break;
+	        case D3DSTENCILOP_INCR   : strcpy(buf, "INCR"); break;
+	        case D3DSTENCILOP_DECR   : strcpy(buf, "DECR"); break;
+		default: sprintf(buf, "%d", rvalue); break;
+	      }
+	      break;
+	    // bool
+	    case D3DRS_ZWRITEENABLE:
+	    case D3DRS_ALPHATESTENABLE:
+	    case D3DRS_LASTPIXEL:
+	    case D3DRS_DITHERENABLE:
+	    case D3DRS_ALPHABLENDENABLE:
+	    case D3DRS_FOGENABLE:
+	    case D3DRS_SPECULARENABLE:
+	    case D3DRS_RANGEFOGENABLE:
+	    case D3DRS_STENCILENABLE:
+	    case D3DRS_CLIPPING:
+	    case D3DRS_LIGHTING:
+	    case D3DRS_COLORVERTEX:
+	    case D3DRS_LOCALVIEWER:
+	    case D3DRS_NORMALIZENORMALS:
+	    case D3DRS_POINTSPRITEENABLE:
+	    case D3DRS_POINTSCALEENABLE:
+	    case D3DRS_MULTISAMPLEANTIALIAS:
+	    case D3DRS_INDEXEDVERTEXBLENDENABLE:
+	    case D3DRS_ANTIALIASEDLINEENABLE:
+	    case D3DRS_TWOSIDEDSTENCILMODE:
+	    case D3DRS_SRGBWRITEENABLE:
+	    case D3DRS_SEPARATEALPHABLENDENABLE:
+	      strcpy(buf, rvalue ? "TRUE" : "FALSE");
+	      break;
+	    // float
+	    case D3DRS_FOGSTART:
+	    case D3DRS_FOGEND:
+	    case D3DRS_FOGDENSITY:
+	    case D3DRS_POINTSIZE:
+	    case D3DRS_POINTSIZE_MIN:
+	    case D3DRS_POINTSCALE_A:
+	    case D3DRS_POINTSCALE_B:
+	    case D3DRS_POINTSCALE_C:
+	    case D3DRS_POINTSIZE_MAX:
+	    case D3DRS_TWEENFACTOR:
+	    case D3DRS_DEPTHBIAS:
+	      sprintf(buf, "%f", *((float *)&rvalue));
+	      break;
+	    // long
+	    case D3DRS_ALPHAREF:
+	    case D3DRS_STENCILREF:
+	    case D3DRS_VERTEXBLEND:
+	      sprintf(buf, "%d", rvalue);
+	      break;
+	    // mask
+	    case D3DRS_COLORWRITEENABLE:
+	      sprintf(buf, "0x%02x", rvalue);
+	      break;
+	    // hex
+	    case D3DRS_STENCILMASK:
+	    case D3DRS_STENCILWRITEMASK:
+	    case D3DRS_CLIPPLANEENABLE:
+	    case D3DRS_MULTISAMPLEMASK:
+	      sprintf(buf, "0x%08x", rvalue);
+	      break;
+	    // unknown
+	    case D3DRS_FOGCOLOR:
+	    case D3DRS_BLENDFACTOR:
+	    case D3DRS_TEXTUREFACTOR:
+	    case D3DRS_AMBIENT:
+              sprintf(buf, "%d", rvalue);
+              break;
+            default:
+//            sprintf(buf, "%d [%c%c%c%c]", rvalue, (rvalue >> 24) & 0xFF, (rvalue >> 16) & 0xFF, (rvalue >> 8) & 0xFF, (rvalue >> 0) & 0xFF);
+              sprintf(buf, "%d [%08x]", rvalue, rvalue);
+              break;
+          }
+
+  return buf;
 }

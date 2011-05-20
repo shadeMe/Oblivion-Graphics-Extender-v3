@@ -7,17 +7,23 @@
 
 #include "D3D9.hpp"
 #include "D3D9Identifiers.hpp"
+#include "TextureIOHook.hpp"
 
 /* ----------------------------------------------------------------------------- */
 
 // Hook-Tracker
-extern enum OBGEPass currentPass;
+extern enum OBGEPass currentPass, previousPass;
 extern IDirect3DTexture9 *passTexture[OBGEPASS_NUM];
 extern IDirect3DSurface9 *passSurface[OBGEPASS_NUM];
 extern IDirect3DSurface9 *passDepth  [OBGEPASS_NUM];
 extern int                passFrames [OBGEPASS_NUM];
 extern int                passPasses [OBGEPASS_NUM];
 extern const char        *passNames  [OBGEPASS_NUM];
+
+/* ----------------------------------------------------------------------------- */
+
+/* hacking CreateTexure passed via the RenderSurfaceParameters-hook */
+extern DWORD specialUsage;
 
 /* ------------------------------------------------------------------------------- */
 
@@ -32,6 +38,11 @@ extern int frame_bge;
 #define	frame_log ((IDebugLog *)NULL)
 #else
 #define	frame_log ((IDebugLog *)NULL)
+#endif
+
+#if	defined(OBGE_PROFILE)
+extern LARGE_INTEGER frame_bgn;
+extern LARGE_INTEGER frame_end;
 #endif
 
 extern bool frame_trk;
@@ -117,13 +128,39 @@ public:
 		frame_bge = 0;
 #endif
 
-#if	defined(OBGE_DEVLING)
+#define HasShaderManager	1	// m_shaders
 		m_shaders = ShaderManager::GetSingleton();
 		m_shadercv = NULL;
 		m_shadercp = NULL;
 
+#if	defined(OBGE_DEVLING)
 		/* just for now */
-		DebugWindow::Create();
+		DebugWindow::Expunge();
+
+	//	assert(NULL);
+#endif
+	}
+
+	~OBGEDirect3DDevice9()
+	{
+		lastOBGEDirect3DDevice9 = NULL;
+
+      		std::map<void *, struct renderSurface *>::iterator sR = surfaceRender.begin();
+      		while (sR != surfaceRender.end()) { if (sR->second) delete sR->second; sR++; } surfaceRender.clear();
+
+      		std::map<void *, struct depthSurface *>::iterator sD = surfaceDepth.begin();
+      		while (sD != surfaceDepth.end()) { if (sD->second) delete sD->second; sD++; } surfaceDepth.clear();
+
+      		std::map<void *, struct textureSurface *>::iterator sT = surfaceTexture.begin();
+      		while (sT != surfaceTexture.end()) { if (sT->second) delete sT->second; sT++;
+      		/*if (sT->first) ((IDirect3DSurface9 *)sT->first)->Release();*/ } surfaceTexture.clear();
+
+      		std::map<void *, struct textureMap *>::iterator tM = textureMaps.begin();
+      		while (tM != textureMaps.end()) { if (tM->second) delete tM->second; tM++; } textureMaps.clear();
+
+#ifdef	OBGE_DEVLING
+		/* just for now */
+		DebugWindow::Destroy();
 #endif
 	}
 
@@ -141,7 +178,7 @@ public:
 	STDMETHOD_(ULONG,Release)(THIS)
 	{
 		ULONG count = m_device->Release();
-		if(0 == count)
+		if (0 == count)
 			delete this;
 
 		return count;
@@ -299,7 +336,22 @@ public:
 			frame_log->FormattedMessage("CreateTexture from 0x%08x", _ReturnAddress());
 #endif
 
+#if	defined(OBGE_AUTOMIPMAP)
+		/* hack a mipmap generating rendertarget (just once!) */
+		if (Usage & D3DUSAGE_RENDERTARGET) {
+			/* we get two reflection allocations, brrr */
+			Usage |= specialUsage; //specialUsage = 0;
+			if (Usage & D3DUSAGE_AUTOGENMIPMAP)
+				Levels = 0;
+		}
+#endif
+
 		HRESULT hr = m_device->CreateTexture(Width, Height, Levels, Usage, Format, Pool, ppTexture, pSharedHandle);
+
+#if	defined(OBGE_AUTOMIPMAP)
+		if ((*ppTexture) && (Usage & D3DUSAGE_AUTOGENMIPMAP))
+			(*ppTexture)->SetAutoGenFilterType(D3DTEXF_LINEAR);
+#endif
 
 		if(SUCCEEDED(hr))
 		{
@@ -326,7 +378,7 @@ public:
 #ifndef	OBGE_TRACKER_TEXTURES
 					/* apparently the level-address stays constant, so we can track this already from here */
 					IDirect3DSurface9* ppSurfaceLevel = NULL;
-					if(SUCCEEDED((*ppTexture)->GetSurfaceLevel(0, &ppSurfaceLevel))) {
+					if (SUCCEEDED((*ppTexture)->GetSurfaceLevel(0, &ppSurfaceLevel))) {
 						struct textureSurface *track = new struct textureSurface;
 
 						track->Level = 0;
@@ -354,10 +406,20 @@ public:
 			frame_log->FormattedMessage("Usage: %s", findUsage(Usage));
 			frame_log->Outdent();
 		}
-		else if (Usage & D3DUSAGE_RENDERTARGET)
-			_MESSAGE("OD3D9: CreateRenderTarget via CreateTexture from 0x%08x: 0x%08x", _ReturnAddress(), *ppTexture);
-		else if (Usage & D3DUSAGE_DEPTHSTENCIL)
-			_MESSAGE("OD3D9: CreateDepthStencilSurface via CreateTexture from 0x%08x: 0x%08x", _ReturnAddress(), *ppTexture);
+		else if (Usage & D3DUSAGE_RENDERTARGET) {
+			_DMESSAGE("OD3D9: CreateRenderTarget via CreateTexture from 0x%08x: 0x%08x", _ReturnAddress(), *ppTexture);
+			_DMESSAGE("{W,H}: {%d,%d}", Width, Height);
+			_DMESSAGE("Format: %s", findFormat(Format));
+			_DMESSAGE("Levels: %d", Levels);
+			_DMESSAGE("Usage: %s", findUsage(Usage));
+		}
+		else if (Usage & D3DUSAGE_DEPTHSTENCIL) {
+			_DMESSAGE("OD3D9: CreateDepthStencilSurface via CreateTexture from 0x%08x: 0x%08x", _ReturnAddress(), *ppTexture);
+			_DMESSAGE("{W,H}: {%d,%d}", Width, Height);
+			_DMESSAGE("Format: %s", findFormat(Format));
+			_DMESSAGE("Levels: %d", Levels);
+			_DMESSAGE("Usage: %s", findUsage(Usage));
+		}
 #endif
 
 		return hr;
@@ -385,7 +447,7 @@ public:
 
 	STDMETHOD(CreateRenderTarget)(THIS_ UINT Width,UINT Height,D3DFORMAT Format,D3DMULTISAMPLE_TYPE MultiSample,DWORD MultisampleQuality,BOOL Lockable,IDirect3DSurface9** ppSurface,HANDLE* pSharedHandle)
 	{
-#ifdef	OBGE_LOGGING
+#if	defined(OBGE_LOGGING)
 		if (frame_log)
 			frame_log->FormattedMessage("CreateRenderTarget from 0x%08x", _ReturnAddress());
 #endif
@@ -413,7 +475,7 @@ public:
 			}
 		}
 
-#ifdef	OBGE_LOGGING
+#if	defined(OBGE_LOGGING)
 		if (frame_log) {
 			frame_log->Indent();
 			frame_log->FormattedMessage("Address: 0x%08x", *ppSurface);
@@ -424,8 +486,15 @@ public:
 			frame_log->FormattedMessage("Lockable: %d", Lockable);
 			frame_log->Outdent();
 		}
-		else
-			_MESSAGE("OD3D9: CreateRenderTarget from 0x%08x: 0x%08x", _ReturnAddress(), *ppSurface);
+		else {
+			_DMESSAGE("OD3D9: CreateRenderTarget from 0x%08x: 0x%08x", _ReturnAddress(), *ppSurface);
+			_DMESSAGE("Address: 0x%08x", *ppSurface);
+			_DMESSAGE("{W,H}: {%d,%d}", Width, Height);
+			_DMESSAGE("Format: %s", findFormat(Format));
+			_DMESSAGE("MultiSample: %d", MultiSample);
+			_DMESSAGE("MultisampleQuality: %d", MultisampleQuality);
+			_DMESSAGE("Lockable: %d", Lockable);
+		}
 #endif
 
 		return hr;
@@ -433,7 +502,7 @@ public:
 
 	STDMETHOD(CreateDepthStencilSurface)(THIS_ UINT Width,UINT Height,D3DFORMAT Format,D3DMULTISAMPLE_TYPE MultiSample,DWORD MultisampleQuality,BOOL Discard,IDirect3DSurface9** ppSurface,HANDLE* pSharedHandle)
 	{
-#ifdef	OBGE_LOGGING
+#if	defined(OBGE_LOGGING)
 		if (frame_log)
 			frame_log->FormattedMessage("CreateDepthStencilSurface from 0x%08x", _ReturnAddress());
 #endif
@@ -461,7 +530,7 @@ public:
 			}
 		}
 
-#ifdef	OBGE_LOGGING
+#if	defined(OBGE_LOGGING)
 		if (frame_log) {
 			frame_log->Indent();
 			frame_log->FormattedMessage("Address: 0x%08x", *ppSurface);
@@ -472,8 +541,15 @@ public:
 			frame_log->FormattedMessage("Discard: %d", Discard);
 			frame_log->Outdent();
 		}
-		else
-			_MESSAGE("OD3D9: CreateDepthStencilSurface from 0x%08x: 0x%08x", _ReturnAddress(), *ppSurface);
+		else {
+			_DMESSAGE("OD3D9: CreateDepthStencilSurface from 0x%08x: 0x%08x", _ReturnAddress(), *ppSurface);
+			_DMESSAGE("Address: 0x%08x", *ppSurface);
+			_DMESSAGE("{W,H}: {%d,%d}", Width, Height);
+			_DMESSAGE("Format: %s", findFormat(Format));
+			_DMESSAGE("MultiSample: %d", MultiSample);
+			_DMESSAGE("MultisampleQuality: %d", MultisampleQuality);
+			_DMESSAGE("Discard: %d", Discard);
+		}
 #endif
 
 		return hr;
@@ -542,9 +618,12 @@ public:
 	{
 		/* they are a textures anyway, no need to check dedicated targets */
 		if (currentPass != OBGEPASS_UNKNOWN) {
+		  /* dedicated rendertarget, possibly with multi-sampling */
 		  if (surfaceRender[pRenderTarget])
 		    passSurface[currentPass] = pRenderTarget,
 		      passTexture[currentPass] = NULL;
+
+		  /* texture-based rendertarget surface, no multisampling */
 		  if (surfaceTexture[pRenderTarget])
 		    if ((passSurface[currentPass] = pRenderTarget))
 		      passTexture[currentPass] = surfaceTexture[pRenderTarget]->tex;
@@ -567,7 +646,7 @@ public:
 			if (!ok) {
 				struct renderSurface *track = surfaceRender[pRenderTarget];
 				if (track) {
-					frame_log->FormattedMessage("Type: Dedicated Rendertarget");
+					frame_log->Message("Type: Dedicated Rendertarget");
 					frame_log->FormattedMessage("{W,H}: {%d,%d}", track->Width, track->Height);
 					frame_log->FormattedMessage("Format: %s", findFormat(track->Format));
 					frame_log->FormattedMessage("MultiSample: %d", track->MultiSample);
@@ -581,7 +660,7 @@ public:
 			if (!ok) {
 				struct textureSurface *track = surfaceTexture[pRenderTarget];
 				if (track) {
-					frame_log->FormattedMessage("Type: Rendertarget Texture");
+					frame_log->Message("Type: Rendertarget Texture");
 					frame_log->FormattedMessage("{W,H}: {%d,%d}", track->map->Width, track->map->Height);
 					frame_log->FormattedMessage("Format: %s", findFormat(track->map->Format));
 					frame_log->FormattedMessage("Level: %d of %d", track->Level, track->map->Levels);
@@ -637,7 +716,12 @@ public:
 	{
 		/* they are a dedicated anyway, no need to check textures */
 		if (currentPass != OBGEPASS_UNKNOWN) {
+		/* dedicated depthstencil, possibly with multi-sampling */
 		  if (surfaceDepth[pNewZStencil])
+		    passDepth[currentPass] = pNewZStencil;
+
+		  /* texture-based depthstencil surface, no multisampling */
+		  if (surfaceTexture[pNewZStencil])
 		    passDepth[currentPass] = pNewZStencil;
 
 	//	  _MESSAGE("OD3D9: Grabbed pass %d depth", currentPass);
@@ -658,7 +742,7 @@ public:
 			if (!ok) {
 				struct depthSurface *track = surfaceDepth[pNewZStencil];
 				if (track) {
-					frame_log->FormattedMessage("Type: Dedicated DepthStencilSurface");
+					frame_log->Message("Type: Dedicated DepthStencilSurface");
 					frame_log->FormattedMessage("{W,H}: {%d,%d}", track->Width, track->Height);
 					frame_log->FormattedMessage("Format: %s", findFormat(track->Format));
 					frame_log->FormattedMessage("MultiSample: %d", track->MultiSample);
@@ -672,7 +756,7 @@ public:
 			if (!ok) {
 				struct textureSurface *track = surfaceTexture[pNewZStencil];
 				if (track) {
-					frame_log->FormattedMessage("Type: Rendertarget Texture");
+					frame_log->Message("Type: Rendertarget Texture");
 					frame_log->FormattedMessage("{W,H}: {%d,%d}", track->map->Width, track->map->Height);
 					frame_log->FormattedMessage("Format: %s", findFormat(track->map->Format));
 					frame_log->FormattedMessage("Level: %d of %d", track->Level, track->map->Levels);
@@ -730,11 +814,12 @@ public:
 	//	assert(currentPass != OBGEPASS_UNKNOWN);
 	//	assert(frame_bge == 26);
 
-#if	defined(OBGE_DEVLING)
-		m_shadercv = NULL;
-		m_shadercp = NULL;
+		/* the D3D-statemachine doesn't kill these ... */
+	//	m_shadercv = NULL;
+	//	m_shadercp = NULL;
 
-		if (m_shaders) {
+#if	defined(OBGE_DEVLING)
+		if (HasShaderManager) {
 			/* clean all on first scene, and partial on successive scenes */
 			int frame_numr = m_shaders->trackd[currentPass].frame_numr;
 
@@ -754,11 +839,21 @@ public:
 		}
 #endif
 
+#if	defined(OBGE_PROFILE)
+		QueryPerformanceCounter(&frame_bgn);
+#endif
+
 		return m_device->BeginScene();
 	}
 
 	STDMETHOD(EndScene)(THIS)
 	{
+#if	defined(OBGE_PROFILE)
+		QueryPerformanceCounter(&frame_end);
+#endif
+
+		HRESULT res = m_device->EndScene();
+
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
 			frame_log->Outdent();
@@ -766,11 +861,9 @@ public:
 		}
 #endif
 
-		HRESULT res = m_device->EndScene();
-
 #ifdef	OBGE_DEVLING
 		/* apparenty there is one BeginScene missing in the HDR-pipeline (2nd scene! */
-		if (m_shaders) {
+		if (HasShaderManager) {
 			/* record exact position of occurance */
 			int frame_cntr = m_shaders->trackd[currentPass].frame_cntr;
 
@@ -778,6 +871,9 @@ public:
 			if (frame_cntr < OBGESCENE_NUM) {
 				m_shaders->trackd[currentPass].frame_used[frame_cntr] = frame_num;
 				m_shaders->trackd[currentPass].frame_pass[frame_cntr] = frame_bge;
+#ifdef	OBGE_PROFILE
+				m_shaders->trackd[currentPass].frame_time[frame_cntr].QuadPart = frame_end.QuadPart - frame_bgn.QuadPart;
+#endif
 
 				m_shaders->trackd[currentPass].rt[frame_cntr] = passSurface[currentPass];
 				m_shaders->trackd[currentPass].ds[frame_cntr] = passDepth  [currentPass];
@@ -795,7 +891,7 @@ public:
 #endif
 
 #ifdef	OBGE_LOGGING
-		if (frame_log) {
+		if (frame_log && 0) {
 			IDirect3DSurface9 *pRenderTarget;
 			IDirect3DSurface9 *pBuf;
 			D3DSURFACE_DESC VDesc;
@@ -816,13 +912,47 @@ public:
 
 	STDMETHOD(Clear)(THIS_ DWORD Count,CONST D3DRECT* pRects,DWORD Flags,D3DCOLOR Color,float Z,DWORD Stencil)
 	{
+#ifdef	OBGE_LOGGING
+		if (frame_log) {
+			frame_log->Message("Clear:");
+
+			frame_log->Indent();
+			frame_log->FormattedMessage("Flags:%s%s%s",
+			  Flags & D3DCLEAR_TARGET  ? " Rendertarget" : "",
+			  Flags & D3DCLEAR_STENCIL ? " Stencil" : "",
+			  Flags & D3DCLEAR_ZBUFFER ? " Depth" : "");
+			frame_log->FormattedMessage("Values: {%d,%d,%d,%d} %f %d",
+			  (Color >> 0) & 0xFF, (Color >> 8) & 0xFF, (Color >> 16) & 0xFF, (Color >> 24) & 0xFF,
+			  Z,
+			  Stencil);
+
+			frame_log->FormattedMessage("Count: %d", Count);
+			if (Count) {
+				frame_log->FormattedMessage("Rects:");
+				frame_log->Indent();
+				for (int c = 0; c < Count; c++)
+					frame_log->FormattedMessage("[%d,%d] [%d,%d]", pRects[c].x1, pRects[c].x2, pRects[c].y1, pRects[c].y2);
+				frame_log->Outdent();
+			}
+
+			frame_log->Outdent();
+		}
+#endif
+
 		return m_device->Clear(Count, pRects, Flags, Color, Z, Stencil);
 	}
 
 	STDMETHOD(SetTransform)(THIS_ D3DTRANSFORMSTATETYPE State,CONST D3DMATRIX* pMatrix)
 	{
+		if (HasShaderManager) {
+			/**/ if (State == D3DTS_VIEW)
+				m_shaders->ShaderConst.view = *pMatrix;
+			else if (State == D3DTS_PROJECTION)
+				m_shaders->ShaderConst.proj = *pMatrix;
+			else if (State == D3DTS_WORLD)
+				m_shaders->ShaderConst.wrld = *pMatrix;
+
 #ifdef	OBGE_DEVLING
-		if (m_shaders) {
 			/* record exact position of occurance */
 			int frame_cntr = m_shaders->trackd[currentPass].frame_cntr;
 
@@ -832,18 +962,21 @@ public:
 					m_shaders->trackd[currentPass].transf[frame_cntr][0] = *pMatrix;
 				else if (State == D3DTS_PROJECTION)
 					m_shaders->trackd[currentPass].transf[frame_cntr][1] = *pMatrix;
+				else if (State == D3DTS_WORLD)
+					m_shaders->trackd[currentPass].transf[frame_cntr][2] = *pMatrix;
 			}
-		}
 #endif
+		}
 
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
-			frame_log->FormattedMessage("SetTransform:");
+			frame_log->Message("SetTransform:");
 
 			const char *Type = NULL;
 			switch (State) {
 			    case D3DTS_VIEW: Type = "View"; break;
 			    case D3DTS_PROJECTION: Type = "Projection"; break;
+			    case D3DTS_WORLD: Type = "World"; break;
 			    case D3DTS_TEXTURE0: Type = "Texture0"; break;
 			    case D3DTS_TEXTURE1: Type = "Texture1"; break;
 			    case D3DTS_TEXTURE2: Type = "Texture2"; break;
@@ -884,9 +1017,20 @@ public:
 
 	STDMETHOD(SetViewport)(THIS_ CONST D3DVIEWPORT9* pViewport)
 	{
+		if (HasShaderManager) {
+			const float W = (float)pViewport->Width;
+			const float H = (float)pViewport->Height;
+
+			/* record constants */
+			m_shaders->ShaderConst.rcpres[0] = 1.0f / W;
+			m_shaders->ShaderConst.rcpres[1] = 1.0f / H;
+			m_shaders->ShaderConst.rcpres[2] = W / H;
+			m_shaders->ShaderConst.rcpres[3] = W * H;
+		}
+
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
-			frame_log->FormattedMessage("SetViewport:");
+			frame_log->Message("SetViewport:");
 
 			frame_log->Indent();
 			frame_log->FormattedMessage("{X,Y}: {%d,%d}", pViewport->X, pViewport->Y);
@@ -908,7 +1052,7 @@ public:
 	{
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
-			frame_log->FormattedMessage("SetMaterial:");
+			frame_log->Message("SetMaterial:");
 
 			frame_log->Indent();
 			frame_log->FormattedMessage("Diffuse: {%f,%f,%f,%f}", pMaterial->Diffuse.r, pMaterial->Diffuse.g, pMaterial->Diffuse.b, pMaterial->Diffuse.a);
@@ -963,9 +1107,8 @@ public:
 	STDMETHOD(LightEnable)(THIS_ DWORD Index,BOOL Enable)
 	{
 #ifdef	OBGE_LOGGING
-		if (frame_log) {
+		if (frame_log)
 			frame_log->FormattedMessage("Light[%d]: %s", Index, Enable ? "enabled" : "disabled");
-		}
 #endif
 
 		return m_device->LightEnable(Index, Enable);
@@ -989,14 +1132,22 @@ public:
 	STDMETHOD(SetRenderState)(THIS_ D3DRENDERSTATETYPE State,DWORD Value)
 	{
 #ifdef	OBGE_DEVLING
-		if (m_shaders) {
+		if (HasShaderManager) {
 			/* record exact position of occurance */
 			int frame_cntr = m_shaders->trackd[currentPass].frame_cntr;
 
 			/* huh, going into menu provokes huge numbers here */
-			if (frame_cntr < OBGESCENE_NUM) {
+			if (frame_cntr < OBGESCENE_NUM)
 				m_shaders->trackd[currentPass].states[frame_cntr][State] = Value;
-			}
+		}
+#endif
+
+#ifdef	OBGE_LOGGING
+		if (frame_log) {
+			frame_log->Message("SetRenderState");
+			frame_log->Indent();
+			frame_log->FormattedMessage("%s: %s", findRenderState(State), findRenderStateValue(State, Value));
+			frame_log->Outdent();
 		}
 #endif
 
@@ -1041,7 +1192,7 @@ public:
 	STDMETHOD(SetTexture)(THIS_ DWORD Sampler,IDirect3DBaseTexture9* pTexture)
 	{
 #ifdef	OBGE_DEVLING
-		if (m_shaders)
+		if (HasShaderManager)
 			m_shaders->traced[currentPass].values_s[Sampler] = pTexture;
 #endif
 
@@ -1049,7 +1200,8 @@ public:
 		if (frame_log) {
 			frame_log->FormattedMessage("SetTexture[%d]", Sampler);
 			frame_log->Indent();
-			frame_log->FormattedMessage("Address: 0x%08x", pTexture);
+			frame_log->FormattedMessage("Address: 0x%08x", pTexture); if (pTexture)
+			frame_log->FormattedMessage("Path: %s", findTexture(pTexture));
 
 			bool ok = false;
 
@@ -1060,7 +1212,7 @@ public:
 			if (!ok) {
 				struct textureSurface *track = surfaceTexture[pTexture];
 				if (track) {
-					frame_log->FormattedMessage("Type: Dedicated Texture");
+					frame_log->Message("Type: Dedicated Texture");
 					frame_log->FormattedMessage("{W,H}: {%d,%d}", track->map->Width, track->map->Height);
 					frame_log->FormattedMessage("Format: %s", findFormat(track->map->Format));
 					frame_log->FormattedMessage("Levels: %d", track->map->Levels);
@@ -1074,7 +1226,38 @@ public:
 		}
 #endif
 
-		return m_device->SetTexture(Sampler, pTexture);
+#if	defined(OBGE_AUTOMIPMAP)
+		struct textureMap *track;
+		bool setfilter = false;
+		if (pTexture && (track = textureMaps[pTexture])) {
+			D3DTEXTUREFILTERTYPE ft = pTexture->GetAutoGenFilterType();
+
+			if (track->Usage & D3DUSAGE_RENDERTARGET) {
+			  int i = 0;
+			}
+
+			if ((track->Usage & D3DUSAGE_AUTOGENMIPMAP) &&
+			    (track->Usage & D3DUSAGE_RENDERTARGET)) {
+#if	defined(OBGE_AUTOMIPMAP) && (OBGE_AUTOMIPMAP > 0)
+      				pTexture->SetAutoGenFilterType(D3DTEXF_LINEAR);
+      				pTexture->GenerateMipSubLevels();
+#endif
+      				setfilter = true;
+			}
+		}
+#endif
+
+		HRESULT res = m_device->SetTexture(Sampler, pTexture);
+
+#if	defined(OBGE_AUTOMIPMAP)
+		if (setfilter) {
+			SetSamplerState(Sampler, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+			SetSamplerState(Sampler, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+			SetSamplerState(Sampler, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR);
+		}
+#endif
+
+   		return res;
 	}
 
 	STDMETHOD(GetTextureStageState)(THIS_ DWORD Stage,D3DTEXTURESTAGESTATETYPE Type,DWORD* pValue)
@@ -1095,7 +1278,7 @@ public:
 	STDMETHOD(SetSamplerState)(THIS_ DWORD Sampler,D3DSAMPLERSTATETYPE Type,DWORD Value)
 	{
 #ifdef	OBGE_DEVLING
-		if (m_shaders)
+		if (HasShaderManager)
 			m_shaders->traced[currentPass].states_s[Sampler][Type] = Value;
 #endif
 
@@ -1161,7 +1344,7 @@ public:
 	{
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
-			frame_log->FormattedMessage("DrawPrimitive");
+			frame_log->Message("DrawPrimitive");
 
 			const char *Type = "Unknown";
 			switch (PrimitiveType) {
@@ -1187,7 +1370,7 @@ public:
 	{
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
-			frame_log->FormattedMessage("DrawIndexedPrimitive");
+			frame_log->Message("DrawIndexedPrimitive");
 
 			const char *Type = "Unknown";
 			switch (PrimitiveType) {
@@ -1214,7 +1397,7 @@ public:
 	{
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
-			frame_log->FormattedMessage("DrawPrimitiveUP");
+			frame_log->Message("DrawPrimitiveUP");
 
 			const char *Type = "Unknown";
 			switch (PrimitiveType) {
@@ -1241,7 +1424,7 @@ public:
 	{
 #ifdef	OBGE_LOGGING
 		if (frame_log) {
-			frame_log->FormattedMessage("DrawIndexedPrimitiveUP");
+			frame_log->Message("DrawIndexedPrimitiveUP");
 
 			const char *Type = "Unknown";
 			switch (PrimitiveType) {
@@ -1299,19 +1482,16 @@ public:
 	STDMETHOD(CreateVertexShader)(THIS_ CONST DWORD* pFunction,IDirect3DVertexShader9** ppShader)
 	{
 #ifdef	OBGE_LOGGING
-		if (frame_log) {
+		if (frame_log)
 			frame_log->FormattedMessage("CreateVertexShader 0x%08x", _ReturnAddress());
-		}
 #endif
 
 		HRESULT res = m_device->CreateVertexShader(pFunction, ppShader);
 
 		if (frame_log || frame_trk) {
-#ifdef	OBGE_DEVLING
 			/* just register, don't return any manipulated class */
-			if (m_shaders)
-				m_shaders->GetRuntimeShader(pFunction, *ppShader);
-#endif
+			if (HasShaderManager)
+				m_shaders->SetRuntimeShader(pFunction, *ppShader);
 
 #ifdef	OBGE_LOGGING
 			if (frame_log) {
@@ -1331,10 +1511,16 @@ public:
 
 	STDMETHOD(SetVertexShader)(THIS_ IDirect3DVertexShader9* pShader)
 	{
-#ifdef	OBGE_DEVLING
+		HRESULT res = 0;
 		m_shadercv = NULL;
 
-		if (m_shaders && pShader && (m_shadercv = m_shaders->Shaders[pShader])) {
+		if (HasShaderManager && pShader && (m_shadercv = m_shaders->GetRuntimeShader(pShader))) {
+#if	!defined(OBGE_DEVLING)
+			/* set shader first before constants */
+			res = m_device->SetPixelShader(pShader);
+			/* apply dynamic runtime parameters */
+			m_shadercv->SetRuntimeParams(m_device, m_device);
+#else
 			m_shadercv->frame_used[OBGEPASS_UNKNOWN] = frame_num;
 			m_shadercv->frame_pass[OBGEPASS_UNKNOWN] = frame_bge;
 
@@ -1343,26 +1529,54 @@ public:
 
 			m_shadercv->Clear(currentPass);
 
+			/* it's impossible for that function to return NULL */
+			res = m_device->SetVertexShader(m_shadercv->GetShader(pShader));
+			/* apply dynamic runtime parameters */
+			m_shadercv->SetRuntimeParams(this, m_device);
+
 			/* these have been set before, takeover */
 			memcpy(m_shadercv->traced[currentPass].states_s, m_shaders->traced[currentPass].states_s, sizeof(m_shaders->traced[currentPass].states_s));
 			memcpy(m_shadercv->traced[currentPass].values_s, m_shaders->traced[currentPass].values_s, sizeof(m_shaders->traced[currentPass].values_s));
 
-			/* it's impossible for that function to return NULL */
-			return m_device->SetVertexShader(m_shadercv->GetRuntimeShader(pShader));
-		}
-#endif
+#if	defined(OBGE_LOGGING)
+			if (frame_log) {
+				char buf[256]; sprintf(buf, "Name: %s", m_shadercv->pAssociate ? m_shadercv->pAssociate->Name : "unknown");
 
-#ifdef	OBGE_LOGGING
+				frame_log->Message("SetVertexShader");
+				frame_log->Indent();
+				frame_log->Message(buf);
+				frame_log->Outdent();
+			}
+#endif
+#endif
+		}
+#if	defined(OBGE_LOGGING) && defined(OBGE_DEVLING)
+		else if (frame_log) {
+			char buf[256]; sprintf(buf, "Name: %s", pShader ? "untracked" : "cleared");
+
+			frame_log->Message("SetVertexShader");
+			frame_log->Indent();
+			frame_log->Message(buf);
+			frame_log->Outdent();
+
+			res = m_device->SetVertexShader(pShader);
+		}
+		else
+			res = m_device->SetVertexShader(pShader);
+#endif
+#if	defined(OBGE_LOGGING) && !defined(OBGE_DEVLING)
 		if (frame_log) {
-			frame_log->FormattedMessage("SetVertexShader");
+			frame_log->Message("SetVertexShader");
 
 			frame_log->Indent();
 			frame_log->FormattedMessage("Name: %s", findShader(pShader));
 			frame_log->Outdent();
 		}
+
+		res = m_device->SetVertexShader(pShader);
 #endif
 
-		return m_device->SetVertexShader(pShader);
+		return res;
 	}
 
 	STDMETHOD(GetVertexShader)(THIS_ IDirect3DVertexShader9** ppShader)
@@ -1490,11 +1704,9 @@ public:
 		HRESULT res = m_device->CreatePixelShader(pFunction, ppShader);
 
 		if (frame_log || frame_trk) {
-#ifdef	OBGE_DEVLING
 			/* just register, don't return any manipulated class */
-			if (m_shaders)
-				m_shaders->GetRuntimeShader(pFunction, *ppShader);
-#endif
+			if (HasShaderManager)
+				m_shaders->SetRuntimeShader(pFunction, *ppShader);
 
 #ifdef	OBGE_LOGGING
 			if (frame_log) {
@@ -1514,10 +1726,17 @@ public:
 
 	STDMETHOD(SetPixelShader)(THIS_ IDirect3DPixelShader9* pShader)
 	{
-#ifdef	OBGE_DEVLING
+		HRESULT res = 0;
 		m_shadercp = NULL;
 
-		if (m_shaders && pShader && (m_shadercp = m_shaders->Shaders[pShader])) {
+		if (HasShaderManager && pShader && (m_shadercp = m_shaders->GetRuntimeShader(pShader))) {
+#if	!defined(OBGE_DEVLING)
+			/* set shader first before constants */
+			res = m_device->SetPixelShader(pShader);
+		        /* apply dynamic runtime parameters */
+			m_shadercp->SetRuntimeParams(m_device, m_device);
+#else
+
 			m_shadercp->frame_used[OBGEPASS_UNKNOWN] = frame_num;
 			m_shadercp->frame_pass[OBGEPASS_UNKNOWN] = frame_bge;
 
@@ -1526,18 +1745,47 @@ public:
 
 			m_shadercp->Clear(currentPass);
 
+			/* it's impossible for that function to return NULL */
+			res = m_device->SetPixelShader(m_shadercp->GetShader(pShader));
+			/* apply dynamic runtime parameters */
+			m_shadercp->SetRuntimeParams(this, m_device);
+
 			/* these have been set before, takeover */
 			memcpy(m_shadercp->traced[currentPass].states_s, m_shaders->traced[currentPass].states_s, sizeof(m_shaders->traced[currentPass].states_s));
 			memcpy(m_shadercp->traced[currentPass].values_s, m_shaders->traced[currentPass].values_s, sizeof(m_shaders->traced[currentPass].values_s));
 
-			/* it's impossible for that function to return NULL */
-			return m_device->SetPixelShader(m_shadercp->GetRuntimeShader(pShader));
-		}
-#endif
+#if	defined(OBGE_LOGGING)
+			if (frame_log) {
+				char buf[256]; sprintf(buf, "Name: %s", m_shadercp->pAssociate ? m_shadercp->pAssociate->Name : "unknown");
 
-#ifdef	OBGE_LOGGING
+				frame_log->Message("SetPixelShader");
+				frame_log->Indent();
+				frame_log->Message(buf);
+				frame_log->Outdent();
+			}
+#endif
+#endif
+		}
+#if	defined(OBGE_LOGGING) && defined(OBGE_DEVLING)
+		else if (frame_log) {
+			char buf[256]; sprintf(buf, "Name: %s", pShader ? "untracked" : "cleared");
+
+			frame_log->Message("SetPixelShader");
+			frame_log->Indent();
+			frame_log->Message(buf);
+			frame_log->Outdent();
+
+			res = m_device->SetPixelShader(pShader);
+		}
+		else
+			res = m_device->SetPixelShader(pShader);
+#endif
+#if	defined(OBGE_LOGGING) && !defined(OBGE_DEVLING)
+		/* set shader first before constants */
+		res = m_device->SetPixelShader(pShader);
+
 		if (frame_log) {
-			frame_log->FormattedMessage("SetPixelShader");
+			frame_log->Message("SetPixelShader");
 
 			frame_log->Indent();
 			frame_log->FormattedMessage("Name: %s", findShader(pShader));
@@ -1545,7 +1793,7 @@ public:
 		}
 #endif
 
-		return m_device->SetPixelShader(pShader);
+		return res;
 	}
 
 	STDMETHOD(GetPixelShader)(THIS_ IDirect3DPixelShader9** ppShader)
@@ -1670,14 +1918,12 @@ public:
 	}
 
 private:
-	IDirect3DDevice9* m_device;
-	IDirect3D9* m_d3d;
+	IDirect3DDevice9 *m_device;
+	IDirect3D9 *m_d3d;
 
-#ifdef	OBGE_DEVLING
 	ShaderManager *m_shaders;
 	RuntimeShaderRecord *m_shadercv;
 	RuntimeShaderRecord *m_shadercp;
-#endif
 };
 
 #endif

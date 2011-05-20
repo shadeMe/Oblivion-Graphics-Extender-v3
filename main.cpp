@@ -8,14 +8,16 @@
 #include "Commands_Misc.h"
 #include "Commands_HUD.h"
 #include "Commands_Shaders.h"
+#include "Commands_Effects.h"
 #include "Commands_Textures.h"
 
 #include "OBSEShaderInterface.h"
 #include "Rendering.h"
 #include "DepthBufferHook.h"
 #include "RenderSurfaceParametersHook.hpp"
-#include "ShaderIOHook.hpp"
 #include "RenderStateManagerHooks.h"
+#include "ShaderIOHook.hpp"
+#include "TextureIOHook.hpp"
 #include "GlobalSettings.h"
 #include "GUIs_DebugWindow.hpp"
 
@@ -77,6 +79,8 @@ void _cdecl ReleaseShader(void)
 		pSpoofShader->DeviceRelease();
 		delete(pSpoofShader);
 		pSpoofShader=NULL;
+
+//		delete ShaderManager::GetSingleton();
 	}
 }
 
@@ -150,11 +154,15 @@ void MessageHandler(OBSEMessagingInterface::Message* msg)
 {
 	switch (msg->type)
 	{
+//	case OBSEMessagingInterface::kMessage_ExitGame_Console:
 	case OBSEMessagingInterface::kMessage_ExitGame:
 		_MESSAGE("Received ExitGame message.");
 		INIList::GetSingleton()->WriteAllToINI();
+#ifdef	OBGE_DEVLING
+		DebugWindow::Exit();
+#endif
 		ReleaseShader();
-		LostDepthBuffer(true,NULL);
+		LostDepthBuffer(true, NULL);
 		break;
 	case OBSEMessagingInterface::kMessage_LoadGame:
 		_MESSAGE("Received load game message.");
@@ -256,20 +264,15 @@ bool OBSEPlugin_Query(const OBSEInterface * obse, PluginInfo * info)
 			return false;
 		}
 
-// Delay loading d3dx9_41.dll file so I can check that it exists on the system.
-// Set linker options DELAYLOAD:d3dx9_41.dll & DELAY:NOBIND (No binding in case someone
-// is using a proxy dll).
-#if 0
-		if (FAILED(__HrLoadAllImportsForDll("d3dx9_41.dll")))
-		{
-			_ERROR ( "ERROR - can't find d3dx9_41.dll file. Please update DirectX." );
-			return false;
-		}
-#endif
-		HookAPICalls(&K32Hook);	// static DLL linkage
-		HookAPICalls(&U32Hook);	// static DLL linkage
-	//	HookAPICalls(&D3DHook);	// dynamic DLL linkage
-		HookAPICalls(&D3XHook);	// static DLL linkage
+		assert(NULL);
+
+		HookAPICalls(&K32Hook);		// static DLL linkage
+		HookAPICalls(&U32Hook);		// static DLL linkage
+	//	HookAPICalls(&D3DHook);		// dynamic DLL linkage
+		HookAPICalls(&D3XHook27);	// static DLL linkage
+		HookAPICalls(&D3XHook31);	// static DLL linkage
+		HookAPICalls(&D3XHook41);	// static DLL linkage
+		HookAPICalls(&D3XHook43);	// static DLL linkage
 	}
 	else
 	{
@@ -290,33 +293,64 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 
 	// Shader range 2100 to 21FF
 
-	obse->RegisterCommand(&kCommandInfo_GetAvailableGraphicsMemory);	// 2100
+	obse->RegisterCommand(&kCommandInfo_GetAvailableGraphicsMemory);		// 2100
 	obse->RegisterCommand(&kCommandInfo_GetScreenWidth);				// 2101
 	obse->RegisterCommand(&kCommandInfo_GetScreenHeight);				// 2102
-	obse->RegisterCommand(&kCommandInfo_LoadEffect);					// 2103
-	obse->RegisterCommand(&kCommandInfo_ApplyFullscreenShader);			// 2104
-	obse->RegisterCommand(&kCommandInfo_RemoveFullscreenShader);		// 2105
-	obse->RegisterCommand(&kCommandInfo_SetEffectInt);					// 2106
-	obse->RegisterCommand(&kCommandInfo_SetEffectFloat);				// 2107
-	obse->RegisterCommand(&kCommandInfo_SetEffectVector);				// 2108
-	obse->RegisterCommand(&kCommandInfo_SetEffectTexture);				// 2109
 	obse->RegisterCommand(&kCommandInfo_ForceGraphicsReset);			// 210A
-	obse->RegisterCommand(&kCommandInfo_LoadTexture);					// 210B
-	obse->RegisterCommand(&kCommandInfo_FreeTexture);					// 210C
+
+	/* effects -------------------------------------------------------------------- */
+	obse->RegisterCommand(&kCommandInfo_LoadEffect);				// 2103
+	obse->RegisterCommand(&kCommandInfo_EnableEffect);				// 2104
+	obse->RegisterCommand(&kCommandInfo_DisableEffect);				// 2105
+	obse->RegisterCommand(&kCommandInfo_ReleaseEffect);				// 2105
+	obse->RegisterCommand(&kCommandInfo_SetEffectConstantB);			// 2106
+	obse->RegisterCommand(&kCommandInfo_SetEffectConstantI);			// 2106
+	obse->RegisterCommand(&kCommandInfo_SetEffectConstantF);			// 2106
+	obse->RegisterCommand(&kCommandInfo_SetEffectConstantV);			// 2106
+	obse->RegisterCommand(&kCommandInfo_SetEffectSamplerTexture);			// 2106
+	obse->RegisterCommand(&kCommandInfo_IsEffectEnabled);				// 2114
+#ifndef	NO_DEPRECATED
+	obse->RegisterCommand(&kCommandInfo_LoadShader);				// 2103
+	obse->RegisterCommand(&kCommandInfo_ApplyFullscreenShader);			// 2104
+	obse->RegisterCommand(&kCommandInfo_RemoveFullscreenShader);			// 2105
+	obse->RegisterCommand(&kCommandInfo_SetShaderInt);				// 2106
+	obse->RegisterCommand(&kCommandInfo_SetShaderFloat);				// 2107
+	obse->RegisterCommand(&kCommandInfo_SetShaderVector);				// 2108
+	obse->RegisterCommand(&kCommandInfo_SetShaderTexture);				// 2109
+	obse->RegisterCommand(&kCommandInfo_IsShaderEnabled);				// 2114
+#endif
+
+	/* shaders -------------------------------------------------------------------- */
+	obse->RegisterCommand(&kCommandInfo_SetShaderConstantB);			// 2106
+	obse->RegisterCommand(&kCommandInfo_SetShaderConstantI);			// 2106
+	obse->RegisterCommand(&kCommandInfo_SetShaderConstantF);			// 2106
+	obse->RegisterCommand(&kCommandInfo_SetShaderSamplerTexture);			// 2106
+
+	/* textures ------------------------------------------------------------------- */
+	obse->RegisterCommand(&kCommandInfo_LoadTexture);				// 210B
+	obse->RegisterCommand(&kCommandInfo_LoadCubeTexture);				// 210C
+	obse->RegisterCommand(&kCommandInfo_LoadVolumeTexture);				// 210D
+	obse->RegisterCommand(&kCommandInfo_ReleaseTexture);				// 210E
+	obse->RegisterCommand(&kCommandInfo_PurgeManagedTextures);			// 2110
+#ifndef	NO_DEPRECATED
+	obse->RegisterCommand(&kCommandInfo_FreeTexture);				// 210F
+#endif
+
+	/* hud ------------------------------------------------------------------------ */
 	obse->RegisterCommand(&kCommandInfo_CreateHUDElement);				// 210D
 	obse->RegisterCommand(&kCommandInfo_SetHUDElementTexture);			// 210E
 	obse->RegisterCommand(&kCommandInfo_SetHUDElementColour);			// 210F
 	obse->RegisterCommand(&kCommandInfo_SetHUDElementPosition);			// 2110
 	obse->RegisterCommand(&kCommandInfo_SetHUDElementScale);			// 2111
 	obse->RegisterCommand(&kCommandInfo_SetHUDElementRotation);			// 2112
-	obse->RegisterCommand(&kCommandInfo_PurgeManagedTextures);			// 2113
-	obse->RegisterCommand(&kCommandInfo_IsEffectEnabled);				// 2114
+
+	/* dev ------------------------------------------------------------------------ */
 #ifdef	OBGE_LOGGING
-	obse->RegisterCommand(&kCommandInfo_DumpFrameScript);			// 2115
-	obse->RegisterCommand(&kCommandInfo_DumpFrameSurfaces);			// 2116
+	obse->RegisterCommand(&kCommandInfo_DumpFrameScript);				// 2115
+	obse->RegisterCommand(&kCommandInfo_DumpFrameSurfaces);				// 2116
 #endif
 #ifdef	OBGE_DEVLING
-	obse->RegisterCommand(&kCommandInfo_OpenRendererInterface);			// 2117
+	obse->RegisterCommand(&kCommandInfo_OpenShaderDeveloper);			// 2117
 #endif
 
 // We don't want to hook the construction set.
@@ -341,6 +375,7 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 			CreateDepthBufferHook();
 			CreateRenderSurfaceHook();
 			CreateShaderIOHook();
+			CreateTextureIOHook();
 		//	v1_2_416::NiDX9RenderStateEx::HookRenderStateManager();
 		}
 		else

@@ -10,10 +10,12 @@
 #define	_DMESSAGE(...)	0
 #endif
 
-#undef	OBGE_LOGGING
+/* these are build-switches from now on */
+//efine	OBGE_LOGGING
 #undef	OBGE_HOOKING
-#define	OBGE_DEVLING
-#undef	OBGE_PROFILE
+//efine	OBGE_DEVLING
+//efine	OBGE_PROFILE
+#define	OBGE_AUTOMIPMAP		0	// 0 = just hint, 1 = call GenerateMipSubLevels
 #define	OBGE_TRACKER		0	// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
 #undef	OBGE_TRACKER_SURFACES		// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
 #undef	OBGE_TRACKER_TEXTURES		// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
@@ -27,9 +29,9 @@ enum OBGEPass {
   OBGEPASS_WATERDISPLACEMENT 	= 0x4,	// off screen-space
   OBGEPASS_SHADOW		= 0x5,	// off screen-space
   OBGEPASS_MAIN			= 0x6,	// missing
-  OBGEPASS_HDR			= 0x7,	// on screen-space, hdr
-  OBGEPASS_EFFECTS		= 0x8,	// on screen-space, blur, hit, menu, etc.
-  OBGEPASS_POST			= 0x9,	// unknown
+  OBGEPASS_EFFECTS		= 0x7,	// on screen-space
+  OBGEPASS_HDR			= 0x8,	// on screen-space, hdr
+  OBGEPASS_POST			= 0x9,	// on screen-space, blur, hit, menu, etc.
 
   OBGEPASS_VIDEO		= 0xA,	// bink
   OBGEPASS_UNKNOWN		= 0xB,
@@ -38,14 +40,19 @@ enum OBGEPass {
   OBGEPASS_NUM			= OBGEPASS_UNKNOWN + 1,
 };
 
+extern const char *passNames[OBGEPASS_NUM];
+extern const char *passScens[OBGEPASS_NUM][16];
+
 /* ------------------------------------------------------------------------------- */
 
 const char *findShader(void *iface, UINT len, const DWORD* buf);
 const char *findShader(void *iface);
 const char *findFormat(D3DFORMAT fmt);
 const char *findUsage(DWORD use);
-const char *findSamplerState(D3DSAMPLERSTATETYPE sstate);
 const char *findTextureState(D3DTEXTURESTAGESTATETYPE tstate);
+const char *findSamplerState(D3DSAMPLERSTATETYPE sstate);
+const char *findSamplerStateValue(D3DSAMPLERSTATETYPE sstate, DWORD svalue);
 const char *findRenderState(D3DRENDERSTATETYPE rstate);
+const char *findRenderStateValue(D3DRENDERSTATETYPE rstate, DWORD rvalue);
 
 #endif

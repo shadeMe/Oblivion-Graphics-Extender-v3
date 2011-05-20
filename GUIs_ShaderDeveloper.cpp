@@ -15,42 +15,66 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	this->SetBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_MENU ) );
 	
 	SDMenubar = new wxMenuBar( 0 );
-	SDOptions = new wxMenu();
-	wxMenuItem* SDCompileSources;
-	SDCompileSources = new wxMenuItem( SDOptions, wxID_COMPILE, wxString( wxT("Compile Sources") ) , wxEmptyString, wxITEM_CHECK );
-	SDOptions->Append( SDCompileSources );
+	SDShaderOptions = new wxMenu();
+	wxMenuItem* SDShaderCompileSources;
+	SDShaderCompileSources = new wxMenuItem( SDShaderOptions, wxID_COMPILE, wxString( wxT("Compile Sources") ) , wxEmptyString, wxITEM_CHECK );
+	SDShaderOptions->Append( SDShaderCompileSources );
 	
-	wxMenuItem* SDSaveBinary;
-	SDSaveBinary = new wxMenuItem( SDOptions, wxID_SAVEBIN, wxString( wxT("Save Binary") ) , wxEmptyString, wxITEM_CHECK );
-	SDOptions->Append( SDSaveBinary );
+	wxMenuItem* SDShaderSaveBinary;
+	SDShaderSaveBinary = new wxMenuItem( SDShaderOptions, wxID_SAVEBIN, wxString( wxT("Save Binary") ) , wxEmptyString, wxITEM_CHECK );
+	SDShaderOptions->Append( SDShaderSaveBinary );
 	
 	wxMenuItem* m_separator1;
-	m_separator1 = SDOptions->AppendSeparator();
+	m_separator1 = SDShaderOptions->AppendSeparator();
 	
-	wxMenuItem* SDLegacy;
-	SDLegacy = new wxMenuItem( SDOptions, wxID_LEGACY, wxString( wxT("Legacy Compiler") ) , wxEmptyString, wxITEM_CHECK );
-	SDOptions->Append( SDLegacy );
+	wxMenuItem* SDShaderLegacy;
+	SDShaderLegacy = new wxMenuItem( SDShaderOptions, wxID_LEGACY, wxString( wxT("Legacy Compiler") ) , wxEmptyString, wxITEM_CHECK );
+	SDShaderOptions->Append( SDShaderLegacy );
 	
-	wxMenuItem* SDUpgradeSM1X;
-	SDUpgradeSM1X = new wxMenuItem( SDOptions, wxID_UPGRADE, wxString( wxT("Upgrade Legacy SM") ) , wxEmptyString, wxITEM_CHECK );
-	SDOptions->Append( SDUpgradeSM1X );
+	wxMenuItem* SDShaderUpgradeSM1X;
+	SDShaderUpgradeSM1X = new wxMenuItem( SDShaderOptions, wxID_UPGRADE, wxString( wxT("Upgrade Legacy SM") ) , wxEmptyString, wxITEM_CHECK );
+	SDShaderOptions->Append( SDShaderUpgradeSM1X );
 	
-	wxMenuItem* SDMaximumSM;
-	SDMaximumSM = new wxMenuItem( SDOptions, wxID_MAXIMUM, wxString( wxT("Maximize SM") ) , wxEmptyString, wxITEM_CHECK );
-	SDOptions->Append( SDMaximumSM );
+	wxMenuItem* SDShaderMaximumSM;
+	SDShaderMaximumSM = new wxMenuItem( SDShaderOptions, wxID_MAXIMUM, wxString( wxT("Maximize SM") ) , wxEmptyString, wxITEM_CHECK );
+	SDShaderOptions->Append( SDShaderMaximumSM );
 	
-	wxMenuItem* SDOptimize;
-	SDOptimize = new wxMenuItem( SDOptions, wxID_OPTIMIZE, wxString( wxT("Optimize") ) , wxEmptyString, wxITEM_CHECK );
-	SDOptions->Append( SDOptimize );
+	wxMenuItem* SDShaderOptimize;
+	SDShaderOptimize = new wxMenuItem( SDShaderOptions, wxID_OPTIMIZE, wxString( wxT("Optimize") ) , wxEmptyString, wxITEM_CHECK );
+	SDShaderOptions->Append( SDShaderOptimize );
 	
 	wxMenuItem* m_separator2;
-	m_separator2 = SDOptions->AppendSeparator();
+	m_separator2 = SDShaderOptions->AppendSeparator();
 	
-	wxMenuItem* SDRuntime;
-	SDRuntime = new wxMenuItem( SDOptions, wxID_RUNTIME, wxString( wxT("Runtime Replacement") ) , wxEmptyString, wxITEM_CHECK );
-	SDOptions->Append( SDRuntime );
+	wxMenuItem* SDShaderRuntime;
+	SDShaderRuntime = new wxMenuItem( SDShaderOptions, wxID_RUNTIME, wxString( wxT("Runtime Replacement") ) , wxEmptyString, wxITEM_CHECK );
+	SDShaderOptions->Append( SDShaderRuntime );
 	
-	SDMenubar->Append( SDOptions, wxT("Options") ); 
+	SDMenubar->Append( SDShaderOptions, wxT("Shaders") ); 
+	
+	SDEffectOptions = new wxMenu();
+	wxMenuItem* SDEffectCompileSources;
+	SDEffectCompileSources = new wxMenuItem( SDEffectOptions, wxID_COMPILE, wxString( wxT("Compile Sources") ) , wxEmptyString, wxITEM_CHECK );
+	SDEffectOptions->Append( SDEffectCompileSources );
+	SDEffectCompileSources->Enable( false );
+	
+	wxMenuItem* SDEffectSaveBinary;
+	SDEffectSaveBinary = new wxMenuItem( SDEffectOptions, wxID_SAVEBIN, wxString( wxT("Save Binary") ) , wxEmptyString, wxITEM_CHECK );
+	SDEffectOptions->Append( SDEffectSaveBinary );
+	SDEffectSaveBinary->Enable( false );
+	
+	wxMenuItem* m_separator11;
+	m_separator11 = SDEffectOptions->AppendSeparator();
+	
+	wxMenuItem* SDEffectLegacy;
+	SDEffectLegacy = new wxMenuItem( SDEffectOptions, wxID_LEGACY, wxString( wxT("Legacy Compiler") ) , wxEmptyString, wxITEM_CHECK );
+	SDEffectOptions->Append( SDEffectLegacy );
+	
+	wxMenuItem* SDEffectOptimize;
+	SDEffectOptimize = new wxMenuItem( SDEffectOptions, wxID_OPTIMIZE, wxString( wxT("Optimize") ) , wxEmptyString, wxITEM_CHECK );
+	SDEffectOptions->Append( SDEffectOptimize );
+	
+	SDMenubar->Append( SDEffectOptions, wxT("Effects") ); 
 	
 	this->SetMenuBar( SDMenubar );
 	
@@ -106,61 +130,61 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	
 	bSizer111->Add( SDToolbarShader, 0, wxEXPAND|wxLEFT|wxRIGHT, 5 );
 	
-	SDCodeSwitch = new wxNotebook( SDPanelShadersTop, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0 );
-	SDSource = new wxPanel( SDCodeSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
+	SDShaderCodeSwitch = new wxNotebook( SDPanelShadersTop, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0 );
+	SDShaderSource = new wxPanel( SDShaderCodeSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
 	wxBoxSizer* bSizer7;
 	bSizer7 = new wxBoxSizer( wxVERTICAL );
 	
-	SDSourceEditor = new wxTextCtrl( SDSource, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE|wxTE_NOHIDESEL|wxTE_PROCESS_TAB|wxTE_RICH|wxTE_RICH2 );
-	SDSourceEditor->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), 76, 90, 90, false, wxEmptyString ) );
+	SDShaderSourceEditor = new wxTextCtrl( SDShaderSource, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_DONTWRAP|wxTE_MULTILINE|wxTE_NOHIDESEL|wxTE_PROCESS_TAB|wxTE_RICH|wxTE_RICH2 );
+	SDShaderSourceEditor->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), 76, 90, 90, false, wxEmptyString ) );
 	
-	bSizer7->Add( SDSourceEditor, 1, wxALL|wxEXPAND, 5 );
+	bSizer7->Add( SDShaderSourceEditor, 1, wxALL|wxEXPAND, 5 );
 	
-	SDSource->SetSizer( bSizer7 );
-	SDSource->Layout();
-	bSizer7->Fit( SDSource );
-	SDCodeSwitch->AddPage( SDSource, wxT("HLSL"), false );
-	SDAssembly = new wxPanel( SDCodeSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
+	SDShaderSource->SetSizer( bSizer7 );
+	SDShaderSource->Layout();
+	bSizer7->Fit( SDShaderSource );
+	SDShaderCodeSwitch->AddPage( SDShaderSource, wxT("HLSL"), true );
+	SDShaderAssembly = new wxPanel( SDShaderCodeSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
 	wxBoxSizer* bSizer8;
 	bSizer8 = new wxBoxSizer( wxVERTICAL );
 	
-	SDAssemblyEditor = new wxTextCtrl( SDAssembly, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE|wxTE_NOHIDESEL|wxTE_PROCESS_TAB|wxTE_RICH|wxTE_RICH2 );
-	SDAssemblyEditor->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), 76, 90, 90, false, wxEmptyString ) );
+	SDShaderAssemblyEditor = new wxTextCtrl( SDShaderAssembly, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_DONTWRAP|wxTE_MULTILINE|wxTE_NOHIDESEL|wxTE_PROCESS_TAB|wxTE_RICH|wxTE_RICH2 );
+	SDShaderAssemblyEditor->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), 76, 90, 90, false, wxEmptyString ) );
 	
-	bSizer8->Add( SDAssemblyEditor, 1, wxALL|wxEXPAND, 5 );
+	bSizer8->Add( SDShaderAssemblyEditor, 1, wxALL|wxEXPAND, 5 );
 	
-	SDAssembly->SetSizer( bSizer8 );
-	SDAssembly->Layout();
-	bSizer8->Fit( SDAssembly );
-	SDCodeSwitch->AddPage( SDAssembly, wxT("Assembly"), false );
-	SDErrors = new wxPanel( SDCodeSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
+	SDShaderAssembly->SetSizer( bSizer8 );
+	SDShaderAssembly->Layout();
+	bSizer8->Fit( SDShaderAssembly );
+	SDShaderCodeSwitch->AddPage( SDShaderAssembly, wxT("Assembly"), false );
+	SDShaderErrors = new wxPanel( SDShaderCodeSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
 	wxBoxSizer* bSizer9;
 	bSizer9 = new wxBoxSizer( wxVERTICAL );
 	
-	SDErrorView = new wxTextCtrl( SDErrors, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE|wxTE_NOHIDESEL|wxTE_PROCESS_TAB|wxTE_READONLY|wxTE_RICH|wxTE_RICH2 );
-	SDErrorView->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), 76, 90, 90, false, wxEmptyString ) );
+	SDShaderErrorView = new wxTextCtrl( SDShaderErrors, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_DONTWRAP|wxTE_MULTILINE|wxTE_NOHIDESEL|wxTE_PROCESS_TAB|wxTE_READONLY|wxTE_RICH|wxTE_RICH2 );
+	SDShaderErrorView->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), 76, 90, 90, false, wxEmptyString ) );
 	
-	bSizer9->Add( SDErrorView, 1, wxALL|wxEXPAND, 5 );
+	bSizer9->Add( SDShaderErrorView, 1, wxALL|wxEXPAND, 5 );
 	
-	SDErrors->SetSizer( bSizer9 );
-	SDErrors->Layout();
-	bSizer9->Fit( SDErrors );
-	SDCodeSwitch->AddPage( SDErrors, wxT("Errors and Warnings"), false );
-	Disassembly = new wxPanel( SDCodeSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
+	SDShaderErrors->SetSizer( bSizer9 );
+	SDShaderErrors->Layout();
+	bSizer9->Fit( SDShaderErrors );
+	SDShaderCodeSwitch->AddPage( SDShaderErrors, wxT("Errors and Warnings"), false );
+	SDShaderDisassembly = new wxPanel( SDShaderCodeSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
 	wxBoxSizer* bSizer10;
 	bSizer10 = new wxBoxSizer( wxVERTICAL );
 	
-	SDDisassemblyView = new wxTextCtrl( Disassembly, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE|wxTE_NOHIDESEL|wxTE_PROCESS_TAB|wxTE_READONLY|wxTE_RICH|wxTE_RICH2 );
-	SDDisassemblyView->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), 76, 90, 90, false, wxEmptyString ) );
+	SDShaderDisassemblyView = new wxTextCtrl( SDShaderDisassembly, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_DONTWRAP|wxTE_MULTILINE|wxTE_NOHIDESEL|wxTE_PROCESS_TAB|wxTE_READONLY|wxTE_RICH|wxTE_RICH2 );
+	SDShaderDisassemblyView->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), 76, 90, 90, false, wxEmptyString ) );
 	
-	bSizer10->Add( SDDisassemblyView, 1, wxALL|wxEXPAND, 5 );
+	bSizer10->Add( SDShaderDisassemblyView, 1, wxALL|wxEXPAND, 5 );
 	
-	Disassembly->SetSizer( bSizer10 );
-	Disassembly->Layout();
-	bSizer10->Fit( Disassembly );
-	SDCodeSwitch->AddPage( Disassembly, wxT("Disassembly"), false );
+	SDShaderDisassembly->SetSizer( bSizer10 );
+	SDShaderDisassembly->Layout();
+	bSizer10->Fit( SDShaderDisassembly );
+	SDShaderCodeSwitch->AddPage( SDShaderDisassembly, wxT("Disassembly"), false );
 	
-	bSizer111->Add( SDCodeSwitch, 1, wxEXPAND | wxALL, 5 );
+	bSizer111->Add( SDShaderCodeSwitch, 1, wxEXPAND | wxALL, 5 );
 	
 	wxBoxSizer* bSizer3;
 	bSizer3 = new wxBoxSizer( wxHORIZONTAL );
@@ -237,7 +261,7 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	
 	// Grid
 	SDShaderConstSetGrid->CreateGrid( 3, 3 );
-	SDShaderConstSetGrid->EnableEditing( false );
+	SDShaderConstSetGrid->EnableEditing( true );
 	SDShaderConstSetGrid->EnableGridLines( true );
 	SDShaderConstSetGrid->EnableDragGridSize( true );
 	SDShaderConstSetGrid->SetMargins( 0, 0 );
@@ -281,7 +305,7 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	
 	// Grid
 	SDShaderSamplerGrid->CreateGrid( 2, 2 );
-	SDShaderSamplerGrid->EnableEditing( false );
+	SDShaderSamplerGrid->EnableEditing( true );
 	SDShaderSamplerGrid->EnableGridLines( true );
 	SDShaderSamplerGrid->EnableDragGridSize( true );
 	SDShaderSamplerGrid->SetMargins( 0, 0 );
@@ -327,6 +351,196 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDPanelShaders->Layout();
 	bSizer2->Fit( SDPanelShaders );
 	SDViewSwitch->AddPage( SDPanelShaders, wxT("Shaders"), true );
+	SDPanelEffects = new wxPanel( SDViewSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
+	wxBoxSizer* bSizer22;
+	bSizer22 = new wxBoxSizer( wxVERTICAL );
+	
+	SDSpitterEffects = new wxSplitterWindow( SDPanelEffects, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE );
+	SDSpitterEffects->SetSashGravity( 1 );
+	SDSpitterEffects->Connect( wxEVT_IDLE, wxIdleEventHandler( wxShaderDeveloper::SDSpitterEffectsOnIdle ), NULL, this );
+	
+	SDPanelEffectsTop = new wxPanel( SDSpitterEffects, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNO_BORDER|wxTAB_TRAVERSAL );
+	wxBoxSizer* bSizer1111;
+	bSizer1111 = new wxBoxSizer( wxVERTICAL );
+	
+	SDComboEffect = new wxBitmapComboBox( SDPanelEffectsTop, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0, NULL, wxCB_READONLY|wxCB_SORT ); 
+	bSizer1111->Add( SDComboEffect, 0, wxALL|wxEXPAND, 5 );
+	
+	SDToolbarEffect = new wxToolBar( SDPanelEffectsTop, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTB_FLAT|wxTB_HORIZONTAL ); 
+	SDButtonEffectNew = new wxBitmapButton( SDToolbarEffect, wxID_ANY, wxBitmap( wxT("#112"), wxBITMAP_TYPE_RESOURCE ), wxDefaultPosition, wxSize( -1,-1 ), wxBU_AUTODRAW );
+	SDButtonEffectNew->Enable( false );
+	
+	SDButtonEffectNew->Enable( false );
+	
+	SDToolbarEffect->AddControl( SDButtonEffectNew );
+	SDButtonEffectLoad = new wxBitmapButton( SDToolbarEffect, wxID_ANY, wxBitmap( wxT("#103"), wxBITMAP_TYPE_RESOURCE ), wxDefaultPosition, wxSize( -1,-1 ), wxBU_AUTODRAW );
+	SDButtonEffectLoad->Enable( false );
+	
+	SDButtonEffectLoad->Enable( false );
+	
+	SDToolbarEffect->AddControl( SDButtonEffectLoad );
+	SDButtonEffectSave = new wxBitmapButton( SDToolbarEffect, wxID_ANY, wxBitmap( wxT("#104"), wxBITMAP_TYPE_RESOURCE ), wxDefaultPosition, wxDefaultSize, wxBU_AUTODRAW );
+	SDToolbarEffect->AddControl( SDButtonEffectSave );
+	SDButtonEffectSaveAs = new wxBitmapButton( SDToolbarEffect, wxID_ANY, wxBitmap( wxT("#105"), wxBITMAP_TYPE_RESOURCE ), wxDefaultPosition, wxDefaultSize, wxBU_AUTODRAW );
+	SDButtonEffectSaveAs->Enable( false );
+	
+	SDButtonEffectSaveAs->Enable( false );
+	
+	SDToolbarEffect->AddControl( SDButtonEffectSaveAs );
+	SDEffectCompile = new wxButton( SDToolbarEffect, wxID_ANY, wxT("Compile"), wxDefaultPosition, wxDefaultSize, 0 );
+	SDToolbarEffect->AddControl( SDEffectCompile );
+	SDToolbarEffect->Realize();
+	
+	bSizer1111->Add( SDToolbarEffect, 0, wxEXPAND|wxLEFT|wxRIGHT, 5 );
+	
+	SDEffectCodeSwitch = new wxNotebook( SDPanelEffectsTop, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0 );
+	SDEffectSource = new wxPanel( SDEffectCodeSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
+	wxBoxSizer* bSizer72;
+	bSizer72 = new wxBoxSizer( wxVERTICAL );
+	
+	SDEffectSourceEditor = new wxTextCtrl( SDEffectSource, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_DONTWRAP|wxTE_MULTILINE|wxTE_NOHIDESEL|wxTE_PROCESS_TAB|wxTE_RICH|wxTE_RICH2 );
+	SDEffectSourceEditor->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), 76, 90, 90, false, wxEmptyString ) );
+	
+	bSizer72->Add( SDEffectSourceEditor, 1, wxALL|wxEXPAND, 5 );
+	
+	SDEffectSource->SetSizer( bSizer72 );
+	SDEffectSource->Layout();
+	bSizer72->Fit( SDEffectSource );
+	SDEffectCodeSwitch->AddPage( SDEffectSource, wxT("FX"), true );
+	SDEffectErrors = new wxPanel( SDEffectCodeSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
+	wxBoxSizer* bSizer91;
+	bSizer91 = new wxBoxSizer( wxVERTICAL );
+	
+	SDEffectErrorView = new wxTextCtrl( SDEffectErrors, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_DONTWRAP|wxTE_MULTILINE|wxTE_NOHIDESEL|wxTE_PROCESS_TAB|wxTE_READONLY|wxTE_RICH|wxTE_RICH2 );
+	SDEffectErrorView->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), 76, 90, 90, false, wxEmptyString ) );
+	
+	bSizer91->Add( SDEffectErrorView, 1, wxALL|wxEXPAND, 5 );
+	
+	SDEffectErrors->SetSizer( bSizer91 );
+	SDEffectErrors->Layout();
+	bSizer91->Fit( SDEffectErrors );
+	SDEffectCodeSwitch->AddPage( SDEffectErrors, wxT("Errors and Warnings"), false );
+	
+	bSizer1111->Add( SDEffectCodeSwitch, 1, wxEXPAND | wxALL, 5 );
+	
+	wxBoxSizer* bSizer31;
+	bSizer31 = new wxBoxSizer( wxHORIZONTAL );
+	
+	SDStatusEffect = new wxStaticText( SDPanelEffectsTop, wxID_ANY, wxT("Status: compiled, enabled, in use"), wxDefaultPosition, wxDefaultSize, 0 );
+	SDStatusEffect->Wrap( -1 );
+	bSizer31->Add( SDStatusEffect, 1, wxALL|wxALIGN_CENTER_VERTICAL, 5 );
+	
+	SDEffectEnable = new wxCheckBox( SDPanelEffectsTop, wxID_ANY, wxT("Enabled"), wxPoint( -1,-1 ), wxDefaultSize, wxALIGN_RIGHT );
+	SDEffectEnable->SetValue(true); 
+	bSizer31->Add( SDEffectEnable, 0, wxALL, 5 );
+	
+	bSizer1111->Add( bSizer31, 0, wxEXPAND|wxLEFT|wxRIGHT, 2 );
+	
+	SDPanelEffectsTop->SetSizer( bSizer1111 );
+	SDPanelEffectsTop->Layout();
+	bSizer1111->Fit( SDPanelEffectsTop );
+	SDPanelEffectsBottom = new wxPanel( SDSpitterEffects, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNO_BORDER|wxTAB_TRAVERSAL );
+	wxBoxSizer* bSizer121;
+	bSizer121 = new wxBoxSizer( wxVERTICAL );
+	
+	SDEffectVariables = new wxNotebook( SDPanelEffectsBottom, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0 );
+	SDEffectConstants = new wxPanel( SDEffectVariables, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSTATIC_BORDER|wxTAB_TRAVERSAL );
+	SDEffectConstants->SetBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ) );
+	
+	wxBoxSizer* bSizer141;
+	bSizer141 = new wxBoxSizer( wxVERTICAL );
+	
+	SDEffectConstSetGrid = new wxGrid( SDEffectConstants, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0 );
+	
+	// Grid
+	SDEffectConstSetGrid->CreateGrid( 3, 1 );
+	SDEffectConstSetGrid->EnableEditing( true );
+	SDEffectConstSetGrid->EnableGridLines( true );
+	SDEffectConstSetGrid->EnableDragGridSize( true );
+	SDEffectConstSetGrid->SetMargins( 0, 0 );
+	
+	// Columns
+	SDEffectConstSetGrid->AutoSizeColumns();
+	SDEffectConstSetGrid->EnableDragColMove( false );
+	SDEffectConstSetGrid->EnableDragColSize( true );
+	SDEffectConstSetGrid->SetColLabelSize( 20 );
+	SDEffectConstSetGrid->SetColLabelValue( 0, wxT("Value") );
+	SDEffectConstSetGrid->SetColLabelAlignment( wxALIGN_CENTRE, wxALIGN_BOTTOM );
+	
+	// Rows
+	SDEffectConstSetGrid->AutoSizeRows();
+	SDEffectConstSetGrid->EnableDragRowSize( false );
+	SDEffectConstSetGrid->SetRowLabelSize( 80 );
+	SDEffectConstSetGrid->SetRowLabelAlignment( wxALIGN_LEFT, wxALIGN_TOP );
+	
+	// Label Appearance
+	SDEffectConstSetGrid->SetLabelBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ) );
+	SDEffectConstSetGrid->SetLabelFont( wxFont( wxNORMAL_FONT->GetPointSize(), 70, 90, 91, false, wxEmptyString ) );
+	
+	// Cell Defaults
+	SDEffectConstSetGrid->SetDefaultCellBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ) );
+	SDEffectConstSetGrid->SetDefaultCellAlignment( wxALIGN_LEFT, wxALIGN_TOP );
+	bSizer141->Add( SDEffectConstSetGrid, 1, wxALL|wxEXPAND, 0 );
+	
+	SDEffectConstants->SetSizer( bSizer141 );
+	SDEffectConstants->Layout();
+	bSizer141->Fit( SDEffectConstants );
+	SDEffectVariables->AddPage( SDEffectConstants, wxT("Variables"), true );
+	SDEffectTextures = new wxPanel( SDEffectVariables, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSTATIC_BORDER|wxTAB_TRAVERSAL );
+	SDEffectTextures->SetBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ) );
+	
+	wxBoxSizer* bSizer1311;
+	bSizer1311 = new wxBoxSizer( wxVERTICAL );
+	
+	SDEffectTexturesGrid = new wxGrid( SDEffectTextures, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0 );
+	
+	// Grid
+	SDEffectTexturesGrid->CreateGrid( 2, 1 );
+	SDEffectTexturesGrid->EnableEditing( true );
+	SDEffectTexturesGrid->EnableGridLines( true );
+	SDEffectTexturesGrid->EnableDragGridSize( true );
+	SDEffectTexturesGrid->SetMargins( 0, 0 );
+	
+	// Columns
+	SDEffectTexturesGrid->AutoSizeColumns();
+	SDEffectTexturesGrid->EnableDragColMove( false );
+	SDEffectTexturesGrid->EnableDragColSize( true );
+	SDEffectTexturesGrid->SetColLabelSize( 20 );
+	SDEffectTexturesGrid->SetColLabelValue( 0, wxT("Value") );
+	SDEffectTexturesGrid->SetColLabelAlignment( wxALIGN_CENTRE, wxALIGN_BOTTOM );
+	
+	// Rows
+	SDEffectTexturesGrid->AutoSizeRows();
+	SDEffectTexturesGrid->EnableDragRowSize( false );
+	SDEffectTexturesGrid->SetRowLabelSize( 80 );
+	SDEffectTexturesGrid->SetRowLabelAlignment( wxALIGN_LEFT, wxALIGN_TOP );
+	
+	// Label Appearance
+	SDEffectTexturesGrid->SetLabelBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ) );
+	SDEffectTexturesGrid->SetLabelFont( wxFont( wxNORMAL_FONT->GetPointSize(), 70, 90, 91, false, wxEmptyString ) );
+	
+	// Cell Defaults
+	SDEffectTexturesGrid->SetDefaultCellBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ) );
+	SDEffectTexturesGrid->SetDefaultCellAlignment( wxALIGN_LEFT, wxALIGN_TOP );
+	bSizer1311->Add( SDEffectTexturesGrid, 1, wxALL|wxEXPAND, 0 );
+	
+	SDEffectTextures->SetSizer( bSizer1311 );
+	SDEffectTextures->Layout();
+	bSizer1311->Fit( SDEffectTextures );
+	SDEffectVariables->AddPage( SDEffectTextures, wxT("Textures"), false );
+	
+	bSizer121->Add( SDEffectVariables, 1, wxEXPAND | wxALL, 5 );
+	
+	SDPanelEffectsBottom->SetSizer( bSizer121 );
+	SDPanelEffectsBottom->Layout();
+	bSizer121->Fit( SDPanelEffectsBottom );
+	SDSpitterEffects->SplitHorizontally( SDPanelEffectsTop, SDPanelEffectsBottom, 0 );
+	bSizer22->Add( SDSpitterEffects, 1, wxEXPAND, 5 );
+	
+	SDPanelEffects->SetSizer( bSizer22 );
+	SDPanelEffects->Layout();
+	bSizer22->Fit( SDPanelEffects );
+	SDViewSwitch->AddPage( SDPanelEffects, wxT("Effects"), false );
 	SDPanelScenes = new wxPanel( SDViewSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
 	wxBoxSizer* bSizer18;
 	bSizer18 = new wxBoxSizer( wxVERTICAL );
@@ -476,13 +690,17 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	this->Connect( wxEVT_CLOSE_WINDOW, wxCloseEventHandler( wxShaderDeveloper::DoClose ) );
 	this->Connect( wxEVT_SIZE, wxSizeEventHandler( wxShaderDeveloper::DoResize ) );
 	this->Connect( wxEVT_UPDATE_UI, wxUpdateUIEventHandler( wxShaderDeveloper::DoUpdate ) );
-	this->Connect( SDCompileSources->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoOptions ) );
-	this->Connect( SDSaveBinary->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoOptions ) );
-	this->Connect( SDLegacy->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoOptions ) );
-	this->Connect( SDUpgradeSM1X->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoOptions ) );
-	this->Connect( SDMaximumSM->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoOptions ) );
-	this->Connect( SDOptimize->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoOptions ) );
-	this->Connect( SDRuntime->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoOptions ) );
+	this->Connect( SDShaderCompileSources->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Connect( SDShaderSaveBinary->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Connect( SDShaderLegacy->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Connect( SDShaderUpgradeSM1X->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Connect( SDShaderMaximumSM->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Connect( SDShaderOptimize->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Connect( SDShaderRuntime->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Connect( SDEffectCompileSources->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
+	this->Connect( SDEffectSaveBinary->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
+	this->Connect( SDEffectLegacy->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
+	this->Connect( SDEffectOptimize->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
 	SDChoicePass->Connect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoRenderpassSwitch ), NULL, this );
 	SDViewSwitch->Connect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxNotebookEventHandler( wxShaderDeveloper::DoViewSwitch ), NULL, this );
 	SDComboShader->Connect( wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderSwitch ), NULL, this );
@@ -491,8 +709,28 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDButtonShaderSaveAs->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderSaveAs ), NULL, this );
 	SDShaderVersion->Connect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderVersion ), NULL, this );
 	SDShaderCompile->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderCompile ), NULL, this );
-	SDSourceEditor->Connect( wxEVT_COMMAND_TEXT_UPDATED, wxCommandEventHandler( wxShaderDeveloper::DoShaderUpdate ), NULL, this );
+	SDShaderSourceEditor->Connect( wxEVT_KEY_UP, wxKeyEventHandler( wxShaderDeveloper::DoShaderHighlight ), NULL, this );
+	SDShaderSourceEditor->Connect( wxEVT_COMMAND_TEXT_UPDATED, wxCommandEventHandler( wxShaderDeveloper::DoShaderUpdate ), NULL, this );
+	SDShaderAssemblyEditor->Connect( wxEVT_KEY_UP, wxKeyEventHandler( wxShaderDeveloper::DoAssemblerHighlight ), NULL, this );
+	SDShaderAssemblyEditor->Connect( wxEVT_COMMAND_TEXT_UPDATED, wxCommandEventHandler( wxShaderDeveloper::DoShaderUpdate ), NULL, this );
 	SDShaderEnable->Connect( wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderToggle ), NULL, this );
+	SDShaderConstSetGrid->Connect( wxEVT_GRID_CELL_CHANGE, wxGridEventHandler( wxShaderDeveloper::DoShaderConstantChange ), NULL, this );
+	SDShaderConstSetGrid->Connect( wxEVT_GRID_CELL_LEFT_CLICK, wxGridEventHandler( wxShaderDeveloper::DoShaderConstantSelect ), NULL, this );
+	SDShaderSamplerGrid->Connect( wxEVT_GRID_CELL_CHANGE, wxGridEventHandler( wxShaderDeveloper::DoShaderSamplerChange ), NULL, this );
+	SDShaderSamplerGrid->Connect( wxEVT_GRID_CELL_LEFT_CLICK, wxGridEventHandler( wxShaderDeveloper::DoShaderSamplerSelect ), NULL, this );
+	SDComboEffect->Connect( wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectSwitch ), NULL, this );
+	SDButtonEffectNew->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoEffectAdd ), NULL, this );
+	SDButtonEffectLoad->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoEffectLoad ), NULL, this );
+	SDButtonEffectSave->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoEffectSave ), NULL, this );
+	SDButtonEffectSaveAs->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoEffectSaveAs ), NULL, this );
+	SDEffectCompile->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoEffectCompile ), NULL, this );
+	SDEffectSourceEditor->Connect( wxEVT_KEY_UP, wxKeyEventHandler( wxShaderDeveloper::DoEffectHighlight ), NULL, this );
+	SDEffectSourceEditor->Connect( wxEVT_COMMAND_TEXT_UPDATED, wxCommandEventHandler( wxShaderDeveloper::DoEffectUpdate ), NULL, this );
+	SDEffectEnable->Connect( wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoEffectToggle ), NULL, this );
+	SDEffectConstSetGrid->Connect( wxEVT_GRID_CELL_CHANGE, wxGridEventHandler( wxShaderDeveloper::DoEffectConstantChange ), NULL, this );
+	SDEffectConstSetGrid->Connect( wxEVT_GRID_CELL_LEFT_CLICK, wxGridEventHandler( wxShaderDeveloper::DoEffectConstantSelect ), NULL, this );
+	SDEffectTexturesGrid->Connect( wxEVT_GRID_CELL_CHANGE, wxGridEventHandler( wxShaderDeveloper::DoEffectTextureChange ), NULL, this );
+	SDEffectTexturesGrid->Connect( wxEVT_GRID_CELL_LEFT_CLICK, wxGridEventHandler( wxShaderDeveloper::DoEffectTextureSelect ), NULL, this );
 	SDChoiceScene->Connect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoScenesSwitch ), NULL, this );
 	SDSurfaceSwitch->Connect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxNotebookEventHandler( wxShaderDeveloper::DoSurfaceSwitch ), NULL, this );
 	SDRendertargetView->Connect( wxEVT_PAINT, wxPaintEventHandler( wxShaderDeveloper::SDPaintRT ), NULL, this );
@@ -506,13 +744,17 @@ wxShaderDeveloper::~wxShaderDeveloper()
 	this->Disconnect( wxEVT_CLOSE_WINDOW, wxCloseEventHandler( wxShaderDeveloper::DoClose ) );
 	this->Disconnect( wxEVT_SIZE, wxSizeEventHandler( wxShaderDeveloper::DoResize ) );
 	this->Disconnect( wxEVT_UPDATE_UI, wxUpdateUIEventHandler( wxShaderDeveloper::DoUpdate ) );
-	this->Disconnect( wxID_COMPILE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoOptions ) );
-	this->Disconnect( wxID_SAVEBIN, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoOptions ) );
-	this->Disconnect( wxID_LEGACY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoOptions ) );
-	this->Disconnect( wxID_UPGRADE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoOptions ) );
-	this->Disconnect( wxID_MAXIMUM, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoOptions ) );
-	this->Disconnect( wxID_OPTIMIZE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoOptions ) );
-	this->Disconnect( wxID_RUNTIME, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoOptions ) );
+	this->Disconnect( wxID_COMPILE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Disconnect( wxID_SAVEBIN, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Disconnect( wxID_LEGACY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Disconnect( wxID_UPGRADE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Disconnect( wxID_MAXIMUM, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Disconnect( wxID_OPTIMIZE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Disconnect( wxID_RUNTIME, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Disconnect( wxID_COMPILE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
+	this->Disconnect( wxID_SAVEBIN, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
+	this->Disconnect( wxID_LEGACY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
+	this->Disconnect( wxID_OPTIMIZE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
 	SDChoicePass->Disconnect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoRenderpassSwitch ), NULL, this );
 	SDViewSwitch->Disconnect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxNotebookEventHandler( wxShaderDeveloper::DoViewSwitch ), NULL, this );
 	SDComboShader->Disconnect( wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderSwitch ), NULL, this );
@@ -521,8 +763,28 @@ wxShaderDeveloper::~wxShaderDeveloper()
 	SDButtonShaderSaveAs->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderSaveAs ), NULL, this );
 	SDShaderVersion->Disconnect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderVersion ), NULL, this );
 	SDShaderCompile->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderCompile ), NULL, this );
-	SDSourceEditor->Disconnect( wxEVT_COMMAND_TEXT_UPDATED, wxCommandEventHandler( wxShaderDeveloper::DoShaderUpdate ), NULL, this );
+	SDShaderSourceEditor->Disconnect( wxEVT_KEY_UP, wxKeyEventHandler( wxShaderDeveloper::DoShaderHighlight ), NULL, this );
+	SDShaderSourceEditor->Disconnect( wxEVT_COMMAND_TEXT_UPDATED, wxCommandEventHandler( wxShaderDeveloper::DoShaderUpdate ), NULL, this );
+	SDShaderAssemblyEditor->Disconnect( wxEVT_KEY_UP, wxKeyEventHandler( wxShaderDeveloper::DoAssemblerHighlight ), NULL, this );
+	SDShaderAssemblyEditor->Disconnect( wxEVT_COMMAND_TEXT_UPDATED, wxCommandEventHandler( wxShaderDeveloper::DoShaderUpdate ), NULL, this );
 	SDShaderEnable->Disconnect( wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderToggle ), NULL, this );
+	SDShaderConstSetGrid->Disconnect( wxEVT_GRID_CELL_CHANGE, wxGridEventHandler( wxShaderDeveloper::DoShaderConstantChange ), NULL, this );
+	SDShaderConstSetGrid->Disconnect( wxEVT_GRID_CELL_LEFT_CLICK, wxGridEventHandler( wxShaderDeveloper::DoShaderConstantSelect ), NULL, this );
+	SDShaderSamplerGrid->Disconnect( wxEVT_GRID_CELL_CHANGE, wxGridEventHandler( wxShaderDeveloper::DoShaderSamplerChange ), NULL, this );
+	SDShaderSamplerGrid->Disconnect( wxEVT_GRID_CELL_LEFT_CLICK, wxGridEventHandler( wxShaderDeveloper::DoShaderSamplerSelect ), NULL, this );
+	SDComboEffect->Disconnect( wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectSwitch ), NULL, this );
+	SDButtonEffectNew->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoEffectAdd ), NULL, this );
+	SDButtonEffectLoad->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoEffectLoad ), NULL, this );
+	SDButtonEffectSave->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoEffectSave ), NULL, this );
+	SDButtonEffectSaveAs->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoEffectSaveAs ), NULL, this );
+	SDEffectCompile->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoEffectCompile ), NULL, this );
+	SDEffectSourceEditor->Disconnect( wxEVT_KEY_UP, wxKeyEventHandler( wxShaderDeveloper::DoEffectHighlight ), NULL, this );
+	SDEffectSourceEditor->Disconnect( wxEVT_COMMAND_TEXT_UPDATED, wxCommandEventHandler( wxShaderDeveloper::DoEffectUpdate ), NULL, this );
+	SDEffectEnable->Disconnect( wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoEffectToggle ), NULL, this );
+	SDEffectConstSetGrid->Disconnect( wxEVT_GRID_CELL_CHANGE, wxGridEventHandler( wxShaderDeveloper::DoEffectConstantChange ), NULL, this );
+	SDEffectConstSetGrid->Disconnect( wxEVT_GRID_CELL_LEFT_CLICK, wxGridEventHandler( wxShaderDeveloper::DoEffectConstantSelect ), NULL, this );
+	SDEffectTexturesGrid->Disconnect( wxEVT_GRID_CELL_CHANGE, wxGridEventHandler( wxShaderDeveloper::DoEffectTextureChange ), NULL, this );
+	SDEffectTexturesGrid->Disconnect( wxEVT_GRID_CELL_LEFT_CLICK, wxGridEventHandler( wxShaderDeveloper::DoEffectTextureSelect ), NULL, this );
 	SDChoiceScene->Disconnect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoScenesSwitch ), NULL, this );
 	SDSurfaceSwitch->Disconnect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxNotebookEventHandler( wxShaderDeveloper::DoSurfaceSwitch ), NULL, this );
 	SDRendertargetView->Disconnect( wxEVT_PAINT, wxPaintEventHandler( wxShaderDeveloper::SDPaintRT ), NULL, this );

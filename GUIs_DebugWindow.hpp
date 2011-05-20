@@ -13,6 +13,8 @@ public:
 
 	static DebugWindow *Create();
 	static DebugWindow *Expunge();
+	static void Destroy();
+	static void Exit();
 
 #ifndef	OBGE_wx
 	void	PumpEvents(void);
