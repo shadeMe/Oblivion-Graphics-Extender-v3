@@ -1,4 +1,3 @@
-#include "D3D9.hpp"
 #include "OBSEShaderInterface.h"
 #include "nodes/NiDX9Renderer.h"
 #include "nodes/NiCamera.h"
@@ -8,12 +7,14 @@
 #include "nodes/NiBillboardNode.h"
 #include "nodes/NiVector4.h"
 #include "ScreenElements.h"
-
 #include "GlobalSettings.h"
 
 #include "ShaderManager.h"
 #include "EffectManager.h"
 #include "TextureManager.h"
+
+#include "D3D9.hpp"
+#include "D3D9Device.hpp"
 
 #pragma warning(disable : 4996)
 

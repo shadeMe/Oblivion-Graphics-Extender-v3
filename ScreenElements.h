@@ -20,7 +20,7 @@ public:
 	void			UpdateTransform(void);
 	void			SetColor(float red, float green, float blue);
 	void			SetAlpha(float alpha);
-	virtual void	Render(ID3DXSprite *sprite)=0;
+	virtual void		Render(ID3DXSprite *sprite)=0;
 };
 
 class Sprite : public ScreenElement
@@ -29,8 +29,8 @@ public:
 	int tex;
 
 	bool			SetTexture(int texture);
-	int				GetTexture(void);
-	virtual void	Render(ID3DXSprite *sprite);
+	int			GetTexture(void);
+	virtual void		Render(ID3DXSprite *sprite);
 };
 
 /*
@@ -64,9 +64,9 @@ private:
 													// This is so we can't init multiple HUD managers.
 public:
 	static HUDManager	*GetSingleton(void);
-	int					AddScreenElement(Sprite *data);
+	int				AddScreenElement(Sprite *data);
 	Sprite				*index(int ind);
-	void				PurgeTexture(int TextureIndex);
+	void				PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum = -1);
 	void				Render(void);
 	void				DeviceLost(void);
 	void				DeviceReset(void);

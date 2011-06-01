@@ -59,9 +59,11 @@ struct EffectConstants
 
 	v1_2_416::NiVector4		ZRange;
 	v1_2_416::NiVector4		SunDir;
+	v1_2_416::NiVector4		SunTiming;
 	v1_2_416::NiVector3		EyeForward;
 
 	struct { int x, y, z, w; }	GameTime;
+	struct { int x, y, z, w; }	TikTiming;
 
 	/* deprecated */
 #ifndef	NO_DEPRECATED
@@ -154,9 +156,13 @@ public:
 
 	bool SetEffectConstantB(const char *name, bool value);
 	bool SetEffectConstantI(const char *name, int value);
+	bool SetEffectConstantI(const char *name, int *values, int num);
 	bool SetEffectConstantF(const char *name, float value);
+	bool SetEffectConstantF(const char *name, float *values, int num);
 	bool SetEffectConstantV(const char *name, v1_2_416::NiVector4 *value);
 	bool SetEffectSamplerTexture(const char *name, int TextureNum);
+
+	void PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum = -1);
 	void SaveVars(OBSESerializationInterface *Interface);
 
 	ID3DXEffect *GetEffect() const;
@@ -278,7 +284,7 @@ public:
 
 	int						AddPrivateEffect(const char *Filename, UINT32 refID);
 	int						AddManagedEffect(const char *Filename, UINT32 refID);
-	int						AddDependentEffect(const char *Filename, UINT32 refID);
+	int						AddDependtEffect(const char *Filename, UINT32 refID);
 
 	inline bool					IsEffectValid(int EffectNum) const { return Effects.count(EffectNum) != 0; };
 	inline ManagedEffectRecord *			GetEffect(int EffectNum) { return (IsEffectValid(EffectNum) ? Effects[EffectNum] : NULL); };
@@ -286,15 +292,18 @@ public:
 	bool						ReleaseEffect(int EffectNum);
 	void						FreeEffect(int EffectNum);
 	bool						GetEffectState(int EffectNum);
+	int						FindEffect(const char *Filename);
 
 	bool						SetEffectConstantB(int EffectNum, char *name, bool value);
 	bool						SetEffectConstantI(int EffectNum, char *name, int value);
+	bool						SetEffectConstantI(int EffectNum, char *name, int *values, int num);
 	bool						SetEffectConstantF(int EffectNum, char *name, float value);
+	bool						SetEffectConstantF(int EffectNum, char *name, float *values, int num);
 	bool						SetEffectConstantV(int EffectNum, char *name, v1_2_416::NiVector4 *value);
 	bool						SetEffectSamplerTexture(int EffectNum, char *name, int TextureNum);
 
 	void						Recalculate();
-	void						PurgeTexture(IDirect3DBaseTexture9 *texture);
+	void						PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum = -1);
 
 private:
 	int						EffectIndex;
@@ -326,6 +335,9 @@ public:
 	bool UseLegacyCompiler();
 	bool CompileSources();
 	bool Optimize();
+	bool UseEffectList();
+	const char *EffectDirectory();
+	const char *EffectListFile();
 
 #ifdef	OLD_QUEUE
 	IDirect3DTexture9*				thisframeTex;

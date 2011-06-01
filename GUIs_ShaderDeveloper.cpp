@@ -589,6 +589,17 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDRendertarget->Layout();
 	bSizer71->Fit( SDRendertarget );
 	SDSurfaceSwitch->AddPage( SDRendertarget, wxT("Primary RT"), true );
+	SDRendertargetGrabbed = new wxPanel( SDSurfaceSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
+	wxBoxSizer* bSizer711;
+	bSizer711 = new wxBoxSizer( wxVERTICAL );
+	
+	SDRendertargetGrabbedView = new wxPanel( SDRendertargetGrabbed, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSIMPLE_BORDER );
+	bSizer711->Add( SDRendertargetGrabbedView, 1, wxEXPAND | wxALL, 5 );
+	
+	SDRendertargetGrabbed->SetSizer( bSizer711 );
+	SDRendertargetGrabbed->Layout();
+	bSizer711->Fit( SDRendertargetGrabbed );
+	SDSurfaceSwitch->AddPage( SDRendertargetGrabbed, wxT("Grabbed RT"), false );
 	SDDepthStencil = new wxPanel( SDSurfaceSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
 	wxBoxSizer* bSizer81;
 	bSizer81 = new wxBoxSizer( wxVERTICAL );
@@ -674,6 +685,103 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDPanelScenes->Layout();
 	bSizer18->Fit( SDPanelScenes );
 	SDViewSwitch->AddPage( SDPanelScenes, wxT("Scenes"), false );
+	SDPanelStats = new wxPanel( SDViewSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
+	wxBoxSizer* bSizer181;
+	bSizer181 = new wxBoxSizer( wxVERTICAL );
+	
+	SDSplitterStats = new wxSplitterWindow( SDPanelStats, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE );
+	SDSplitterStats->SetSashGravity( 1 );
+	SDSplitterStats->Connect( wxEVT_IDLE, wxIdleEventHandler( wxShaderDeveloper::SDSplitterStatsOnIdle ), NULL, this );
+	
+	SDPanelStatsTop = new wxPanel( SDSplitterStats, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
+	wxBoxSizer* bSizer112;
+	bSizer112 = new wxBoxSizer( wxVERTICAL );
+	
+	SDStatsView = new wxPanel( SDPanelStatsTop, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSIMPLE_BORDER );
+	bSizer112->Add( SDStatsView, 1, wxEXPAND | wxALL, 5 );
+	
+	wxBoxSizer* bSizer32;
+	bSizer32 = new wxBoxSizer( wxHORIZONTAL );
+	
+	SDStatusStats = new wxStaticText( SDPanelStatsTop, wxID_ANY, wxT("Global: 12.4 FPS, 35% frame-time"), wxDefaultPosition, wxDefaultSize, 0 );
+	SDStatusStats->Wrap( -1 );
+	bSizer32->Add( SDStatusStats, 1, wxALIGN_CENTER_VERTICAL|wxALL, 5 );
+	
+	SDStatsNormalize = new wxCheckBox( SDPanelStatsTop, wxID_ANY, wxT("Normalize"), wxPoint( -1,-1 ), wxDefaultSize, wxALIGN_RIGHT );
+	bSizer32->Add( SDStatsNormalize, 0, wxALL, 5 );
+	
+	bSizer112->Add( bSizer32, 0, wxEXPAND|wxLEFT|wxRIGHT, 2 );
+	
+	SDPanelStatsTop->SetSizer( bSizer112 );
+	SDPanelStatsTop->Layout();
+	bSizer112->Fit( SDPanelStatsTop );
+	SDPanelStatsBottom = new wxPanel( SDSplitterStats, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
+	wxBoxSizer* bSizer211;
+	bSizer211 = new wxBoxSizer( wxVERTICAL );
+	
+	wxArrayString SDChoiceStatsChoices;
+	SDChoiceStats = new wxChoice( SDPanelStatsBottom, wxID_ANY, wxDefaultPosition, wxDefaultSize, SDChoiceStatsChoices, 0 );
+	SDChoiceStats->SetSelection( 0 );
+	SDChoiceStats->SetToolTip( wxT("Surface Pass") );
+	
+	bSizer211->Add( SDChoiceStats, 0, wxALL|wxEXPAND, 5 );
+	
+	SDStatsVariables = new wxNotebook( SDPanelStatsBottom, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0 );
+	SDSceneStats = new wxPanel( SDStatsVariables, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSTATIC_BORDER|wxTAB_TRAVERSAL );
+	SDSceneStats->SetBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ) );
+	
+	wxBoxSizer* bSizer41;
+	bSizer41 = new wxBoxSizer( wxVERTICAL );
+	
+	SDSceneStatsGrid = new wxGrid( SDSceneStats, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0 );
+	
+	// Grid
+	SDSceneStatsGrid->CreateGrid( 2, 1 );
+	SDSceneStatsGrid->EnableEditing( false );
+	SDSceneStatsGrid->EnableGridLines( true );
+	SDSceneStatsGrid->EnableDragGridSize( true );
+	SDSceneStatsGrid->SetMargins( 0, 0 );
+	
+	// Columns
+	SDSceneStatsGrid->AutoSizeColumns();
+	SDSceneStatsGrid->EnableDragColMove( false );
+	SDSceneStatsGrid->EnableDragColSize( true );
+	SDSceneStatsGrid->SetColLabelSize( 20 );
+	SDSceneStatsGrid->SetColLabelValue( 0, wxT("Value") );
+	SDSceneStatsGrid->SetColLabelAlignment( wxALIGN_CENTRE, wxALIGN_BOTTOM );
+	
+	// Rows
+	SDSceneStatsGrid->AutoSizeRows();
+	SDSceneStatsGrid->EnableDragRowSize( false );
+	SDSceneStatsGrid->SetRowLabelSize( 80 );
+	SDSceneStatsGrid->SetRowLabelAlignment( wxALIGN_LEFT, wxALIGN_TOP );
+	
+	// Label Appearance
+	SDSceneStatsGrid->SetLabelBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ) );
+	SDSceneStatsGrid->SetLabelFont( wxFont( wxNORMAL_FONT->GetPointSize(), 70, 90, 91, false, wxEmptyString ) );
+	
+	// Cell Defaults
+	SDSceneStatsGrid->SetDefaultCellBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ) );
+	SDSceneStatsGrid->SetDefaultCellAlignment( wxALIGN_LEFT, wxALIGN_TOP );
+	bSizer41->Add( SDSceneStatsGrid, 1, wxALL|wxEXPAND, 0 );
+	
+	SDSceneStats->SetSizer( bSizer41 );
+	SDSceneStats->Layout();
+	bSizer41->Fit( SDSceneStats );
+	SDStatsVariables->AddPage( SDSceneStats, wxT("Statistics"), false );
+	
+	bSizer211->Add( SDStatsVariables, 1, wxEXPAND | wxALL, 5 );
+	
+	SDPanelStatsBottom->SetSizer( bSizer211 );
+	SDPanelStatsBottom->Layout();
+	bSizer211->Fit( SDPanelStatsBottom );
+	SDSplitterStats->SplitHorizontally( SDPanelStatsTop, SDPanelStatsBottom, 410 );
+	bSizer181->Add( SDSplitterStats, 1, wxEXPAND, 5 );
+	
+	SDPanelStats->SetSizer( bSizer181 );
+	SDPanelStats->Layout();
+	bSizer181->Fit( SDPanelStats );
+	SDViewSwitch->AddPage( SDPanelStats, wxT("Stats"), false );
 	
 	bSizer1->Add( SDViewSwitch, 1, wxALL|wxEXPAND, 5 );
 	
@@ -734,7 +842,11 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDChoiceScene->Connect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoScenesSwitch ), NULL, this );
 	SDSurfaceSwitch->Connect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxNotebookEventHandler( wxShaderDeveloper::DoSurfaceSwitch ), NULL, this );
 	SDRendertargetView->Connect( wxEVT_PAINT, wxPaintEventHandler( wxShaderDeveloper::SDPaintRT ), NULL, this );
+	SDRendertargetGrabbedView->Connect( wxEVT_PAINT, wxPaintEventHandler( wxShaderDeveloper::SDPaintGrabbedRT ), NULL, this );
 	SDDepthStencilView->Connect( wxEVT_PAINT, wxPaintEventHandler( wxShaderDeveloper::SDPaintDS ), NULL, this );
+	SDStatsView->Connect( wxEVT_PAINT, wxPaintEventHandler( wxShaderDeveloper::SDPaintProfile ), NULL, this );
+	SDStatsNormalize->Connect( wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoStatsToggle ), NULL, this );
+	SDChoiceStats->Connect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoStatsSwitch ), NULL, this );
 }
 
 wxShaderDeveloper::~wxShaderDeveloper()
@@ -788,6 +900,10 @@ wxShaderDeveloper::~wxShaderDeveloper()
 	SDChoiceScene->Disconnect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoScenesSwitch ), NULL, this );
 	SDSurfaceSwitch->Disconnect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxNotebookEventHandler( wxShaderDeveloper::DoSurfaceSwitch ), NULL, this );
 	SDRendertargetView->Disconnect( wxEVT_PAINT, wxPaintEventHandler( wxShaderDeveloper::SDPaintRT ), NULL, this );
+	SDRendertargetGrabbedView->Disconnect( wxEVT_PAINT, wxPaintEventHandler( wxShaderDeveloper::SDPaintGrabbedRT ), NULL, this );
 	SDDepthStencilView->Disconnect( wxEVT_PAINT, wxPaintEventHandler( wxShaderDeveloper::SDPaintDS ), NULL, this );
+	SDStatsView->Disconnect( wxEVT_PAINT, wxPaintEventHandler( wxShaderDeveloper::SDPaintProfile ), NULL, this );
+	SDStatsNormalize->Disconnect( wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoStatsToggle ), NULL, this );
+	SDChoiceStats->Disconnect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoStatsSwitch ), NULL, this );
 	
 }

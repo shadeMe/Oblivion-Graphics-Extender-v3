@@ -98,7 +98,7 @@ HUDManager	*HUDManager::GetSingleton()
 		return(new(HUDManager));
 }
 
-int		HUDManager::AddScreenElement(Sprite *data)
+int HUDManager::AddScreenElement(Sprite *data)
 {
 	ScreenElementList.push_back(data);
 	NextElementIndex++;
@@ -110,13 +110,13 @@ Sprite	*HUDManager::index(int ind)
 	return(ScreenElementList[ind]);
 }
 
-void	HUDManager::PurgeTexture(int TextureIndex)
+void	HUDManager::PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum)
 {
 	/* release previous texture */
 	std::vector<Sprite *>::iterator SE = ScreenElementList.begin();
 
 	while (SE != ScreenElementList.end()) {
-	  if ((*SE)->GetTexture() == TextureIndex) {
+	  if ((*SE)->GetTexture() == TexNum) {
 	    (*SE)->SetTexture(-1);
 	  //(*SE)->enabled = false;
 	  }

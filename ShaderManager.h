@@ -133,6 +133,7 @@ public:
 	bool SetShaderConstantF(const char *name, float *values);
 	bool SetShaderSamplerTexture(const char *name, int TextureNum);
 
+	void PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum = -1);
 	bool AssignShader(IUnknown *Shader, ShaderRecord *Associate);
 	bool ActivateShader(char which);
 
@@ -217,8 +218,11 @@ struct ShaderConstants
 	D3DXMATRIX			view;
 	D3DXMATRIX			proj;
 
+	v1_2_416::NiVector4		PlayerPosition;
 	v1_2_416::NiVector4		SunDir;
+	v1_2_416::NiVector4		SunTiming;
 	v1_2_416::NiVector4		GameTime;
+	v1_2_416::NiVector4		TikTiming;
 };
 
 class ShaderManager
@@ -255,6 +259,8 @@ public:
 	bool						SetShaderConstantI(const char *ShaderName, char *name, int *values);
 	bool						SetShaderConstantF(const char *ShaderName, char *name, float *values);
 	bool						SetShaderSamplerTexture(const char *ShaderName, char *name, int TextureNum);
+
+	void						PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum = -1);
 
 private:
 	BuiltInShaderList				BuiltInShaders;
@@ -315,6 +321,7 @@ public:
 	} traced[OBGEPASS_NUM];
 
 #define	OBGESCENE_NUM	256
+#define	OBGEFRAME_NUM	256
 
 	struct track {
 	  /* stats */
@@ -333,5 +340,21 @@ public:
 	  D3DMATRIX				transf[OBGESCENE_NUM][3];	// View & Projection
 	  DWORD					states[OBGESCENE_NUM][210];	// ...
 	} trackd[OBGEPASS_NUM];
+
+#ifdef	OBGE_PROFILE
+	int					frame_capt;
+	LARGE_INTEGER				frame_time;
+
+	struct history {
+	  LARGE_INTEGER				frame_totl;
+
+	  /* stats */
+	  struct track {
+	    int					frame_cntr;			// counter
+
+	    LARGE_INTEGER			frame_hist[OBGESCENE_NUM];
+	  } trackd[OBGEPASS_NUM];
+	} trackh[OBGEFRAME_NUM];
+#endif
 #endif
 };

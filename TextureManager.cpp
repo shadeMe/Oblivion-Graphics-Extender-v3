@@ -1,12 +1,15 @@
+#include <sys/stat.h>
+
+#include <algorithm>
+
 #include "TextureManager.h"
 #include "EffectManager.h"
 #include "ScreenElements.h"
 #include "obse\pluginapi.h"
 #include "GlobalSettings.h"
 
-#include <algorithm>
-
 #include "D3D9.hpp"
+#include "D3D9Device.hpp"
 
 static global<bool> PurgeOnNewGame(false, NULL, "Textures", "bPurgeOnNewGame");
 
@@ -93,12 +96,55 @@ bool TextureRecord::LoadTexture(TextureRecordType type, const char *fp, bool NON
                  0,
                  0,
                  0,
-                 &tex)) || !tex)
+		 &tex)) || !tex) {
       if (FAILED(res = D3DXCreateVolumeTextureFromFile(
                    lastOBGEDirect3DDevice9,
                    fp,
-                   &tex)) || !tex)
-        return false;
+		   &tex)) || !tex) {
+
+#if 0
+	struct stat vf; FILE *f; void *data;
+	if (!stat((const char *)fp, &vf)) {
+	  if ((data = malloc(vf.st_size))) {
+	    if (!fopen_s(&f, fp, "rb")) {
+	      fread(data, 1, vf.st_size, f);
+	      fclose(f);
+
+	      if (!NONPOW2 || FAILED(res = D3DXCreateVolumeTextureFromFileInMemoryEx(
+		lastOBGEDirect3DDevice9,
+		data,
+		vf.st_size,
+		D3DX_DEFAULT_NONPOW2,
+		D3DX_DEFAULT_NONPOW2,
+		D3DX_DEFAULT_NONPOW2,
+		D3DX_FROM_FILE,
+		0,
+		D3DFMT_UNKNOWN,
+		D3DPOOL_MANAGED,
+		D3DX_DEFAULT,
+		D3DX_DEFAULT,
+		0,
+		0,
+		0,
+		&tex)) || !tex) {
+		  if (FAILED(res = D3DXCreateVolumeTextureFromFileInMemory(
+		    lastOBGEDirect3DDevice9,
+		    data,
+		    vf.st_size,
+		    &tex)) || !tex) {
+		  }
+	      }
+	    }
+
+	    free(data);
+	  }
+	}
+#endif
+
+	if (FAILED(res))
+	  return false;
+      }
+    }
 
     SetTexture(tex, fp, NONPOW2, Private);
   }
@@ -184,13 +230,22 @@ bool TextureRecord::IsPrivate() const {
   return this->Private;
 }
 
-void TextureRecord::Purge() {
-  if (this->IsType(TR_PLANAR))
-    EffectManager::GetSingleton()->PurgeTexture(this->textureP);
-  else if (this->IsType(TR_CUBIC))
-    EffectManager::GetSingleton()->PurgeTexture(this->textureC);
-  else if (this->IsType(TR_VOLUMETRIC))
-    EffectManager::GetSingleton()->PurgeTexture(this->textureV);
+void TextureRecord::Purge(int TexNum) {
+  if (this->IsType(TR_PLANAR)) {
+       HUDManager::GetSingleton()->PurgeTexture(this->textureP, TexNum);
+    EffectManager::GetSingleton()->PurgeTexture(this->textureP, TexNum);
+    ShaderManager::GetSingleton()->PurgeTexture(this->textureP, TexNum);
+  }
+  else if (this->IsType(TR_CUBIC)) {
+       HUDManager::GetSingleton()->PurgeTexture(this->textureC, TexNum);
+    EffectManager::GetSingleton()->PurgeTexture(this->textureC, TexNum);
+    ShaderManager::GetSingleton()->PurgeTexture(this->textureC, TexNum);
+  }
+  else if (this->IsType(TR_VOLUMETRIC)) {
+       HUDManager::GetSingleton()->PurgeTexture(this->textureV, TexNum);
+    EffectManager::GetSingleton()->PurgeTexture(this->textureV, TexNum);
+    ShaderManager::GetSingleton()->PurgeTexture(this->textureV, TexNum);
+  }
 }
 
 void TextureRecord::Kill() {
@@ -218,6 +273,10 @@ ManagedTextureRecord::ManagedTextureRecord() {
 }
 
 ManagedTextureRecord::~ManagedTextureRecord() {
+}
+
+void ManagedTextureRecord::ClrRef() {
+  RefCount = 0;
 }
 
 int ManagedTextureRecord::AddRef() {
@@ -305,6 +364,7 @@ int TextureManager::LoadManagedTexture(const char *Filename, TextureRecordType t
 
   TextureRegistry::iterator Texture = Textures.begin();
 
+  /* search for non-private texture */
   while (Texture != Textures.end()) {
     if (!Texture->second->IsPrivate()) {
       if (!_stricmp(NewPath, Texture->second->GetPath())/*&& ((Effect->second->ParentRefID & 0xff000000) == (refID & 0xff000000))*/) {
@@ -337,6 +397,49 @@ int TextureManager::LoadManagedTexture(const char *Filename, TextureRecordType t
   return TextureIndex - 1;
 }
 
+int TextureManager::LoadDependtTexture(const char *Filename, TextureRecordType type, bool NONPOW2) {
+  if (strlen(Filename) > 240)
+    return NULL;
+
+  char NewPath[256];
+  strcpy_s(NewPath, 256, "data\\textures\\");
+  strcat_s(NewPath, 256, Filename);
+
+  _MESSAGE("Loading texture (%s)", NewPath);
+
+  TextureRegistry::iterator Texture = Textures.begin();
+
+  /* search for any texture */
+  while (Texture != Textures.end()) {
+    if (!_stricmp(NewPath, Texture->second->GetPath())/*&& ((Effect->second->ParentRefID & 0xff000000) == (refID & 0xff000000))*/) {
+      _MESSAGE("Linking to existing texture.");
+
+      Texture->second->AddRef();
+      return Texture->first;
+    }
+
+    Texture++;
+  }
+
+  ManagedTextureRecord *NewTex = new ManagedTextureRecord();
+
+  if (!NewTex->LoadTexture(type, NewPath, NONPOW2, true)) {
+    delete NewTex;
+    return -1;
+  }
+
+  /* prepare */
+  NewTex->AddRef();
+
+  /* append and sort */
+  ManagedTextures.push_back(NewTex);
+
+  /* register */
+  Textures[TextureIndex++] = NewTex;
+
+  return TextureIndex - 1;
+}
+
 bool TextureManager::ReleaseTexture(int TextureNum) {
   if (!IsTextureValid(TextureNum))
     return false;
@@ -347,8 +450,7 @@ bool TextureManager::ReleaseTexture(int TextureNum) {
 
   /* reached zero */
   if (!OldTexture->Release()) {
-    HUDManager::GetSingleton()->PurgeTexture(TextureNum);
-    OldTexture->Purge();
+    OldTexture->Purge(TextureNum);
 
     /* remove from map */
     Textures.erase(TextureNum);
@@ -357,6 +459,7 @@ bool TextureManager::ReleaseTexture(int TextureNum) {
 
     _DMESSAGE("and removing it from memory.");
     delete OldTexture;
+
     return true;
   }
 
@@ -391,8 +494,7 @@ void TextureManager::FreeTexture(int TextureNum) {
   ManagedTextureRecord *OldTexture = Textures[TextureNum];
 
   if (OldTexture->HasTexture()) {
-    HUDManager::GetSingleton()->PurgeTexture(TextureNum);
-    OldTexture->Purge();
+    OldTexture->Purge(TextureNum);
 
     /* remove from map */
     Textures.erase(TextureNum);
@@ -401,20 +503,24 @@ void TextureManager::FreeTexture(int TextureNum) {
 
     _DMESSAGE("Freeing %s", OldTexture->GetPath());
     delete OldTexture;
+
+    return;
   }
+
+  return;
 }
 
 void TextureManager::NewGame() {
   if (PurgeOnNewGame.Get()) {
-    TextureRegistry::iterator Texture = Textures.begin();
+    /* prevent locking up because other resources have allready been freed */
+    TextureRegistry prevTextures = Textures; Textures.clear();
+    TextureRegistry::iterator Texture = prevTextures.begin();
 
-    while (Texture != Textures.end()) {
+    while (Texture != prevTextures.end()) {
       ManagedTextureRecord *OldTexture = Texture->second;
 
-      if (OldTexture->HasTexture()) {
-        HUDManager::GetSingleton()->PurgeTexture(Texture->first);
-        OldTexture->Purge();
-      }
+      if (OldTexture->HasTexture())
+        OldTexture->Purge(Texture->first);
 
       delete OldTexture;
 
@@ -422,6 +528,19 @@ void TextureManager::NewGame() {
     }
 
     Clear();
+  }
+  else {
+    TextureRegistry::iterator Texture = Textures.begin();
+
+    /* disable and remove all refs */
+    while (Texture != Textures.end()) {
+      /* TODO ClrRef clears enabled as well, logical, no? */
+      if (!Texture->second->IsPrivate())
+	Texture->second->ClrRef();
+
+      /* delete private shaders I guess */
+      Texture++;
+    }
   }
 }
 
@@ -458,9 +577,12 @@ void TextureManager::LoadGame(OBSESerializationInterface *Interface) {
   UInt32 type, version, length;
   int OldTextureNum = -1;
   int TextureNum = -1;
-  char TexturePath[260];
   bool NONPOW2;
+
+  /* obtain a copy of the old resources */
+  TextureRegistry prevTextures = Textures;
   TextureRecordType TextureType;
+  char TexturePath[260];
 
   Interface->GetNextRecordInfo(&type, &version, &length);
 
@@ -522,5 +644,18 @@ void TextureManager::LoadGame(OBSESerializationInterface *Interface) {
       _MESSAGE("Error loading texture list: too small.");
       return;
     }
+  }
+
+  /* release previous non-priate textures, those are supposed
+   * to be handled entirely by the game-save
+   */
+  TextureRegistry::iterator PTexture = prevTextures.begin();
+
+  while (PTexture != prevTextures.end()) {
+    if (PTexture->second &&
+       !PTexture->second->IsPrivate())
+      ReleaseTexture(PTexture->first);
+
+    PTexture++;
   }
 }

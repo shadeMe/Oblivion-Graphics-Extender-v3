@@ -6,6 +6,7 @@
 
 #include "D3D9.hpp"
 #include "D3D9Device.hpp"
+
 #include "GUIs_DebugWindow.hpp"
 
 void NotImplemented(void) {

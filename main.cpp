@@ -264,7 +264,7 @@ bool OBSEPlugin_Query(const OBSEInterface * obse, PluginInfo * info)
 			return false;
 		}
 
-		assert(NULL);
+	//	assert(NULL);
 
 		HookAPICalls(&K32Hook);		// static DLL linkage
 		HookAPICalls(&U32Hook);		// static DLL linkage

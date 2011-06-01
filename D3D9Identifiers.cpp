@@ -1,8 +1,8 @@
+#include <assert.h>
 
 #include <d3d9.h>
 #include <d3dx9.h>
 
-#include <assert.h>
 #include "D3D9Identifiers.hpp"
 
 const char *passNames[OBGEPASS_NUM] = {

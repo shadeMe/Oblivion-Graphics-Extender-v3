@@ -1,10 +1,12 @@
-#include "D3D9.hpp"
+#include <assert.h>
+#include <windows.h>
+
 #include "ShaderManager.h"
 #include "ShaderIOHook.hpp"
-#include "windows.h"
 #include "obse_common/SafeWrite.h"
 #include "GlobalSettings.h"
-#include <assert.h>
+
+#include "D3D9.hpp"
 
 #include "Hooking/detours/detours.h"
 

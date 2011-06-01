@@ -44,7 +44,7 @@ public:
 	bool IsPrivate() const;
 
 public:
-	void Purge();
+	void Purge(int TexNum = -1);
 	void Kill();
 
 private:
@@ -69,6 +69,7 @@ public:
 	ManagedTextureRecord();
 	~ManagedTextureRecord();
 
+	void ClrRef();
 	int AddRef();
 	int Release();
 	int RefCount;
@@ -97,6 +98,7 @@ private:
 public:
 	int						LoadPrivateTexture(const char *Filename, TextureRecordType type, bool NONPOW2 = true);
 	int						LoadManagedTexture(const char *Filename, TextureRecordType type, bool NONPOW2 = true);
+	int						LoadDependtTexture(const char *Filename, TextureRecordType type, bool NONPOW2 = true);
 	inline bool					IsTextureValid(int TextureNum) const { return Textures.count(TextureNum) != 0; };
 	inline ManagedTextureRecord *			GetTexture(int TextureNum) { return (IsTextureValid(TextureNum) ? Textures[TextureNum] : NULL); };
 	bool						ReleaseTexture(int TextureNum);

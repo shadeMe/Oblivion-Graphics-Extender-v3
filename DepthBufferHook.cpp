@@ -1,10 +1,13 @@
+#include <windows.h>
+
 #include "DepthBufferHook.h"
-#include "windows.h"
 #include "obse_common/SafeWrite.h"
 #include "nodes\NiDX9Renderer.h"
 #include "Rendering.h"
 #include "EffectManager.h"
+
 #include "D3D9.hpp"
+#include "D3D9Device.hpp"
 
 static global<bool> UseDepthBuffer(true, NULL, "DepthBuffer", "bUseDepthBuffer");
 static global<bool> UseRAWZfix(true, NULL, "DepthBuffer", "bUseRAWZfix");

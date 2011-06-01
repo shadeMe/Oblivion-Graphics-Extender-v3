@@ -119,6 +119,8 @@ class wxShaderDeveloper : public wxFrame
 		wxNotebook* SDSurfaceSwitch;
 		wxPanel* SDRendertarget;
 		wxPanel* SDRendertargetView;
+		wxPanel* SDRendertargetGrabbed;
+		wxPanel* SDRendertargetGrabbedView;
 		wxPanel* SDDepthStencil;
 		wxPanel* SDDepthStencilView;
 		wxSlider* SDDepthStencilDepth;
@@ -127,6 +129,17 @@ class wxShaderDeveloper : public wxFrame
 		wxNotebook* SDSceneVariables;
 		wxPanel* SDSceneStates;
 		wxGrid* SDSceneStateGrid;
+		wxPanel* SDPanelStats;
+		wxSplitterWindow* SDSplitterStats;
+		wxPanel* SDPanelStatsTop;
+		wxPanel* SDStatsView;
+		wxStaticText* SDStatusStats;
+		wxCheckBox* SDStatsNormalize;
+		wxPanel* SDPanelStatsBottom;
+		wxChoice* SDChoiceStats;
+		wxNotebook* SDStatsVariables;
+		wxPanel* SDSceneStats;
+		wxGrid* SDSceneStatsGrid;
 		wxStatusBar* SDStatusBar;
 		
 		// Virtual event handlers, overide them in your derived class
@@ -168,7 +181,11 @@ class wxShaderDeveloper : public wxFrame
 		virtual void DoScenesSwitch( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoSurfaceSwitch( wxNotebookEvent& event ) { event.Skip(); }
 		virtual void SDPaintRT( wxPaintEvent& event ) { event.Skip(); }
+		virtual void SDPaintGrabbedRT( wxPaintEvent& event ) { event.Skip(); }
 		virtual void SDPaintDS( wxPaintEvent& event ) { event.Skip(); }
+		virtual void SDPaintProfile( wxPaintEvent& event ) { event.Skip(); }
+		virtual void DoStatsToggle( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoStatsSwitch( wxCommandEvent& event ) { event.Skip(); }
 		
 	
 	public:
@@ -193,6 +210,12 @@ class wxShaderDeveloper : public wxFrame
 		{
 			SDSplitterScenes->SetSashPosition( 410 );
 			SDSplitterScenes->Disconnect( wxEVT_IDLE, wxIdleEventHandler( wxShaderDeveloper::SDSplitterScenesOnIdle ), NULL, this );
+		}
+		
+		void SDSplitterStatsOnIdle( wxIdleEvent& )
+		{
+			SDSplitterStats->SetSashPosition( 410 );
+			SDSplitterStats->Disconnect( wxEVT_IDLE, wxIdleEventHandler( wxShaderDeveloper::SDSplitterStatsOnIdle ), NULL, this );
 		}
 	
 };

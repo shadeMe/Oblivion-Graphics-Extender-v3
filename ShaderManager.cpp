@@ -7,8 +7,10 @@
 #include "ShaderManager.h"
 #include "TextureManager.h"
 #include "GlobalSettings.h"
+#include "obse/GameObjects.h"
 
 #include "D3D9.hpp"
+#include "D3D9Device.hpp"
 
 static global<bool> UseShaderOverride(true,NULL,"Shaders","bUseShaderOverride");
 static global<bool> UseLegacyCompiler(false,NULL,"Shaders","bUseLegacyCompiler");
@@ -453,9 +455,9 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
     const char *texpath = strstr(src, tPath.c_str());
 
     /* all different position */
-    if ((texture != sampler) &&
-        (texture != texpath) &&
-        (texpath != sampler)) {
+    if (((texture != sampler) || !texture) &&
+        ((texture != texpath) || !texpath) &&
+        ((sampler != texpath))) {
       const char *samplert = sampler;
       while (--samplert > src)
 	if (*samplert == ';')
@@ -478,6 +480,7 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 
       if ((sampleri <  sampler ) &&
       //  (samplerc >= samplerb) &&
+	  (textureb || texpathb) &&
 	  ((texturec >= texturee) ||
 	   (texpathc >= texpathe))) {
       	char buf[256];
@@ -495,11 +498,14 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	if (len > 0) {
 	  buf[len] = '\0';
 
-	  TextureManager *TexMan = TextureManager::GetSingleton();
-	  if (sampleri[7] == 'C') *TexNum = TexMan->LoadManagedTexture(buf, TR_CUBIC);
-	  if (sampleri[7] == '3') *TexNum = TexMan->LoadManagedTexture(buf, TR_VOLUMETRIC);
-	  if (sampleri[7] == '2') *TexNum = TexMan->LoadManagedTexture(buf, TR_PLANAR);
-	  if (sampleri[7] == ' ') *TexNum = TexMan->LoadManagedTexture(buf, TR_PLANAR);
+	  if (TexNum) {
+	    TextureManager *TexMan = TextureManager::GetSingleton();
+
+	    if (sampleri[7] == 'C') *TexNum = TexMan->LoadDependtTexture(buf, TR_CUBIC);
+	    if (sampleri[7] == '3') *TexNum = TexMan->LoadDependtTexture(buf, TR_VOLUMETRIC);
+	    if (sampleri[7] == '2') *TexNum = TexMan->LoadDependtTexture(buf, TR_PLANAR);
+	    if (sampleri[7] == ' ') *TexNum = TexMan->LoadDependtTexture(buf, TR_PLANAR);
+	  }
 	}
       }
 
@@ -993,7 +999,8 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	CoTa->GetConstantDesc(handle, &cnst, &count);
 
 	if (cnst.RegisterSet <= 4) {
-	  if ((cnst.Name == strstr(cnst.Name, "cust_")))
+	  if ((cnst.Name == strstr(cnst.Name, "cust_")) ||
+	      (cnst.Name == strstr(cnst.Name, "oblv_")))
 	    lcls[cnst.RegisterSet] += cnst.RegisterCount;
 	  if ((cnst.Name == strstr(cnst.Name, "obge_")) ||
 	      (cnst.Name == strstr(cnst.Name, "oblv_")) ||
@@ -1092,8 +1099,12 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	    pFloat4[cnts[D3DXRS_FLOAT4]].length = cnst.RegisterCount;
 	    pFloat4[cnts[D3DXRS_FLOAT4]].name = cnst.Name;
 
-	    /**/ if (cnst.Name == strstr(cnst.Name, "obge_"))
-	      break;
+	    /**/ if (cnst.Name == strstr(cnst.Name, "obge_")) {
+	      /**/ if (cnst.Name == strstr(cnst.Name, "obge_Tick"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.TikTiming;
+	      else
+		break;
+	    }
 	    else if (cnst.Name == strstr(cnst.Name, "oblv_")) {
 	      /**/ if (cnst.Name == strstr(cnst.Name, "oblv_WorldTransform_CURRENTPASS"))
 	        pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.wrld;
@@ -1109,6 +1120,10 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.rcpresd;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_SunDirection"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.SunDir;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_SunTiming"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.SunTiming;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_PlayerPosition"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.PlayerPosition;
 	      else if  (cnst.Name == strstr(cnst.Name, "oblv_GameTime"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.GameTime;
 	      else
@@ -1136,8 +1151,28 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL, pTextDS = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture, pGrabDS = NULL;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_CurrDepthStenzilR_CURRENTPASS"))
 		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL, pTextDZ = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture, pGrabDZ = NULL;
-	      else
+	      else {
+	        /* read and interprete the source and extract optional information */
+	        int sts = (RuntimeVariable::mem::tv *)
+		  pAssociate->GetDX9ShaderTexture(cnst.Name,
+		  NULL,
+		  (DWORD *)tvs) - tvs;
+
+	        /* specific sampler-states have been defined */
+	        if (tvs->Type) {
+		  assert(sts < 16);
+
+		  pSampler[cnts[D3DXRS_SAMPLER + 1]].offset = cnst.RegisterIndex;
+		  pSampler[cnts[D3DXRS_SAMPLER + 1]].length = cnst.RegisterCount;
+		  pSampler[cnts[D3DXRS_SAMPLER + 1]].name = cnst.Name;
+
+		  pSampler[cnts[D3DXRS_SAMPLER + 1]].vals.state = tvs; tvs += sts + 1;
+
+		  cnts[D3DXRS_SAMPLER + 1]++;
+	        }
+
 		break;
+	      }
 	    }
 	    else if (cnst.Name == strstr(cnst.Name, "cust_")) {
 	      pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL;
@@ -1158,8 +1193,8 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].name = cnst.Name;
 
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].vals.state = tvs; tvs += sts + 1;
- 		
-		cnts[D3DXRS_SAMPLER + 1]++; 
+
+		cnts[D3DXRS_SAMPLER + 1]++;
 	      }
 
 	      /* a specific texture has been given */
@@ -1176,6 +1211,12 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	    break;
 	}
       }
+
+      assert(cnts[D3DXRS_BOOL	    ] <= nums[D3DXRS_BOOL	]);
+      assert(cnts[D3DXRS_INT4	    ] <= nums[D3DXRS_INT4	]);
+      assert(cnts[D3DXRS_FLOAT4	    ] <= nums[D3DXRS_FLOAT4	]);
+      assert(cnts[D3DXRS_SAMPLER    ] <= nums[D3DXRS_SAMPLER    ]);
+      assert(cnts[D3DXRS_SAMPLER + 1] <= nums[D3DXRS_SAMPLER    ]);
 
       if (!cnts[D3DXRS_BOOL	  ]) pBool    = NULL;
       if (!cnts[D3DXRS_INT4	  ]) pInt4    = NULL;
@@ -1201,17 +1242,17 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
       SceneDevice->EndScene();
 
     if (pTextRT) {
-      (*pTextRT) = NULL; IDirect3DSurface9 *pCurrRT;
+      IDirect3DSurface9 *pCurrRT;
       if (SceneDevice->GetRenderTarget(0, &pCurrRT) == D3D_OK) {
 	D3DSURFACE_DESC CurrD;              pCurrRT->GetDesc(&CurrD);
 	D3DSURFACE_DESC GrabD; if (pGrabRT) pGrabRT->GetDesc(&GrabD);
 
 	/* different */
-	if (memcmp(&CurrD, &GrabD, sizeof(D3DSURFACE_DESC))) {
+	if (!(*pTextRT) || memcmp(&CurrD, &GrabD, sizeof(D3DSURFACE_DESC))) {
 	  if ( pGrabRT)   pGrabRT ->Release();
 	  if (*pTextRT) (*pTextRT)->Release();
 
-	  pGrabRT = NULL;
+	  pGrabRT = NULL; (*pTextRT) = NULL;
 	  if (StateDevice->CreateTexture(CurrD.Width, CurrD.Height, 1, CurrD.Usage, CurrD.Format, CurrD.Pool, pTextRT, NULL) == D3D_OK)
 	    (*pTextRT)->GetSurfaceLevel(0, &pGrabRT);
 	}
@@ -1222,17 +1263,17 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
     }
 
     if (pTextDS) {
-      (*pTextDS) = NULL; IDirect3DSurface9 *pCurrDS;
+      IDirect3DSurface9 *pCurrDS;
       if (SceneDevice->GetDepthStencilSurface(&pCurrDS) == D3D_OK) {
 	D3DSURFACE_DESC CurrD;              pCurrDS->GetDesc(&CurrD);
 	D3DSURFACE_DESC GrabD; if (pGrabDS) pGrabDS->GetDesc(&GrabD);
 
 	/* different */
-	if (memcmp(&CurrD, &GrabD, sizeof(D3DSURFACE_DESC))) {
+	if (!(*pTextDS) || memcmp(&CurrD, &GrabD, sizeof(D3DSURFACE_DESC))) {
 	  if ( pGrabDS)   pGrabDS ->Release();
 	  if (*pTextDS) (*pTextDS)->Release();
 
-	  pGrabDS = NULL;
+	  pGrabDS = NULL; (*pTextDS) = NULL;
 	  if (StateDevice->CreateTexture(CurrD.Width, CurrD.Height, 1, CurrD.Usage, CurrD.Format, CurrD.Pool, pTextDS, NULL) == D3D_OK)
 	    (*pTextDS)->GetSurfaceLevel(0, &pGrabDS);
 	}
@@ -1354,19 +1395,54 @@ bool RuntimeShaderRecord::SetShaderSamplerTexture(const char *name, int TextureN
   if ((rV = pTexture))
     do {
       if (!stricmp(rV->name, name)) {
-        TextureManager *TexMan = TextureManager::GetSingleton();
-        TextureRecord *NewTexture = TexMan->GetTexture(TextureNum);
+	TextureManager *TexMan = TextureManager::GetSingleton();
 
-        if (rV->vals.texture)
-          TexMan->ReleaseTexture(rV->vals.texture);
-        if (!NewTexture)
-          return false;
+	IDirect3DBaseTexture9 *OldTexture = NULL;
+	/* get old one */
+	OldTexture = rV->vals.texture;
+	/* and dereference */
+	rV->vals.texture = NULL;
 
-        rV->vals.texture = NewTexture->GetTexture();
-      	return true;
+	/* remove any trace of the texture from this effect */
+	if (OldTexture) {
+	  int OldTextureNum = TexMan->FindTexture(OldTexture);
+	  TexMan->ReleaseTexture(OldTexture);
+
+	  /* remove from vector */
+	  if (OldTextureNum != -1)
+	    Textures.erase(std::find(Textures.begin(), Textures.end(), OldTextureNum));
+	}
+
+	/* apply the new texture and remember it */
+	TextureRecord *NewTexture = TexMan->GetTexture(TextureNum);
+	if (NewTexture) {
+	  rV->vals.texture = NewTexture->GetTexture();
+
+	  /* add to vector */
+	  if (true)
+	    Textures.push_back(TextureNum);
+
+	  return true;
+	}
+
+	return false;
       }
     } while ((++rV)->length);
   return false;
+}
+
+void RuntimeShaderRecord::PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum) {
+  RuntimeVariable *rV;
+  if ((rV = pTexture))
+    do {
+      if (rV->vals.texture == texture) {
+	rV->vals.texture = NULL;
+
+	/* remove from vector */
+	if (TexNum != -1)
+	  Textures.erase(std::find(Textures.begin(), Textures.end(), TexNum));
+      }
+    } while ((++rV)->length);
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -1443,8 +1519,17 @@ IDirect3DVertexShader9 *RuntimeShaderRecord::GetShader(IDirect3DVertexShader9 *S
 ShaderManager *ShaderManager::Singleton = NULL;
 
 ShaderManager::ShaderManager() {
+  LARGE_INTEGER freq;
+
+  QueryPerformanceFrequency(&freq);
+
+  ShaderConst.TikTiming.w = (freq.QuadPart);
+
 #ifdef	OBGE_DEVLING
   Clear();
+
+  /* only thing needed */
+  frame_capt = 0;
 #endif
 }
 
@@ -1481,16 +1566,20 @@ void ShaderManager::Reset() {
 }
 
 void ShaderManager::OnReleaseDevice() {
-  RuntimeShaderList::iterator RShader = RuntimeShaders.begin();
+  /* prevent locking up because other resources have allready been freed */
+  RuntimeShaderList prevRShaders = RuntimeShaders; RuntimeShaders.clear();
+  RuntimeShaderList::iterator RShader = prevRShaders.begin();
 
-  while (RShader != RuntimeShaders.end()) {
+  while (RShader != prevRShaders.end()) {
     delete (*RShader);
     RShader++;
   }
 
-  BuiltInShaderList::iterator BShader = BuiltInShaders.begin();
+  /* prevent locking up because other resources have allready been freed */
+  BuiltInShaderList prevBShaders = BuiltInShaders; BuiltInShaders.clear();
+  BuiltInShaderList::iterator BShader = prevBShaders.begin();
 
-  while (BShader != BuiltInShaders.end()) {
+  while (BShader != prevBShaders.end()) {
     delete (*BShader);
     BShader++;
   }
@@ -1512,7 +1601,6 @@ void ShaderManager::OnResetDevice() {
 
   while (RShader != RuntimeShaders.end()) {
     (*RShader)->OnResetDevice();
-
     RShader++;
   }
 }
@@ -1521,21 +1609,62 @@ void ShaderManager::OnResetDevice() {
  */
 
 void ShaderManager::UpdateFrameConstants() {
+  OBGEfork::Sky *pSky = OBGEfork::Sky::GetSingleton();
+  OBGEfork::Sun *pSun = pSky->sun;
+  TESClimate *climate = pSky->firstClimate;
+  TESWeather *weather = pSky->firstWeather;
   v1_2_416::NiDX9Renderer *Renderer = v1_2_416::GetRenderer();
   float (_cdecl * GetTimer)(bool, bool) = (float( *)(bool, bool))0x0043F490; // (TimePassed,GameTime)
-  OBGEfork::Sun *pSun = OBGEfork::Sky::GetSingleton()->sun;
+  int gtime = GetTimer(0, 1);
+  LARGE_INTEGER tick;
 
-  ShaderConst.GameTime.x = GetTimer(0, 1);
-  ShaderConst.GameTime.w = ((int)ShaderConst.GameTime.x     ) % 60;
-  ShaderConst.GameTime.z = ((int)ShaderConst.GameTime.x / 60) % 60;
-  ShaderConst.GameTime.y = ((int)ShaderConst.GameTime.x / 60) / 60; // [-PI,0,+PI]
-  ShaderConst.GameTime.x = M_PI * (ShaderConst.GameTime.x - (12 * 60 * 60)) / (12 * 60 * 60);
+  QueryPerformanceCounter(&tick);
+
+  ShaderConst.TikTiming.z = (float)(tick.QuadPart * 1000 * 1000) / ShaderConst.TikTiming.w;
+  ShaderConst.TikTiming.y = (float)(tick.QuadPart * 1000 * 1   ) / ShaderConst.TikTiming.w;
+  ShaderConst.TikTiming.x = (float)(tick.QuadPart * 1    * 1   ) / ShaderConst.TikTiming.w;
+
+  ShaderConst.SunTiming.x = climate->sunriseBegin * 10 * 60;
+  ShaderConst.SunTiming.y = climate->sunriseEnd   * 10 * 60;
+  ShaderConst.SunTiming.z = climate->sunsetBegin  * 10 * 60;
+  ShaderConst.SunTiming.w = climate->sunsetEnd    * 10 * 60;
+
+  ShaderConst.GameTime.x = gtime;
+  ShaderConst.GameTime.w = ((int)gtime     ) % 60;
+  ShaderConst.GameTime.z = ((int)gtime / 60) % 60;
+  ShaderConst.GameTime.y = ((int)gtime / 60) / 60; // [-PI,0,+PI]
+  // Noon is at (20:00 + 06:00) / 2 == 13:00
+  ShaderConst.GameTime.x = M_PI * (gtime - (13 * 60 * 60)) / (14 * 60 * 60);
 
   v1_2_416::NiNode *SunContainer = pSun->SunBillboard.Get()->ParentNode;
+  float deltaz = ShaderConst.SunDir.z;
   ShaderConst.SunDir.x = SunContainer->m_localTranslate.x;
   ShaderConst.SunDir.y = SunContainer->m_localTranslate.y;
   ShaderConst.SunDir.z = SunContainer->m_localTranslate.z;
   ShaderConst.SunDir.Normalize3();
+  // Sunrise is at 06:00, Sunset at 20:00
+  if ((gtime > ShaderConst.SunTiming.w + (10 * 60)) ||
+      (gtime < ShaderConst.SunTiming.x - (10 * 60)))
+    ShaderConst.SunDir.z = -ShaderConst.SunDir.z;
+  else if ((gtime > ShaderConst.SunTiming.z - (10 * 60))) {
+    /* needs to go down aways */
+    if ((fabs(deltaz) - ShaderConst.SunDir.z) <= 0.0)
+      ShaderConst.SunDir.z = -ShaderConst.SunDir.z;
+  }
+  else if ((gtime < ShaderConst.SunTiming.y + (10 * 60))) {
+    /* needs to go up aways */
+    if ((fabs(deltaz) - ShaderConst.SunDir.z) >= 0.0)
+      ShaderConst.SunDir.z = -ShaderConst.SunDir.z;
+  }
+//if ((ShaderConst.GameTime.y < 6) || (ShaderConst.GameTime.y >= 21))
+//  ShaderConst.SunDir.z = -fabs(ShaderConst.SunDir.z);
+
+#define Units2Centimeters	0.1428767293691635
+#define Units2Meters		0.001428767293691635
+  PlayerCharacter *PlayerContainer = (*g_thePlayer);
+  ShaderConst.PlayerPosition.x = PlayerContainer->posX * Units2Meters;
+  ShaderConst.PlayerPosition.y = PlayerContainer->posY * Units2Meters;
+  ShaderConst.PlayerPosition.z = PlayerContainer->posZ * Units2Meters * 4;
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -1704,6 +1833,17 @@ bool ShaderManager::SetShaderSamplerTexture(const char *ShaderName, char *name, 
   }
 
   return false;
+}
+
+void ShaderManager::PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum) {
+  RuntimeShaderList::iterator RShader = RuntimeShaders.begin();
+
+  while (RShader != RuntimeShaders.end()) {
+    if (*RShader)
+      (*RShader)->PurgeTexture(texture, TexNum);
+
+    RShader++;
+  }
 }
 
 /* -------------------------------------------------------------------------------------------------

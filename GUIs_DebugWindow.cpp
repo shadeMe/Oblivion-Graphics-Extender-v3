@@ -1,9 +1,11 @@
+#include <assert.h>
+
 #include "obse/Utilities.h"
 #include "GlobalSettings.h"
-#include <assert.h>
 
 #include "D3D9.hpp"
 #include "D3D9Device.hpp"
+
 #include "GUIs_DebugWindow.hpp"
 
 #ifdef	OBGE_DEVLING
@@ -205,11 +207,23 @@ HWND DebugWindow::ControlActiveWindow(HWND org) {
 #include <wx/init.h>
 #include <wx/app.h>
 #include <wx/dialog.h>
+#include <wx/filedlg.h>
 #include <wx/string.h>
 #include <wx/dcclient.h>
 #include <wx/dcmemory.h>
 #pragma comment(lib,"Comctl32")
 #pragma comment(lib,"Rpcrt4")
+
+#if 1 //def OGBE_PROFILE
+#include <wx/xy/xyplot.h>
+#include <wx/xy/xysimpledataset.h>
+#include <wx/xy/xydynamicdataset.h>
+#include <wx/xy/xylinerenderer.h>
+#include <wx/xy/xyarearenderer.h>
+#include <wx/chart.h>
+#include <wx/chartpanel.h>
+#pragma comment(lib,"D:/Development/wxWidgets/additions-more/freechart/lib/vc_lib/wxcode_msw28d_freechart")
+#endif
 
 #include "EffectManager.h"
 
@@ -219,6 +233,11 @@ HWND DebugWindow::ControlActiveWindow(HWND org) {
 #define SDVIEW_SHADER	0
 #define SDVIEW_EFFECT	1
 #define SDVIEW_SCENES	2
+#define SDVIEW_STATS	3
+
+#define SDSURF_PRIMARY	0
+#define SDSURF_GRABBED	1
+#define SDSURF_DEPTH	2
 
 #define wxBName		wxString((*BShader)->Name)
 #define wxMName		wxString((*MEffect)->Name)
@@ -241,15 +260,91 @@ public:
     KeywordStyle.SetTextColour(wxColour("BLUE"));
     FunctionStyle.SetTextColour(wxColour("RED"));
     DeclaresStyle.SetTextColour(wxColour("ORANGE"));
+
+    /* start enabling these functions */
+    SDButtonEffectNew->Enable();
+
+#if 1//def OGBE_PROFILE
+    memset(hist, 0, sizeof(hist));
+    assert(NULL);
+
+    // first step: create plot
+    plot = new XYPlot();
+
+    // set line renderer to dataset
+//  rndr = new XYLineStepRenderer();
+//  rndr = new XYLineRenderer();
+    rndr = new XYAreaRenderer();
+
+    // create dataset
+    hist[OBGEPASS_ANY].dset = new XYDynamicDataset();
+
+    // set line renderer to dataset
+    hist[OBGEPASS_ANY].dset->SetRenderer(rndr);
+
+    // add our dataset to plot
+    plot->AddDataset(hist[OBGEPASS_ANY].dset);
+
+    // create left and bottom number axes
+    leftAxis = new NumberAxis(AXIS_LEFT);
+    bottomAxis = new NumberAxis(AXIS_BOTTOM);
+
+    // optional: set axis titles
+    leftAxis->SetTitle(wxT("ms"));
+    bottomAxis->SetTitle(wxT("Frame"));
+
+    // add axes to plot
+    plot->AddAxis(leftAxis);
+    plot->AddAxis(bottomAxis);
+
+    // link axes and dataset
+    plot->LinkDataVerticalAxis(0, 0);
+    plot->LinkDataHorizontalAxis(0, 0);
+
+    // set legend to plot
+    plot->SetLegend(new Legend(wxTOP, wxLEFT));
+
+    // and finally create chart
+    chrt = new Chart(plot, wxString("Performance Graph"));
+
+    // And finally create chart panel to display it:
+    st = new wxChartPanel(SDStatsView, wxID_ANY, chrt, wxPoint(0,0), wxSize(256, 256));
+    st->SetAntialias(true);
+
+    wxBoxSizer* ChartSizer;
+    ChartSizer = new wxBoxSizer( wxVERTICAL );
+
+    ChartSizer->Add(st, 1, wxEXPAND | wxALL, 0);
+    SDStatsView->SetSizer(ChartSizer);
+    SDStatsView->Layout();
+    ChartSizer->Fit(SDStatsView);
+    ChartSizer->Layout();
+
+    normed = false;
+#endif
   }
 
   ShaderManager *sm;
   EffectManager *em;
-  wxImage rt, ds;
-  wxMemoryDC crt, cds;
+  wxImage rt, gt, ds;
+  wxMemoryDC crt, grt, cds, sts;
+#if 1//def OGBE_PROFILE
+  NumberAxis *leftAxis, *bottomAxis;
+  XYAreaRenderer *rndr;
+  XYPlot *plot;
+  Chart *chrt;
+  wxChartPanel *st;
+
+  bool normed;
+  struct history {
+    int hconsm;
+    XYDynamicDataset *dset;
+    XYDynamicSerie *series[OBGESCENE_NUM + 1];
+  } hist[OBGEPASS_NUM];
+#endif
   ShaderRecord *currs;
   EffectRecord *currx;
-  int currv;
+  int currv, currh;
   int fs[4];
   int pass;
   int scene;
@@ -267,6 +362,22 @@ public:
   wxTextAttr DeclaresStyle;
   wxTextAttr PreprocessorStyle;
   wxTextAttr SymbolStyle;
+
+  /* --------------------------------------------------------------
+   */
+  IDirect3DSurface9 *FindGrabbedRT(int offs = 0) {
+    /* search shader render-targets */
+    RuntimeShaderList::iterator RS = sm->RuntimeShaders.begin();
+    while (RS != sm->RuntimeShaders.end()) {
+      if ((*RS)->pTextRT && (*RS)->pGrabRT)
+	if (--offs < 0)
+	  return (*RS)->pGrabRT;
+
+      RS++;
+    }
+
+    return NULL;
+  }
 
   /* --------------------------------------------------------------
    */
@@ -309,11 +420,40 @@ public:
 	  return "Last frame effects-rendertarget copy";
       }
 
+      /* search shader render-targets */
+      RuntimeShaderList::iterator RS = sm->RuntimeShaders.begin();
+      while (RS != sm->RuntimeShaders.end()) {
+	if ((*RS)->pTextRT && (*((*RS)->pTextRT) == tex)) {
+	  if ((*RS)->pAssociate)
+	    sprintf(buf, "%s local rendertarget copy", (*RS)->pAssociate->Name);
+	  else
+	    sprintf(buf, "Unknown shader local rendertarget copy");
+	  return buf;
+	}
+
+	if ((*RS)->pTextDS && (*((*RS)->pTextDS) == tex)) {
+	  if ((*RS)->pAssociate)
+	    sprintf(buf, "%s local depth-stencil copy", (*RS)->pAssociate->Name);
+	  else
+	    sprintf(buf, "Unknown shader local depth-stencil copy");
+	  return buf;
+	}
+
+	if ((*RS)->pTextDZ && (*((*RS)->pTextDZ) == tex)) {
+	  if ((*RS)->pAssociate)
+	    sprintf(buf, "%s global depth-stencil", (*RS)->pAssociate->Name);
+	  else
+	    sprintf(buf, "Unknown shader global depth-stencil");
+	  return buf;
+	}
+
+	RS++;
+      }
+
       /* search other render-targets */
       std::map <void *, struct textureMap *>::iterator TRT = textureMaps.begin();
       while (TRT != textureMaps.end()) {
-	if (TRT->second &&
-	    (TRT->second->Usage & D3DUSAGE_RENDERTARGET))
+	if (TRT->second && (TRT->second->Usage & D3DUSAGE_RENDERTARGET))
 	  if (TRT->first == tex) {
 	    sprintf(buf, "Unidentified rendertarget");
 	    return buf;
@@ -344,7 +484,7 @@ public:
       }
 
       /* search managed texture files */
-      TextureManager *em = TextureManager::GetSingleton(); 
+      TextureManager *em = TextureManager::GetSingleton();
       int TexNum = em->FindTexture(tex); ManagedTextureRecord *Tex;
       if ((TexNum != -1) && (Tex = em->GetTexture(TexNum))) {
 	const char *ptr = Tex->GetPath(), *ofs;
@@ -1077,6 +1217,12 @@ public:
   /* --------------------------------------------------------------
    */
 
+  void SetStatsTable(int o) {
+  }
+
+  /* --------------------------------------------------------------
+   */
+
   void SetImage(int p, wxImage *im, IDirect3DSurface9 *pSurface) {
     bool valid = false;
 
@@ -1131,7 +1277,7 @@ public:
 		    case (D3DFORMAT)MAKEFOURCC('R','A','W','Z'): def[0].Name = "RAWZ"; break;
 	      }
 
-	      if (D3D_Effect.LoadEffect("TransferZ.fx", 0xFF000000, true, (D3DXMACRO *)&def)) {
+	      if (D3D_Effect.LoadEffect("TransferZ.fx", 0, true, (D3DXMACRO *)&def)) {
 		ID3DXEffect *Effect = D3D_Effect.GetEffect();
 		frame_trk = false;
 
@@ -1742,7 +1888,7 @@ public:
       	 * - runtime failed, replacement good
       	 * - both failed
       	 */
-      	status = "Status: compiled, with errors, disabled";
+      	status = "Status: compiled, with errors, unavailable";
 	SDEffectCompile->Enable();
 	if (x != wxNOT_FOUND)
 	  SDComboEffect->SetItemBitmap(x, wxBMError);
@@ -1752,13 +1898,13 @@ public:
       	 * - runtime warning
       	 * - replacement warning
       	 */
-      	status = "Status: compiled, with warnings, enabled";
+      	status = "Status: compiled, with warnings, available";
 	SDEffectCompile->Enable();
 	if (x != wxNOT_FOUND)
 	  SDComboEffect->SetItemBitmap(x, wxBMWarning);
       }
       else {
-	status = "Status: compiled, enabled";
+	status = "Status: compiled, available";
 	SDEffectCompile->Disable();
 	if (x != wxNOT_FOUND)
 	  SDComboEffect->SetItemBitmap(x, wxBMApplied);
@@ -1770,7 +1916,7 @@ public:
       	 * - runtime
       	 * - replacement
       	 */
-      	status = "Status: compiled, enabled";
+      	status = "Status: compiled, available";
 	SDEffectCompile->Disable();
 	if (x != wxNOT_FOUND)
 	  SDComboEffect->SetItemBitmap(x, wxBMApplied);
@@ -1879,7 +2025,7 @@ public:
     /* refresh only if visible */
     if (SDViewSwitch->GetSelection() != SDVIEW_SCENES)
       return;
-    if (SDSurfaceSwitch->GetSelection() != 0)
+    if (SDSurfaceSwitch->GetCurrentPage() != SDRendertarget)
       return;
 
     wxRect rg = SDRendertargetView->GetUpdateRegion().GetBox();
@@ -1933,13 +2079,73 @@ public:
 #endif
   }
 
+  void SDPaintGrabbedRT(wxPaintEvent& event) {
+    wxPaintDC dc(SDRendertargetGrabbedView);
+
+    /* refresh only if visible */
+    if (SDViewSwitch->GetSelection() != SDVIEW_SCENES)
+      return;
+    if (SDSurfaceSwitch->GetCurrentPage() != SDRendertargetGrabbed)
+      return;
+
+    wxRect rg = SDRendertargetGrabbedView->GetUpdateRegion().GetBox();
+    int dw = SDRendertargetGrabbedView->GetClientSize().GetWidth();
+    int dh = SDRendertargetGrabbedView->GetClientSize().GetHeight();
+    int sw = grt.GetSize().GetWidth();
+    int sh = grt.GetSize().GetHeight();
+
+#if 0
+    if (crt.IsOk())
+      dc.Blit(
+      0,
+      0,
+      SDRendertargetGrabbedView->GetClientSize().GetWidth(),
+      SDRendertargetGrabbedView->GetClientSize().GetHeight(),
+      &grt,
+      0,
+      0,
+      wxCOPY
+      );
+#elif 1
+    if (grt.IsOk())
+      dc.StretchBlit(
+      0,
+      0,
+      dw,
+      dh,
+      &grt,
+      0,
+      0,
+      sw,
+      sh,
+      wxCOPY
+      );
+#else
+    if (grt.IsOk())
+      if ((rg.GetWidth() > 0) &&
+	(rg.GetHeight() > 0))
+	dc.StretchBlit(
+	rg.GetLeft(),
+	rg.GetTop(),
+	rg.GetWidth(),
+	rg.GetHeight(),
+	&grt,
+	(rg.GetLeft() * sw) / dw,
+	(rg.GetTop() * sh) / dh,
+	(rg.GetWidth() * sw) / dw,
+	(rg.GetHeight() * sh) / dh,
+	wxCOPY
+	);
+#endif
+  }
+
   void SDPaintDS(wxPaintEvent& event) {
     wxPaintDC dc(SDDepthStencilView);
 
     /* refresh only if visible */
     if (SDViewSwitch->GetSelection() != SDVIEW_SCENES)
       return;
-    if (SDSurfaceSwitch->GetSelection() != 1)
+    if (SDSurfaceSwitch->GetCurrentPage() != SDDepthStencil)
       return;
 
     wxRect rg = SDDepthStencilView->GetUpdateRegion().GetBox();
@@ -2008,8 +2214,14 @@ public:
 
       if (surfaceTexture[pSurface]) {
 	D3DTEXTUREFILTERTYPE af = surfaceTexture[pSurface]->tex->GetAutoGenFilterType();
-	if (surfaceTexture[pSurface]->map->Usage & D3DUSAGE_AUTOGENMIPMAP)
-	  sprintf(buf, "%s, AutoMip %d levels", buf, surfaceTexture[pSurface]->tex->GetLevelCount());
+	if (surfaceTexture[pSurface]->map->Usage & D3DUSAGE_AUTOGENMIPMAP) {
+	  int v = surfaceTexture[pSurface]->tex->GetLevelCount();
+	  int l = 0, s = (VDesc.Width < VDesc.Height ? VDesc.Width : VDesc.Height);
+	  while ((s << 1) >= 1)
+	    s <<= 1, l++;
+
+	  sprintf(buf, "%s, AutoMip %d levels", buf, l);
+	}
       }
     }
 
@@ -2034,21 +2246,26 @@ public:
     int p = pass; FindScene(p, o);
 
     IDirect3DSurface9 *_rt = NULL;
+    IDirect3DSurface9 *_gt = NULL;
     IDirect3DSurface9 *_ds = NULL;
 
     if (sm) {
       _rt = sm->trackd[p].rt[o];
+      _gt = FindGrabbedRT(0);
       _ds = sm->trackd[p].ds[o];
-      if ((int)_rt == -1) _rt = 0;
-      if ((int)_ds == -1) _ds = 0;
+      if ((int)_rt == -1) _rt = NULL;
+      if ((int)_gt == -1) _gt = NULL;
+      if ((int)_ds == -1) _ds = NULL;
     }
 
     SDStatusRT->SetLabel(wxString(GetViewStatus(p, o, _rt)));
 
     SetImage(p, &rt, _rt);
+    SetImage(p, &gt, _gt);
     SetImage(p, &ds, _ds);
 
     crt.SelectObject(wxBitmap(rt));
+    grt.SelectObject(wxBitmap(gt));
     cds.SelectObject(wxBitmap(ds));
 
 //  SetImage(&rt, _rt); wxImage __rt = rt.Rescale(SDRendertargetView->GetClientSize().GetWidth(), SDRendertargetView->GetClientSize().GetHeight(), wxIMAGE_QUALITY_HIGH);
@@ -2060,6 +2277,163 @@ public:
     SetStatesTable(o);
 
     DoRefresh();
+  }
+
+  void SetStats(int o, bool forced = false) {
+    //    st->SetS
+    // And finally create chart panel to display it:
+//  st = new wxChartPanel(SDPanelStats, wxID_ANY, chrt, wxPoint(0,0), wxSize(256, 256));
+
+    if (normed != (SDStatsNormalize->GetValue() == wxCHK_CHECKED)) {
+      normed = (SDStatsNormalize->GetValue() == wxCHK_CHECKED);
+
+      if (!normed) {
+	leftAxis->SetTitle(wxT("ms"));
+	bottomAxis->SetTitle(wxT("Frame"));
+      }
+      else {
+	leftAxis->SetTitle(wxT("%"));
+	bottomAxis->SetTitle(wxT("Frame"));
+      }
+
+      /* reset history */
+      hist[pass].hconsm = 0;
+    }
+
+    if ((hist[pass].hconsm != sm->frame_capt) || forced) {
+      LARGE_INTEGER freq;
+      QueryPerformanceFrequency(&freq);
+
+      /* cap shifting-in new data to OBGESCENE_NUM */
+      int toadd = sm->frame_capt - hist[pass].hconsm;
+      if (toadd > OBGESCENE_NUM)
+	toadd = OBGESCENE_NUM;
+      hist[pass].hconsm = sm->frame_capt - toadd;
+
+      if (pass == OBGEPASS_ANY) {
+	XYDynamicSerie *serie;
+
+	/* start updating */
+	hist[pass].dset->BeginUpdate();
+
+	/* loop over passes */
+	for (int p = OBGEPASS_NUM; p > 0; p--) {
+	  if (!(serie = hist[pass].series[p])) {
+	    serie = new XYDynamicSerie();
+
+	    // set serie names to be displayed on legend
+	    if (p == OBGEPASS_NUM)
+	      serie->SetName(wxString("Total"));
+	    else
+	      serie->SetName(wxString(passNames[p]));
+
+	    hist[pass].dset->AddSerie(serie);
+	    hist[pass].series[p] = serie; int s =
+	    hist[pass].dset->GetSerieCount() - 1;
+
+	    switch(p) {
+	      case OBGEPASS_REFLECTION:
+		rndr->SetSerieColour(s, new wxColour(0x00EFEFFFUL)); break;
+	      case OBGEPASS_WATER:
+		rndr->SetSerieColour(s, new wxColour(0x00FF0000UL)); break;
+	      case OBGEPASS_WATERHEIGHTMAP:
+		rndr->SetSerieColour(s, new wxColour(0x007F7F7FUL)); break;
+	      case OBGEPASS_WATERDISPLACEMENT:
+		rndr->SetSerieColour(s, new wxColour(0x00007F7FUL)); break;
+	      case OBGEPASS_SHADOW:
+		rndr->SetSerieColour(s, new wxColour(0x00010101UL)); break;
+	      case OBGEPASS_MAIN:
+		rndr->SetSerieColour(s, new wxColour(0x00FFFF7FUL)); break;
+	      case OBGEPASS_EFFECTS:
+		rndr->SetSerieColour(s, new wxColour(0x00FF7FFFUL)); break;
+	      case OBGEPASS_HDR:
+		rndr->SetSerieColour(s, new wxColour(0x00FFEFDFUL)); break;
+	      case OBGEPASS_POST:
+		rndr->SetSerieColour(s, new wxColour(0x00CFCFCFUL)); break;
+
+	      case OBGEPASS_VIDEO:
+		rndr->SetSerieColour(s, new wxColour(0x00CFCFCFUL)); break;
+	      case OBGEPASS_UNKNOWN:
+		rndr->SetSerieColour(s, new wxColour(0x00CFCFCFUL)); break;
+
+	      case OBGEPASS_NUM:
+		rndr->SetSerieColour(s, new wxColour(0x00FFFFFFUL)); break;
+	    }
+	  }
+	}
+
+	/* loop over passes */
+	for (int p = OBGEPASS_NUM; p > 0; p--) {
+	  serie = hist[pass].series[p];
+
+	  /* cap the number of resulting data to OBGESCENE_NUM */
+	  int tokll = (serie->GetCount() + toadd) - OBGESCENE_NUM;
+	  if (tokll < 0)
+	    tokll = 0;
+	  if (tokll > serie->GetCount())
+	    tokll = serie->GetCount();
+	  if (tokll > 0)
+	    serie->Remove(0, tokll);
+	}
+
+	LARGE_INTEGER xbase; int xmul;
+	LARGE_INTEGER fsum; fsum.QuadPart = 0;
+	LARGE_INTEGER csum; csum.QuadPart = 0;
+	for (int h = hist[pass].hconsm; h < sm->frame_capt; h++) {
+	  int frame_wrp = h % OBGEFRAME_NUM;
+
+	  /* define renormalization ranged */
+	  if (!normed)
+	    xmul = 1000, xbase.QuadPart = freq.QuadPart;
+	  else
+	    xmul =  100, xbase.QuadPart = sm->trackh[frame_wrp].frame_totl.QuadPart;
+
+	  LARGE_INTEGER tsum; tsum.QuadPart = 0;
+	  /* loop over passes */
+	  for (int p = 1; p <= OBGEPASS_MAX; p++) {
+
+	    LARGE_INTEGER psum; psum.QuadPart = 0;
+	    /* loop over scenes */
+	    for (int s = 0; s < sm->trackh[frame_wrp].trackd[p].frame_cntr; s++) {
+	      psum.QuadPart += sm->trackh[frame_wrp].trackd[p].frame_hist[s].QuadPart;
+	    }
+
+	    /* sum up times */
+	    tsum.QuadPart += psum.QuadPart;
+
+	    serie = hist[pass].series[p];
+	    serie->AddXY(h, (double)(tsum.QuadPart * xmul) / xbase.QuadPart);
+	  }
+
+	  /* total frame-time incl. code */
+	  fsum.QuadPart = fsum.QuadPart + tsum.QuadPart;
+	  tsum.QuadPart = sm->trackh[frame_wrp].frame_totl.QuadPart;
+	  csum.QuadPart = csum.QuadPart + tsum.QuadPart;
+
+	  serie = hist[pass].series[OBGEPASS_NUM];
+	  serie->AddXY(h, (double)(tsum.QuadPart * xmul) / xbase.QuadPart);
+	}
+
+	/* start updating */
+	hist[pass].dset->EndUpdate();
+
+	char buf[256];
+	int smth = sm->frame_capt - hist[pass].hconsm;
+
+	double fps = (double)freq.QuadPart / (fsum.QuadPart / smth);
+	double prc = (100.0 * fsum.QuadPart) / csum.QuadPart;
+
+	sprintf(buf, "Global: %f FPS, %f%% frame-time", (float)fps, (float)prc);
+
+	SDStatusStats->SetLabel(buf);
+      }
+      else {
+      }
+
+      hist[pass].hconsm = sm->frame_capt;
+    //st->ChartChanged(chrt);
+    //st->SetChart(chrt);
+    }
   }
 
   /* --------------------------------------------------------------
@@ -2193,6 +2567,9 @@ public:
       SDPanelScenes->Hide();
   }
 
+  void UpdateFrameStats() {
+  }
+
   void UpdateFrame() {
     if (SDViewSwitch->GetSelection() == SDVIEW_SHADER)
       UpdateFrameShaders();
@@ -2200,17 +2577,25 @@ public:
       UpdateFrameEffects();
     else if (SDViewSwitch->GetSelection() == SDVIEW_SCENES)
       UpdateFrameScene();
+    else if (SDViewSwitch->GetSelection() == SDVIEW_STATS)
+      UpdateFrameStats();
   }
 
   /* --------------------------------------------------------------
    */
 
-  void SetPanels(int sel) {
+  void SetPanels(int sel, wxString *resel = NULL) {
     /* ------------------------------------------------ */
     if (sel == SDVIEW_SHADER) {
+      /* not changeable */
       int j = SDComboShader->GetSelection();
       if (j == wxNOT_FOUND) {
+	wxString jj = SDComboShader->GetStringSelection();
 	SDComboShader->Clear();
+
+	/* overwrite old for re-selection */
+	if (resel)
+	  jj = *resel;
 
 	if (sm) {
 	  BuiltInShaderList::iterator BShader = sm->BuiltInShaders.begin();
@@ -2250,6 +2635,8 @@ public:
 	if (!SDComboShader->IsEmpty()) {
 	  SDPanelShaders->Show();
 	  SDComboShader->SetSelection(0);
+	  if (j != wxNOT_FOUND)
+	    SDComboShader->SetStringSelection(jj);
 
 	  DoShaderSwitch(true);
 	}
@@ -2260,9 +2647,15 @@ public:
 
     /* ------------------------------------------------ */
     else if (sel == SDVIEW_EFFECT) {
+      /* always changeable */
       int j = SDComboEffect->GetSelection();
-      if (j == wxNOT_FOUND) {
+      if (j == wxNOT_FOUND || 1) {
+	wxString jj = SDComboEffect->GetStringSelection();
 	SDComboEffect->Clear();
+
+	/* overwrite old for re-selection */
+	if (resel)
+	  jj = *resel;
 
 	if (em) {
 	  ManagedEffectList::iterator MEffect = em->ManagedEffects.begin();
@@ -2291,6 +2684,8 @@ public:
 	if (!SDComboEffect->IsEmpty()) {
 	  SDPanelEffects->Show();
 	  SDComboEffect->SetSelection(0);
+	  if ((j != wxNOT_FOUND) || resel)
+	    SDComboEffect->SetStringSelection(jj);
 
 	  DoEffectSwitch(true);
 	}
@@ -2311,6 +2706,21 @@ public:
 	}
 	else
 	  SDPanelScenes->Hide();
+      }
+    }
+
+    /* ------------------------------------------------ */
+    else if (sel == SDVIEW_STATS) {
+      int k = SDChoiceStats->GetSelection();
+      if (k == wxNOT_FOUND || 1) {
+	//if (!SDChoiceStats->IsEmpty()) {
+	  SDPanelStats->Show();
+	  //SDChoiceStats->SetSelection(0);
+
+	  DoStatsSwitch(true);
+	//}
+	//else
+	  //SDPanelStats->Hide();
       }
     }
   }
@@ -2483,6 +2893,8 @@ public:
       DoEffectSwitch(forced || (p != pass));
     else if (SDViewSwitch->GetSelection() == SDVIEW_SCENES)
       DoScenesSwitch(forced || (p != pass));
+    else if (SDViewSwitch->GetSelection() == SDVIEW_STATS)
+      DoStatsSwitch(forced || (p != pass));
   }
 
   /* --------------------------------------------------------------
@@ -2495,26 +2907,37 @@ public:
     if (hit == SDViewSwitch) {
       SetPanels(o);
 
-      if (o == 0) {
+      if (o == SDVIEW_SHADER) {
 	SDPanelShaders->Show();
 	SDPanelEffects->Hide();
 	SDPanelScenes->Hide();
+	SDPanelStats->Hide();
 
 	UpdateFrameShaders();
       }
-      else if (o == 1) {
+      else if (o == SDVIEW_EFFECT) {
 	SDPanelShaders->Hide();
 	SDPanelEffects->Show();
 	SDPanelScenes->Hide();
+	SDPanelStats->Hide();
 
 	UpdateFrameEffects();
       }
-      else if (o == 2) {
+      else if (o == SDVIEW_SCENES) {
 	SDPanelShaders->Hide();
 	SDPanelEffects->Hide();
 	SDPanelScenes->Show();
+	SDPanelStats->Hide();
 
 	UpdateFrameScene();
+      }
+      else if (o == SDVIEW_STATS) {
+	SDPanelShaders->Hide();
+	SDPanelEffects->Hide();
+	SDPanelScenes->Hide();
+	SDPanelStats->Show();
+
+	UpdateFrameStats();
       }
     }
 
@@ -2526,12 +2949,21 @@ public:
     wxObject *hit = event.GetEventObject();
 
     if (hit == SDSurfaceSwitch) {
-      if (o == 0) {
+      wxWindow *ow = SDSurfaceSwitch->GetPage(o);
+
+      if (ow == SDRendertarget) {
 	SDRendertarget->Show();
+	SDRendertargetGrabbed->Hide();
 	SDDepthStencil->Hide();
       }
-      else if (o == 1) {
+      else if (ow == SDRendertargetGrabbed) {
 	SDRendertarget->Hide();
+	SDRendertargetGrabbed->Hide();
+	SDDepthStencil->Show();
+      }
+      else if (ow == SDDepthStencil) {
+	SDRendertarget->Hide();
+	SDRendertargetGrabbed->Hide();
 	SDDepthStencil->Show();
       }
     }
@@ -2601,6 +3033,25 @@ public:
     /* trace might have changed since last activation */
     if (currv)
       SetStatesTable(currv);
+  }
+
+  virtual void DoStatsSwitch(wxCommandEvent& event) {
+    DoStatsSwitch();
+    event.Skip();
+  }
+
+  void DoStatsSwitch(bool force = false) {
+    int o = SDChoiceStats->GetSelection();
+
+    /* ------------------------------------------------ */
+    if ((currh != o) || force) {
+      currh = o;
+      SetStats(o);
+    }
+
+    /* trace might have changed since last activation */
+    if (currh)
+      SetStatsTable(currh);
   }
 
   /* --------------------------------------------------------------
@@ -2837,10 +3288,113 @@ public:
 
   virtual void DoEffectAdd(wxCommandEvent& event) {
     DoEffectAdd();
-    event.Skip();
+  //event.Skip();
   }
 
   void DoEffectAdd() {
+    wxFileDialog dlg(
+	this, 
+	_T("Open effect"), 
+	wxT(em->EffectDirectory()), 
+	wxEmptyString,
+	_T("Effects file (*.fx)|*.fx"), 
+	wxFD_OPEN | wxFD_FILE_MUST_EXIST
+    );
+
+    if (dlg.ShowModal() != wxID_OK)
+      return;
+
+    // get filename
+    wxString m_filename = dlg.GetFilename();
+    wxString m_filepath = dlg.GetPath();
+
+    // some feedback
+    bool list = false;
+    int eid = -1;
+    if ((eid = em->FindEffect(m_filename)) != -1) {
+      wxMessageDialog dlg(
+	this, 
+	_T("Effect already exist. Do you want to overwrite it?"),
+	_T("Confirmation"), 
+	wxYES_NO
+	);
+
+      if (dlg.ShowModal() != wxID_YES)
+	return;
+    }
+    else if (em->UseEffectList()) {
+      wxMessageDialog dlg(
+	this, 
+	_T("Do you want to add the effect to the shaderlist?"),
+	_T("Confirmation"), 
+	wxYES_NO
+	);
+
+      list = (dlg.ShowModal() == wxID_YES);
+    }
+
+    /* transfer data */
+    struct stat sx;
+    char strFileFull[MAX_PATH];
+    FILE *f;
+
+    strcpy(strFileFull, em->EffectDirectory());
+    strcat(strFileFull, m_filename);
+
+    /* overwrite */
+    if (!stat((const char *)m_filepath, &sx)) {
+      UINT size = sx.st_size;
+      CHAR *ooo = new CHAR[size + 1];
+      if (ooo != NULL) {
+	/* reading in text-mode can yield any number of less characters */
+	memset(ooo, 0, size + 1);
+
+	if (!fopen_s(&f, m_filepath, "rb"/*"rt"*/)) {
+	  fread(ooo, 1, size, f);
+	  fclose(f);
+
+	  if (!fopen_s(&f, strFileFull, "wb"/*"rt"*/)) {
+	    fwrite(ooo, 1, size, f);
+	    fclose(f);
+
+	    /* insert new effect */
+	    if (eid == -1) {
+	      if (em->AddManagedEffect(m_filename, 0) != -1) {
+		/* append to list */
+		if (list) {
+		  if (!fopen_s(&f, em->EffectListFile(), "ab"/*"rt"*/)) {
+		    fprintf(f, "%s\n", m_filename);
+		    fclose(f);
+		  }
+		}
+
+		SetPanels(SDViewSwitch->GetSelection(), &m_filename);
+	      }
+	    }
+	    /* update previous effect */
+	    else {
+	      /* get previous effect */
+	      EffectRecord *o = em->GetEffect(eid);
+
+	      if (o) {
+		if (o->RuntimeEffect(ooo))
+		  SetEffectRecord(o);
+		else
+		  UpdateEffectRecord(o);
+
+		/* trigger re-creation of the DX9-class */
+		if (SDEffectEnable->GetValue() == wxCHK_CHECKED)
+		  o->Enable(true);
+		else
+		  o->Enable(false);
+	      }
+	    }
+	  }
+	}
+
+	delete[] ooo;
+      }
+    }
   }
 
   virtual void DoEffectLoad(wxCommandEvent& event) {
@@ -2865,12 +3419,8 @@ public:
     int size = strlen(ooo);
 
     if (o) {
-      char strFileFull[MAX_PATH];
-      strcpy(strFileFull, o->Filepath);
-//    strcat(strFileFull, ".fx");
-
       FILE *f;
-      if (!fopen_s(&f, strFileFull, "wb"/*"wt"*/)) {
+      if (!fopen_s(&f, o->GetPath(), "wb"/*"wt"*/)) {
 	fwrite(ooo, 1, size, f);
 	fclose(f);
 
@@ -2943,6 +3493,24 @@ public:
   /* --------------------------------------------------------------
    */
 
+  virtual void DoStatsToggle(wxCommandEvent& event) {
+    DoStatsToggle();
+    event.Skip();
+  }
+
+  void DoStatsToggle() {
+    /* ------------------------------------------------ */
+    if (SDStatsNormalize->GetValue() == wxCHK_CHECKED)
+      ;
+    else //if (SDStatsNormalize->GetValue() == wxCHK_UNCHECKED)
+      ;
+    
+    SetStats(currh, true);
+  }
+
+  /* --------------------------------------------------------------
+   */
+
   virtual void DoShaderOptions(wxCommandEvent& event) {
     ShaderRecord *o = FindShaderRecord(NULL, SDComboShader->GetStringSelection());
 
@@ -2997,9 +3565,11 @@ public:
   void DoRefresh() {
     /* refresh only if visible */
     if (SDViewSwitch->GetSelection() == SDVIEW_SCENES) {
-      if (SDSurfaceSwitch->GetSelection() == 0)
+      if (SDSurfaceSwitch->GetCurrentPage() == SDRendertarget)
 	SDRendertarget->Refresh();
-      else if (SDSurfaceSwitch->GetSelection() == 1)
+      else if (SDSurfaceSwitch->GetCurrentPage() == SDRendertargetGrabbed)
+	SDRendertargetGrabbed->Refresh();
+      else if (SDSurfaceSwitch->GetCurrentPage() == SDDepthStencil)
 	SDDepthStencil->Refresh();
     }
   }
@@ -3071,7 +3641,7 @@ DebugWindow *DebugWindow::Expunge() {
 	if (DWEnabled.data) {
 	  if (!da) {
 	    int argc = 0; char** argv = NULL;
- 
+
 	    HINSTANCE exe = GetModuleHandle(NULL);
 	    HINSTANCE dll = GetModuleHandle("OBGEv2.dll");
 

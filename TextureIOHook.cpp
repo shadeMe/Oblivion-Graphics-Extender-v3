@@ -1,10 +1,12 @@
-#include "D3D9.hpp"
+#include <assert.h>
+
 #include "TextureManager.h"
 #include "TextureIOHook.hpp"
 #include "windows.h"
 #include "obse_common/SafeWrite.h"
 #include "GlobalSettings.h"
-#include <assert.h>
+
+#include "D3D9.hpp"
 
 #include "Hooking/detours/detours.h"
 #include "Hooking/D3DX.hpp"

@@ -1,18 +1,21 @@
+#include <assert.h>
+
 #include "RenderSurfaceParametersHook.hpp"
 #include "windows.h"
 #include "obse_common/SafeWrite.h"
 #include "GlobalSettings.h"
-#include "D3D9.hpp"
-#include "D3D9Identifiers.hpp"
 #include "OBSEShaderInterface.h"
 
-#include <assert.h>
+#include "D3D9.hpp"
+#include "D3D9Device.hpp"
+#include "D3D9Identifiers.hpp"
 
 #include "Hooking/detours/detours.h"
 
 static global<int> ReflectionMapSize(256, NULL, "ScreenBuffers", "iReflectionMapSize");
 static global<int> WaterHeightMapSize(512, NULL, "ScreenBuffers", "iWaterHeightMapSize");
 static global<int> WaterDisplacementMapSize(256, NULL, "ScreenBuffers", "iWaterDisplacementMapSize");
+static global<int> AutoGenerateMipMaps(D3DTEXF_LINEAR, NULL, "ScreenBuffers", "iAutoGenerateMipMaps");
 static global<int> RendererWidth(0, "Oblivion.ini", "Display", "iSize W");
 static global<bool> UseWaterReflectionsMisc(0, "Oblivion.ini", "Water", "bUseWaterReflectionsMisc");
 static global<bool> UseWaterReflectionsStatics(0, "Oblivion.ini", "Water", "bUseWaterReflectionsStatics");
@@ -98,6 +101,8 @@ void (__thiscall Anonymous::* MiscPass)(int)/* =
 
 void (__cdecl * IdlePass)(int, int)/* =
 	(void (__thiscall TES::*)(int, int))0x007D71C0*/;
+bool (__cdecl * IsScriptRunning)(int, int)/* =
+	(void (__thiscall TES::*)(int, int))0x004F8DB0*/;
 
 void (__thiscall Anonymous::* TrackCombinerPass)(int)/* =
 	(void (__thiscall TES::*)(int, int))0040C830*/;
@@ -529,6 +534,19 @@ void __cdecl TrackIdlePass(int unk1, int unk2) {
 	currentPass = previousPass;
 }
 
+bool __cdecl TrackIsScriptRunning(int unk1, int unk2) {
+	bool res = false;
+
+	__try {
+		res = IsScriptRunning(unk1, unk2);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		res = false;
+	}
+
+	return res;
+}
+
 /* ------------------------------------------------------------------------------------------------- */
 
 void *(__thiscall Anonymous::* GetRenderedSurface)(v1_2_416::NiDX9Renderer *, int Width, int Height, int Flags, D3DFORMAT Format, enum SurfaceIDs SurfaceTypeID)/* =
@@ -659,11 +677,10 @@ void __stdcall TrackRenderedSurfaceParameters(v1_2_416::NiDX9Renderer *renderer,
 	_DMESSAGE("OD3D9: Intercepted Format: %s", findFormat(*pFormat));
 	_DMESSAGE("OD3D9: Intercepted {W,H} before: {%d,%d}", *pWidth, *pHeight);
 
-	/* turn off automipmapping */
-	specialUsage = 0;
+	/* enable default automipmapping */
+	AMFilter = (D3DTEXTUREFILTERTYPE)AutoGenerateMipMaps.Get();
 
 	switch (SurfaceTypeID) {
-#if	1
 		case SURFACE_ID_WATER6:
 		  /* Water heightmap */
 		  if (UseWaterHiRes.Get()) {
@@ -744,12 +761,7 @@ void __stdcall TrackRenderedSurfaceParameters(v1_2_416::NiDX9Renderer *renderer,
 		      *pWidth = *pHeight = RendererWidth.data;
 		  }
 
-#if	defined(OBGE_AUTOMIPMAP)
-		  /* let's try mipmapping this fella */
-		  specialUsage |= D3DUSAGE_AUTOGENMIPMAP;
-#endif
 		  break;
-#endif
 	}
 
 	_DMESSAGE("OD3D9: Intercepted {W,H} after: {%d,%d}", *pWidth, *pHeight);
@@ -812,6 +824,8 @@ void CreateRenderSurfaceHook(void) {
 	TrackMiscPass              = &Anonymous::TrackMiscPass;
 
 	*((int *)&IdlePass) = 0x007D71C0;
+	*((int *)&IsScriptRunning) = 0x004F8DB0;
+
 	/* GetRenderedSurfaceParameters */
 	*((int *)&GetRenderedSurface          ) = 0x007C1B50;
 	*((int *)&GetRenderedSurfaceParameters) = 0x007C0D10;
@@ -845,6 +859,8 @@ void CreateRenderSurfaceHook(void) {
 	DetourAttach(&(PVOID&)MiscPass,              *((PVOID *)&TrackMiscPass));
 
 	DetourAttach(&(PVOID&)IdlePass, TrackIdlePass);
+	DetourAttach(&(PVOID&)IsScriptRunning, TrackIsScriptRunning);
+
 	DetourAttach(&(PVOID&)GetRenderedSurface, *((PVOID *)&TrackRenderedSurface         ));
 	DetourAttach(&(PVOID&)GetRenderedSurfaceParameters,   TrackRenderedSurfaceParameters);
         LONG error = DetourTransactionCommit();
@@ -857,6 +873,9 @@ void CreateRenderSurfaceHook(void) {
         else {
 		_MESSAGE("Detoured GetRenderedSurfaceParameters(); failed");
         }
+
+	/* enable default automipmapping */
+	AMFilter = (D3DTEXTUREFILTERTYPE)AutoGenerateMipMaps.Get();
 
 	/* Reflection Render-Surface Dimension (square) */
 	if ((ReflectionMapSize.Get() >= 256) &&

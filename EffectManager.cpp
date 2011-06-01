@@ -1,16 +1,18 @@
 #include <sys/stat.h>
 
+#include <algorithm>
+
 #include "EffectManager.h"
 #include "TextureManager.h"
 #include "GlobalSettings.h"
-#include "D3D9.hpp"
 #include "OBSEShaderInterface.h"
 
-#include <algorithm>
+#include "D3D9.hpp"
+#include "D3D9Device.hpp"
 
-static global<bool> UseShaderList(true, NULL, "Effects", "bUseShaderList");
-static global<char*> EffectDirectory("data\\shaders\\",NULL,"Effects","sEffectDirectory");
-static global<char *> ShaderListFile("data\\shaders\\shaderlist.txt", NULL, "Effects", "sShaderListFile");
+static global<bool> UseEffectList(true, NULL, "Effects", "bUseEffectList");
+static global<char *> EffectDirectory("data\\shaders\\", NULL, "Effects", "sEffectDirectory");
+static global<char *> EffectListFile("data\\shaders\\shaderlist.txt", NULL, "Effects", "sEffectListFile");
 static global<bool> UseLegacyCompiler(false, NULL, "Effects", "bUseLegacyCompiler");
 static global<bool> Optimize(false, NULL, "Effects", "bOptimize");
 static global<bool> SplitScreen(false, NULL, "Effects", "bRenderHalfScreen");
@@ -83,8 +85,8 @@ static FXIncludeManager incl;
 #define	EFFECTGROUP_LAST	0xFF
 
 #define	EFFECTCLASS_NEUTRAL	0x00
-#define	EFFECTCLASS_LIGHT	0x01
-#define	EFFECTCLASS_AO	        0x02
+#define	EFFECTCLASS_AO	        0x01
+#define	EFFECTCLASS_LIGHT	0x02
 #define	EFFECTCLASS_WATER	0x03
 #define	EFFECTCLASS_DOF		0x04
 #define	EFFECTCLASS_COLOR	0x05
@@ -97,7 +99,8 @@ static FXIncludeManager incl;
 #define	EFFECTCOND_UNDERWATER	(1 << 10)
 #define	EFFECTCOND_ISDAY	(1 << 16)
 #define	EFFECTCOND_ISNIGHT	(1 << 17)
-#define	EFFECTCOND_HASREFL	(1 << 30)
+#define	EFFECTCOND_HASREFL	(1 << 24)
+#define	EFFECTCOND_HASMIPS	(1 << 30)	// special one
 #define	EFFECTCOND_HASZBUF	(1 << 31)	// special one
 
 #define	EFFECTBUF_COPY		(1 << 28)	// need frame "copy" because the effect surfaces have other format
@@ -124,6 +127,7 @@ static D3DXMACRO defs[] = {
   {"EFFECTCOND_HASWATER"	, stringify(EFFECTCOND_HASWATER	        )},
   {"EFFECTCOND_HASREFLECTIONS"	, stringify(EFFECTCOND_HASREFL	        )},
   {"EFFECTCOND_HASZBUFFER"	, stringify(EFFECTCOND_HASZBUF		)},
+  {"EFFECTCOND_HASMIPMAPS"	, stringify(EFFECTCOND_HASMIPS		)},
   {"EFFECTCOND_INTERIOUR"	, stringify(EFFECTCOND_INTERIOUR	)},
   {"EFFECTCOND_EXTERIOUR"	, stringify(EFFECTCOND_EXTERIOUR	)},
   {"EFFECTCOND_UNDERWATER"	, stringify(EFFECTCOND_UNDERWATER	)},
@@ -131,6 +135,7 @@ static D3DXMACRO defs[] = {
   {"EFFECTCOND_ISNIGHT"	        , stringify(EFFECTCOND_ISNIGHT	        )},
 
   {"EFFECTCOND_ZBUFFER"		, stringify(EFFECTCOND_HASZBUF		)}, // hm, error
+  {"EFFECTCOND_MIPMAPS"		, stringify(EFFECTCOND_HASMIPS		)}, // hm, error
 
   {"D3DFMT_DEFAULT"	        , "0"},		// same format as main-pass surface
 
@@ -193,23 +198,29 @@ inline HRESULT EffectBuffer::Initialise(D3DFORMAT rt0, D3DFORMAT rt1, D3DFORMAT 
   UInt32 Height = v1_2_416::GetRenderer()->SizeHeight;
   HRESULT hr;
 
+#if	defined(OBGE_AUTOMIPMAP) && 0
+#define EFFECT_USAGE  D3DUSAGE_RENDERTARGET | D3DUSAGE_AUTOGENMIPMAP
+#else
+#define EFFECT_USAGE  D3DUSAGE_RENDERTARGET
+#endif
+
   if (!Tex[0] && (rt0 != D3DFMT_UNKNOWN)) {
-    if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, D3DUSAGE_RENDERTARGET, rt0, D3DPOOL_DEFAULT, &Tex[0], 0)) == D3D_OK)
+    if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, EFFECT_USAGE, rt0, D3DPOOL_DEFAULT, &Tex[0], 0)) == D3D_OK)
       Tex[0]->GetSurfaceLevel(0, &Srf[0]);
   }
 
   if (!Tex[1] && (rt1 != D3DFMT_UNKNOWN)) {
-    if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, D3DUSAGE_RENDERTARGET, rt1, D3DPOOL_DEFAULT, &Tex[1], 0)) == D3D_OK)
+    if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, EFFECT_USAGE, rt1, D3DPOOL_DEFAULT, &Tex[1], 0)) == D3D_OK)
       Tex[1]->GetSurfaceLevel(0, &Srf[1]);
   }
 
   if (!Tex[2] && (rt2 != D3DFMT_UNKNOWN)) {
-    if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, D3DUSAGE_RENDERTARGET, rt2, D3DPOOL_DEFAULT, &Tex[2], 0)) == D3D_OK)
+    if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, EFFECT_USAGE, rt2, D3DPOOL_DEFAULT, &Tex[2], 0)) == D3D_OK)
       Tex[2]->GetSurfaceLevel(0, &Srf[2]);
   }
 
   if (!Tex[3] && (rt3 != D3DFMT_UNKNOWN)) {
-    if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, D3DUSAGE_RENDERTARGET, rt3, D3DPOOL_DEFAULT, &Tex[3], 0)) == D3D_OK)
+    if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, EFFECT_USAGE, rt3, D3DPOOL_DEFAULT, &Tex[3], 0)) == D3D_OK)
       Tex[3]->GetSurfaceLevel(0, &Srf[3]);
   }
 
@@ -325,12 +336,14 @@ inline void EffectQueue::Begin(ID3DXEffect *pEffect) {
   rotate[EQLAST]->SetTexture("obge_LastRendertarget%d_EFFECTPASS", pEffect);
 
   alterning ^= 1; (rotate[EQLAST] = queue[alterning])->SetRenderTarget(device);
+  device->Clear(0, NULL, D3DCLEAR_TARGET, 0, 0, 0);
 }
 
 inline void EffectQueue::Step(ID3DXEffect *pEffect) {
   rotate[EQLAST]->SetTexture("obge_LastRendertarget%d_EFFECTPASS", pEffect);
 
   alterning ^= 1; (rotate[EQLAST] = queue[alterning])->SetRenderTarget(device);
+  device->Clear(0, NULL, D3DCLEAR_TARGET, 0, 0, 0);
 }
 
 inline void EffectQueue::End(ID3DXEffect *pEffect) {
@@ -370,7 +383,7 @@ inline void EffectQueue::End(EffectBuffer *target) {
 EffectRecord::EffectRecord() {
   Filepath[0] = '\0';
   Name[0] = '\0';
-  ParentRefID = 0xFF000000;
+  ParentRefID = 0;
 
   Enabled = false;
   Private = false;
@@ -455,6 +468,8 @@ bool EffectRecord::LoadEffect(const char *Filename, UINT32 refID, bool Private, 
       }
     }
   }
+  if (ext)
+    *ext = '.';
 
   /* getting a FX source for compiling if there is any
    */
@@ -495,12 +510,11 @@ bool EffectRecord::LoadEffect(const char *Filename, UINT32 refID, bool Private, 
   }
 
   this->pDefine = defs;
-
   this->Enabled = false;
   this->Private = Private;
   this->ParentRefID = refID;
 
-  return true;
+  return (pSource != NULL);
 }
 
 bool EffectRecord::RuntimeFlush() {
@@ -527,9 +541,7 @@ bool EffectRecord::RuntimeEffect(const char *fx) {
   sourceLen = size;
 
   /* trigger recompile */
-  RuntimeFlush();
-
-  return true;
+  return RuntimeFlush();
 }
 
 bool EffectRecord::SaveEffect() {
@@ -641,10 +653,12 @@ bool EffectRecord::CompileEffect(bool forced) {
 }
 
 void EffectRecord::ApplyCompileDirectives() {
+  if (!HasEffect()) return;
   LPCSTR pName = NULL; pEffect->GetString("Name", &pName);
   if (pName)
     strcpy(Name, (char *)pName);
 
+  /* obtain a copy of the old resources */
   TextureManager *TexMan = TextureManager::GetSingleton();
   std::vector<int> prevTextures = Textures; Textures.clear();
   D3DXEFFECT_DESC Description;
@@ -667,7 +681,7 @@ void EffectRecord::ApplyCompileDirectives() {
 
 	  _MESSAGE("Found filename : %s", pString);
 
-	  int TexNum = TexMan->LoadManagedTexture((char *)pString, TR_CUBIC);
+	  int TexNum = TexMan->LoadDependtTexture((char *)pString, TR_CUBIC);
 	  if (TexNum != -1) {
 	    pEffect->SetTexture(handle, TexMan->GetTexture(TexNum)->GetTexture());
 	    Textures.push_back(TexNum);
@@ -682,7 +696,7 @@ void EffectRecord::ApplyCompileDirectives() {
 
 	  _MESSAGE("Found filename : %s", pString);
 
-	  int TexNum = TexMan->LoadManagedTexture((char *)pString, TR_VOLUMETRIC);
+	  int TexNum = TexMan->LoadDependtTexture((char *)pString, TR_VOLUMETRIC);
 	  if (TexNum != -1) {
 	    pEffect->SetTexture(handle, TexMan->GetTexture(TexNum)->GetTexture());
 	    Textures.push_back(TexNum);
@@ -699,7 +713,7 @@ void EffectRecord::ApplyCompileDirectives() {
 
 	    _MESSAGE("Found filename : %s", pString);
 
-	    int TexNum = TexMan->LoadManagedTexture((char *)pString, TR_PLANAR);
+	    int TexNum = TexMan->LoadDependtTexture((char *)pString, TR_PLANAR);
 	    if (TexNum != -1) {
 	      pEffect->SetTexture(handle, TexMan->GetTexture(TexNum)->GetTexture());
 	      Textures.push_back(TexNum);
@@ -783,7 +797,7 @@ void EffectRecord::ApplyCompileDirectives() {
 	    else if (Description.Type == D3DXPT_STRING) {
 	      LPCSTR pString = NULL; pEffect->GetString(handle2, &pString);
 
-	      EffectManager::GetSingleton()->AddDependentEffect(pString, 0xFF000000);
+	      EffectManager::GetSingleton()->AddDependtEffect(pString, 0);
 	    }
 	  }
 	}
@@ -856,7 +870,9 @@ inline void EffectRecord::ApplyConstants(EffectConstants *ConstList) {
   pEffect->SetFloatArray("oblv_CameraForward_MAINPASS", &ConstList->EyeForward.x, 3);
 
   pEffect->SetIntArray("oblv_GameTime", &ConstList->GameTime.x, 4);
+  pEffect->SetIntArray("obge_Tick", &ConstList->TikTiming.x, 4);
   pEffect->SetVector("oblv_SunDirection", &ConstList->SunDir);
+  pEffect->SetVector("oblv_SunTiming", &ConstList->SunTiming);
 
   /* deprecated */
 #ifndef	NO_DEPRECATED
@@ -874,17 +890,17 @@ inline void EffectRecord::ApplyDynamics() {
 }
 
 inline void EffectRecord::OnLostDevice(void) {
-  if (pEffect)
+  if (HasEffect())
     pEffect->OnLostDevice();
 }
 
 inline void EffectRecord::OnResetDevice(void) {
-  if (pEffect)
+  if (HasEffect())
     pEffect->OnResetDevice();
 }
 
 inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo, IDirect3DSurface9 *RenderCopy) {
-  if (!Enabled)
+  if (!IsEnabled())
     return;
 
   D3DDevice->BeginScene();
@@ -913,7 +929,7 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 
 }
 
 inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectConstants *ConstList, EffectQueue *Queue) {
-  if (!Enabled)
+  if (!IsEnabled())
     return false;
 
   D3DDevice->BeginScene();
@@ -949,7 +965,7 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectConstants *C
 }
 
 inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice) {
-  if (!Enabled)
+  if (!IsEnabled())
     return;
 
   D3DDevice->BeginScene();
@@ -991,7 +1007,7 @@ inline void EffectRecord::Enable(bool Enabled) {
 }
 
 inline bool EffectRecord::IsEnabled() const {
-  return this->Enabled;
+  return this->Enabled && HasEffect();
 }
 
 inline UINT32 EffectRecord::GetRefID() const {
@@ -1027,46 +1043,112 @@ inline void EffectRecord::SetPriority(int pri) {
 }
 
 inline bool EffectRecord::SetEffectConstantB(const char *name, bool value) {
-  HRESULT hr = pEffect->SetBool(name, value);
+  HRESULT hr = (HasEffect() ? pEffect->SetBool(name, value) : -1);
   return (hr == D3D_OK);
 }
 
 inline bool EffectRecord::SetEffectConstantI(const char *name, int value) {
-  HRESULT hr = pEffect->SetInt(name, value);
+  HRESULT hr = (HasEffect() ? pEffect->SetInt(name, value) : -1);
+  return (hr == D3D_OK);
+}
+
+inline bool EffectRecord::SetEffectConstantI(const char *name, int *values, int num) {
+  HRESULT hr = (HasEffect() ? pEffect->SetIntArray(name, values, num) : -1);
   return (hr == D3D_OK);
 }
 
 inline bool EffectRecord::SetEffectConstantF(const char *name, float value) {
-  HRESULT hr = pEffect->SetFloat(name, value);
+  HRESULT hr = (HasEffect() ? pEffect->SetFloat(name, value) : -1);
+  return (hr == D3D_OK);
+}
+
+inline bool EffectRecord::SetEffectConstantF(const char *name, float *values, int num) {
+  HRESULT hr = (HasEffect() ? pEffect->SetFloatArray(name, values, num) : -1);
   return (hr == D3D_OK);
 }
 
 inline bool EffectRecord::SetEffectConstantV(const char *name, v1_2_416::NiVector4 *value) {
-  HRESULT hr = pEffect->SetVector(name, value);
+  HRESULT hr = (HasEffect() ? pEffect->SetVector(name, value) : -1);
   return (hr == D3D_OK);
 }
 
 bool EffectRecord::SetEffectSamplerTexture(const char *name, int TextureNum) {
   TextureManager *TexMan = TextureManager::GetSingleton();
-  TextureRecord *NewTexture = TexMan->GetTexture(TextureNum);
+  if (!HasEffect()) return false;
 
   IDirect3DBaseTexture9 *OldTexture = NULL;
+  /* get old one */
   pEffect->GetTexture(name, (LPDIRECT3DBASETEXTURE9 *)&OldTexture);
+  /* and dereference */
   pEffect->SetTexture(name, NULL);
-  if (OldTexture)
-    TexMan->ReleaseTexture(OldTexture);
-  if (!NewTexture)
-    return false;
 
-  HRESULT hr = pEffect->SetTexture(name, NewTexture->GetTexture());
-  return (hr == D3D_OK);
+  /* remove any trace of the texture from this effect */
+  if (OldTexture) {
+    int OldTextureNum = TexMan->FindTexture(OldTexture);
+    TexMan->ReleaseTexture(OldTexture);
+
+    /* remove from vector */
+    if (OldTextureNum != -1)
+      Textures.erase(std::find(Textures.begin(), Textures.end(), OldTextureNum));
+  }
+
+  /* apply the new texture and remember it */
+  TextureRecord *NewTexture = TexMan->GetTexture(TextureNum);
+  if (NewTexture) {
+    HRESULT hr = pEffect->SetTexture(name, NewTexture->GetTexture());
+
+    /* add to vector */
+    if (hr == D3D_OK)
+      Textures.push_back(TextureNum);
+
+    return (hr == D3D_OK);
+  }
+
+  return false;
+}
+
+void EffectRecord::PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum) {
+  if (!HasEffect()) return;
+  D3DXEFFECT_DESC Description;
+  pEffect->GetDesc(&Description);
+
+  for (int par = 0; par < Description.Parameters; par++) {
+    D3DXHANDLE handle;
+
+    if ((handle = pEffect->GetParameter(NULL, par))) {
+      D3DXPARAMETER_DESC Description;
+
+      pEffect->GetParameterDesc(handle, &Description);
+
+      if ((Description.Type = D3DXPT_TEXTURE) ||
+	  (Description.Type = D3DXPT_TEXTURE1D) ||
+	  (Description.Type = D3DXPT_TEXTURE2D) ||
+	  (Description.Type = D3DXPT_TEXTURE3D) ||
+	  (Description.Type = D3DXPT_TEXTURECUBE)) {
+	// NB must set to NULL otherwise strange things happen
+	IDirect3DBaseTexture9 *EffectTexture = NULL;
+	pEffect->GetTexture(handle, &EffectTexture);
+
+	if (EffectTexture == texture) {
+	  pEffect->SetTexture(handle, NULL);
+
+	  _DMESSAGE("Removing texture %s from effect %s", Description.Name, GetPath());
+
+	  /* remove from vector */
+	  if (TexNum != -1)
+	    Textures.erase(std::find(Textures.begin(), Textures.end(), TexNum));
+	}
+      }
+    }
+  }
 }
 
 void EffectRecord::SaveVars(OBSESerializationInterface *Interface) {
+  if (!HasEffect()) return;
   TextureManager *TexMan = TextureManager::GetSingleton();
   D3DXEFFECT_DESC Description;
-
   pEffect->GetDesc(&Description);
+
   _MESSAGE("pEffect %s has %d parameters.", Filepath, Description.Parameters);
 
   for (int par = 0; par < Description.Parameters; par++) {
@@ -1084,19 +1166,30 @@ void EffectRecord::SaveVars(OBSESerializationInterface *Interface) {
 	case D3DXPT_TEXTURECUBE: {
           IDirect3DBaseTexture9 *Texture = NULL;
           int TextureNum; TextureType TextureData;
+	  ManagedTextureRecord *MTexture;
 
+	  /* find the DX-resource */
           pEffect->GetTexture(handle, &Texture);
+	  /* and the corresponding ID */
           TextureNum = TexMan->FindTexture(Texture);
-          strcpy(TextureData.Name, Description.Name);
 
-          if (TextureNum >= 0) {
-            TextureData.tex = TextureNum;
-            Interface->WriteRecord('STEX', SHADERVERSION, &TextureData, sizeof(TextureData));
+	  if (TextureNum == -1)
+	    break;
 
-            _MESSAGE("Found texture: name - %s, texnum - %d", TextureData.Name, TextureNum);
-          }
-          else
-            _MESSAGE("Found texture: name - %s - not in texture list.", TextureData.Name);
+	  /* and the corresponding structure */
+	  MTexture = TexMan->GetTexture(TextureNum);
+
+	  /* save the texture only if it's not private,
+	   * those in the effect-files themself
+	   * are private textures for example
+	   */
+	  if (!MTexture->IsPrivate()) {
+	    TextureData.tex = TextureNum;
+	    strcpy(TextureData.Name, Description.Name);
+	    Interface->WriteRecord('STEX', SHADERVERSION, &TextureData, sizeof(TextureData));
+
+	    _MESSAGE("Found texture: name - %s, texnum - %d", TextureData.Name, TextureNum);
+	  }
 
 	} break;
         case D3DXPT_INT: {
@@ -1166,6 +1259,12 @@ int ManagedEffectRecord::Release() {
 EffectManager *EffectManager::Singleton = NULL;
 
 EffectManager::EffectManager() {
+  LARGE_INTEGER freq;
+
+  QueryPerformanceFrequency(&freq);
+
+  EffectConst.TikTiming.w = (int)(freq.QuadPart);
+
   EffectIndex = 0;
   MaxEffectIndex = 0;
 
@@ -1256,7 +1355,7 @@ bool EffectManager::SetRAWZ(bool enabled) {
   if (RenderRawZ && !EffectDepth) {
     EffectDepth = new EffectRecord();
 
-    if (!EffectDepth->LoadEffect("RAWZfix.fx", 0xFF000000)) {
+    if (!EffectDepth->LoadEffect("RAWZfix.fx", 0)) {
       delete EffectDepth;
       EffectDepth = NULL;
 
@@ -1530,11 +1629,12 @@ void EffectManager::OnReleaseDevice() {
   ReleaseBuffers();
   ReleaseFrameTextures();
 
-  ManagedEffectList::iterator SEffect = ManagedEffects.begin();
+  /* prevent locking up because other resources have allready been freed */
+  ManagedEffectList prevEffects = ManagedEffects; ManagedEffects.clear();
+  ManagedEffectList::iterator SEffect = prevEffects.begin();
 
-  while (SEffect != ManagedEffects.end()) {
+  while (SEffect != prevEffects.end()) {
     delete (*SEffect);
-    *SEffect = NULL;
     SEffect++;
   }
 
@@ -1582,10 +1682,14 @@ void EffectManager::OnResetDevice() {
 }
 
 void EffectManager::UpdateFrameConstants(v1_2_416::NiDX9Renderer *Renderer) {
-  OBGEfork::Sun *pSun = OBGEfork::Sky::GetSingleton()->sun;
+  OBGEfork::Sky *pSky = OBGEfork::Sky::GetSingleton();
+  OBGEfork::Sun *pSun = pSky->sun;
+  TESClimate *climate = pSky->firstClimate;
+  TESWeather *weather = pSky->firstWeather;
   float (_cdecl * GetTimer)(bool, bool) = (float( *)(bool, bool))0x0043F490; // (TimePassed,GameTime)
   v1_2_416::NiCamera **pMainCamera = (v1_2_416::NiCamera **)0x00B43124;
-  char *CamName;
+  char *CamName; int gtime = GetTimer(0, 1);
+  LARGE_INTEGER tick;
 
   Renderer->SetCameraViewProj(*pMainCamera);
   D3DXMatrixTranslation(&EffectConst.world,
@@ -1604,32 +1708,64 @@ void EffectManager::UpdateFrameConstants(v1_2_416::NiDX9Renderer *Renderer) {
   EffectConst.ZRange.z = EffectConst.ZRange.x - EffectConst.ZRange.y;
   EffectConst.ZRange.w = EffectConst.ZRange.x + EffectConst.ZRange.y;
 
-  EffectConst.GameTime.x = GetTimer(0, 1);
-  EffectConst.GameTime.w = (EffectConst.GameTime.x     ) % 60;
-  EffectConst.GameTime.z = (EffectConst.GameTime.x / 60) % 60;
-  EffectConst.GameTime.y = (EffectConst.GameTime.x / 60) / 60;
-  bool Between6and18 = (EffectConst.GameTime.y >= 6) && (EffectConst.GameTime.y < 18);
+  QueryPerformanceCounter(&tick);
+
+  EffectConst.TikTiming.z = (__int64)((tick.QuadPart * 1000 * 1000) / EffectConst.TikTiming.w);
+  EffectConst.TikTiming.y = (__int64)((tick.QuadPart * 1000 * 1   ) / EffectConst.TikTiming.w);
+  EffectConst.TikTiming.x = (__int64)((tick.QuadPart * 1    * 1   ) / EffectConst.TikTiming.w);
+
+  EffectConst.SunTiming.x = climate->sunriseBegin * 10 * 60;
+  EffectConst.SunTiming.y = climate->sunriseEnd   * 10 * 60;
+  EffectConst.SunTiming.z = climate->sunsetBegin  * 10 * 60;
+  EffectConst.SunTiming.w = climate->sunsetEnd    * 10 * 60;
+
+  EffectConst.GameTime.x = gtime;
+  EffectConst.GameTime.w = (gtime     ) % 60;
+  EffectConst.GameTime.z = (gtime / 60) % 60;
+  EffectConst.GameTime.y = (gtime / 60) / 60;
+  // Sunrise is at 06:00, Sunset at 20:00
+  bool DayTime =
+    (gtime >= EffectConst.SunTiming.x) &&
+    (gtime <= EffectConst.SunTiming.w);
 
   /* deprecated */
 #ifndef	NO_DEPRECATED
-  EffectConst.time.x = GetTimer(0, 1);
-  EffectConst.time.w = (int)(EffectConst.time.x     ) % 60;
-  EffectConst.time.z = (int)(EffectConst.time.x / 60) % 60;
-  EffectConst.time.y = (int)(EffectConst.time.x / 60) / 60;
+  EffectConst.time.x = gtime;
+  EffectConst.time.w = (int)(gtime     ) % 60;
+  EffectConst.time.z = (int)(gtime / 60) % 60;
+  EffectConst.time.y = (int)(gtime / 60) / 60;
 #endif
 
   v1_2_416::NiNode *SunContainer = pSun->SunBillboard.Get()->ParentNode;
+  float deltaz = EffectConst.SunDir.z;
   bool SunHasBenCulled = SunContainer->m_flags.individual.AppCulled;
   EffectConst.SunDir.x = SunContainer->m_localTranslate.x;
   EffectConst.SunDir.y = SunContainer->m_localTranslate.y;
   EffectConst.SunDir.z = SunContainer->m_localTranslate.z;
   EffectConst.SunDir.Normalize3();
+  // Sunrise is at 06:00, Sunset at 20:00
+  if ((gtime > EffectConst.SunTiming.w + (10 * 60)) ||
+      (gtime < EffectConst.SunTiming.x - (10 * 60)))
+    EffectConst.SunDir.z = -EffectConst.SunDir.z;
+  else if ((gtime > EffectConst.SunTiming.z - (10 * 60))) {
+    /* needs to go down aways */
+    if ((fabs(deltaz) - EffectConst.SunDir.z) <= 0.0)
+      EffectConst.SunDir.z = -EffectConst.SunDir.z;
+  }
+  else if ((gtime < EffectConst.SunTiming.y + (10 * 60))) {
+    /* needs to go up aways */
+    if ((fabs(deltaz) - EffectConst.SunDir.z) >= 0.0)
+      EffectConst.SunDir.z = -EffectConst.SunDir.z;
+  }
+  //if ((ShaderConst.GameTime.y < 6) || (ShaderConst.GameTime.y >= 21))
+  //  ShaderConst.SunDir.z = -fabs(ShaderConst.SunDir.z);
 
-  RenderCnd = (RenderCnd & ~EFFECTCOND_ISDAY  ) | ( Between6and18                   ? EFFECTCOND_ISDAY   : 0);
-  RenderCnd = (RenderCnd & ~EFFECTCOND_ISNIGHT) | (!Between6and18                   ? EFFECTCOND_ISNIGHT : 0);
+  RenderCnd = (RenderCnd & ~EFFECTCOND_ISDAY  ) | ( DayTime			    ? EFFECTCOND_ISDAY   : 0);
+  RenderCnd = (RenderCnd & ~EFFECTCOND_ISNIGHT) | (!DayTime			    ? EFFECTCOND_ISNIGHT : 0);
   RenderCnd = (RenderCnd & ~EFFECTCOND_HASSUN ) | (!SunHasBenCulled                 ? EFFECTCOND_HASSUN  : 0);
   RenderCnd = (RenderCnd & ~EFFECTCOND_HASREFL) | (passTexture[OBGEPASS_REFLECTION] ? EFFECTCOND_HASREFL : 0);
   RenderCnd = (RenderCnd & ~EFFECTCOND_HASZBUF) | (CurrDS.IsValid()                 ? EFFECTCOND_HASZBUF : 0);
+  RenderCnd = (RenderCnd & ~EFFECTCOND_HASMIPS) | (AMFilter != D3DTEXF_NONE         ? EFFECTCOND_HASMIPS : 0);
 }
 
 void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo, IDirect3DSurface9 *RenderFrom) {
@@ -1644,7 +1780,8 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
   float test[4] = { 0.0, 1.0, 1.0, 0.0 };
   Renderer->SetupScreenSpaceCamera(test);
 
-  Renderer->RenderStateManager->SetRenderState(D3DRS_COLORWRITEENABLE, 0xF, false);
+  Renderer->RenderStateManager->SetRenderState(D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_ALPHA | D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_RED, false);
+  Renderer->RenderStateManager->SetRenderState(D3DRS_ALPHATESTENABLE, false, false);
   Renderer->RenderStateManager->SetRenderState(D3DRS_ALPHABLENDENABLE, false, false);
   Renderer->RenderStateManager->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE, false);
   Renderer->RenderStateManager->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE, false);
@@ -1757,7 +1894,7 @@ void EffectManager::RenderRAWZfix(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9
   if (!EffectDepth) {
     EffectDepth = new EffectRecord();
 
-    if (!EffectDepth->LoadEffect("RAWZfix.fx", 0xFF000000)) {
+    if (!EffectDepth->LoadEffect("RAWZfix.fx", 0)) {
       _MESSAGE("ERROR - RAWZfix.fx is missing! Please reinstall OBGEv2.2");
       return;
     }
@@ -1773,11 +1910,13 @@ void EffectManager::RenderRAWZfix(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9
 int EffectManager::AddPrivateEffect(const char *Filename, UINT32 refID) {
   ManagedEffectRecord *NewEffect = new ManagedEffectRecord();
 
-  if (!NewEffect->LoadEffect(Filename, refID, true) ||
-      !NewEffect->CompileEffect()) {
+  if (!NewEffect->LoadEffect(Filename, refID, true)) {
     delete NewEffect;
     return -1;
   }
+
+  /* you are allowed to fail */
+  NewEffect->CompileEffect();
 
   /* prepare */
   NewEffect->SetPriority(ManagedEffects.size());
@@ -1796,6 +1935,7 @@ int EffectManager::AddPrivateEffect(const char *Filename, UINT32 refID) {
 int EffectManager::AddManagedEffect(const char *Filename, UINT32 refID) {
   EffectRegistry::iterator SEffect = Effects.begin();
 
+  /* search for a non-private effect */
   while (SEffect != Effects.end()) {
     if (!SEffect->second->IsPrivate()) {
       if (!_stricmp(Filename, SEffect->second->GetName())/*&& ((pEffect->second->ParentRefID & 0xff000000) == (refID & 0xff000000))*/) {
@@ -1811,11 +1951,13 @@ int EffectManager::AddManagedEffect(const char *Filename, UINT32 refID) {
 
   ManagedEffectRecord *NewEffect = new ManagedEffectRecord();
 
-  if (!NewEffect->LoadEffect(Filename, refID, false) ||
-      !NewEffect->CompileEffect()) {
+  if (!NewEffect->LoadEffect(Filename, refID, false)) {
     delete NewEffect;
     return -1;
   }
+
+  /* you are allowed to fail */
+  NewEffect->CompileEffect();
 
   /* prepare */
   NewEffect->SetPriority(ManagedEffects.size());
@@ -1831,9 +1973,10 @@ int EffectManager::AddManagedEffect(const char *Filename, UINT32 refID) {
   return EffectIndex - 1;
 }
 
-int EffectManager::AddDependentEffect(const char *Filename, UINT32 refID) {
+int EffectManager::AddDependtEffect(const char *Filename, UINT32 refID) {
   EffectRegistry::iterator SEffect = Effects.begin();
 
+  /* search for a any effect */
   while (SEffect != Effects.end()) {
     if (!_stricmp(Filename, SEffect->second->GetName())/*&& ((pEffect->second->ParentRefID & 0xff000000) == (refID & 0xff000000))*/) {
       _MESSAGE("Loading effect that already exists. Returning index of existing effect.");
@@ -1847,11 +1990,13 @@ int EffectManager::AddDependentEffect(const char *Filename, UINT32 refID) {
 
   ManagedEffectRecord *NewEffect = new ManagedEffectRecord();
 
-  if (!NewEffect->LoadEffect(Filename, refID, true) ||
-      !NewEffect->CompileEffect()) {
+  if (!NewEffect->LoadEffect(Filename, refID, true)) {
     delete NewEffect;
     return -1;
   }
+
+  /* you are allowed to fail */
+  NewEffect->CompileEffect();
 
   /* prepare */
   NewEffect->SetPriority(ManagedEffects.size());
@@ -1865,6 +2010,22 @@ int EffectManager::AddDependentEffect(const char *Filename, UINT32 refID) {
   Effects[EffectIndex++] = NewEffect;
 
   return EffectIndex - 1;
+}
+
+int EffectManager::FindEffect(const char *Filename) {
+  EffectRegistry::iterator SEffect = Effects.begin();
+
+  /* search for a non-private effect */
+  while (SEffect != Effects.end()) {
+    if (!SEffect->second->IsPrivate()) {
+      if (!_stricmp(Filename, SEffect->second->GetName()))
+	return SEffect->first;
+    }
+
+    SEffect++;
+  }
+
+  return -1;
 }
 
 bool EffectManager::ReleaseEffect(int EffectNum) {
@@ -1915,23 +2076,35 @@ void EffectManager::LoadEffectList() {
   FILE *EffectFile;
   char EffectBuffer[260];
   int lastpos;
+  bool enabled;
 
-  if (UseShaderList.data) {
+  if (::UseEffectList.Get()) {
     _MESSAGE("Loading the effects.");
 
-    if (!fopen_s(&EffectFile, ShaderListFile.Get(), "rt")) {
+    if (!fopen_s(&EffectFile, ::EffectListFile.Get(), "rt")) {
       while (!feof(EffectFile)) {
         if (fgets(EffectBuffer, 260, EffectFile)) {
           lastpos = strlen(EffectBuffer) - 1;
+          enabled = true;
 
           if (EffectBuffer[lastpos] == 10 ||
 	      EffectBuffer[lastpos] == 13)
             EffectBuffer[lastpos] = 0;
 
+          if (EffectBuffer[lastpos - 2] == '=') {
+            enabled = (EffectBuffer[lastpos - 1] == '1');
+	    EffectBuffer[lastpos - 2] = 0;
+          }
+
 	  /* TODO: don't count this as ref */
-          int EffectNum = AddManagedEffect(EffectBuffer, 0xFF000000);
-          if (EffectNum != -1)
-            GetEffect(EffectNum)->Enable(true);
+          int EffectNum = AddManagedEffect(EffectBuffer, 0);
+	  if (EffectNum != -1) {
+	    ManagedEffectRecord *pEffect;
+
+	    pEffect = GetEffect(EffectNum);
+            pEffect->Enable(enabled);
+	  //pEffect->ClrRef();
+	  }
         }
       }
 
@@ -1946,29 +2119,33 @@ void EffectManager::LoadEffectList() {
 
 void EffectManager::NewGame() {
   if (PurgeOnNewGame.Get()) {
-    EffectRegistry::iterator pEffect = Effects.begin();
+    /* prevent locking up because other resources have allready been freed */
+    EffectRegistry prevEffects = Effects; Effects.clear();
+    EffectRegistry::iterator Effect = prevEffects.begin();
 
     /* delete terminally */
-    while (pEffect != Effects.end()) {
-      ManagedEffectRecord *OldEffect = pEffect->second;
-      delete OldEffect;
-
-      pEffect++;
+    while (Effect != prevEffects.end()) {
+      delete Effect->second;
+      Effect++;
     }
 
     /* redo everything */
     Reset();
   }
   else {
-    EffectRegistry::iterator pEffect = Effects.begin();
+    EffectRegistry::iterator Effect = Effects.begin();
 
     /* disable and remove all refs */
-    while (pEffect != Effects.end()) {
+    while (Effect != Effects.end()) {
+      /* disable, but have them cached */
+      Effect->second->Enable(false);
+      /* reset to initial state */
+      Effect->second->ApplyCompileDirectives();
       /* TODO ClrRef clears enabled as well, logical, no? */
-      pEffect->second->Enable(false);
-      pEffect->second->ClrRef();
+      Effect->second->ClrRef();
+
       /* delete private shaders I guess */
-      pEffect++;
+      Effect++;
     }
 
     /* redo the conditions */
@@ -2005,15 +2182,20 @@ void EffectManager::SaveGame(OBSESerializationInterface *Interface) {
 	}
 
 	/* locals */
-	const char *Filepath = (*pEffect)->GetPath();
+	const char *Name = (*pEffect)->GetName();
 	const bool Enabled = (*pEffect)->IsEnabled();
 	const UINT32 RefID = (*pEffect)->GetRefID();
 
         Interface->WriteRecord('SNUM', SHADERVERSION, &EffectNum, sizeof(EffectNum));
-        Interface->WriteRecord('SPAT', SHADERVERSION, Filepath, strlen(Filepath) + 1);
+        Interface->WriteRecord('SPAT', SHADERVERSION, Name, strlen(Name) + 1);
         Interface->WriteRecord('SENB', SHADERVERSION, &Enabled, sizeof(Enabled));
         Interface->WriteRecord('SREF', SHADERVERSION, &RefID, sizeof(RefID));
-        (*pEffect)->SaveVars(Interface);
+
+	/* save variables and non-private textures (those that
+	 * have been replaced/changed from the source)
+	 */
+	(*pEffect)->SaveVars(Interface);
+
         Interface->WriteRecord('SEOD', SHADERVERSION, &temp, 1);
       }
     }
@@ -2027,7 +2209,6 @@ void EffectManager::SaveGame(OBSESerializationInterface *Interface) {
 void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
   UInt32 type, version, length;
   int LoadShaderNum;
-  int EffectNum;
   char LoadFilepath[260];
   bool LoadEnabled;
   UInt32 LoadRefID;
@@ -2052,7 +2233,7 @@ void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
       _MESSAGE("pEffect num = %d", LoadShaderNum);
     }
     else {
-      _MESSAGE("Error loading effect list. type!=SNUM");
+      _MESSAGE("Error loading game. type!=SNUM");
       return;
     }
 
@@ -2063,7 +2244,7 @@ void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
       _MESSAGE("Filename = %s", LoadFilepath);
     }
     else {
-      _MESSAGE("Error loading effect list. type!=SPAT");
+      _MESSAGE("Error loading game. type!=SPAT");
       return;
     }
 
@@ -2074,7 +2255,7 @@ void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
       _MESSAGE("Enabled = %d", LoadEnabled);
     }
     else {
-      _MESSAGE("Error loading effect list. type!=SENB");
+      _MESSAGE("Error loading game. type!=SENB");
       return;
     }
 
@@ -2094,11 +2275,21 @@ void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
       }
     }
     else {
-      _MESSAGE("Error loading effect list. type!=SREF");
+      _MESSAGE("Error loading game. type!=SREF");
       return;
     }
 
-    if (InUse && ((EffectNum = AddManagedEffect(LoadFilepath, LoadRefID)) != -1)) {
+    /* the only effects we load here are effect which have been
+     * added by scripts, the effects from the shader-list may have
+     * saved entries, but we ignore them
+     */
+    int EffectNum = -1;
+    if (InUse)
+      EffectNum = AddManagedEffect(LoadFilepath, LoadRefID);
+    else
+      EffectNum = FindEffect(LoadFilepath);
+
+    if (EffectNum != -1) {
       ManagedEffectRecord *NewEffect = GetEffect(EffectNum);
       ID3DXEffect *pEffect = NewEffect->GetEffect();
 
@@ -2110,7 +2301,6 @@ void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
 	      TextureType TextureData;
 
 	      Interface->ReadRecordData(&TextureData, length);
-
 	      NewEffect->SetEffectSamplerTexture(TextureData.Name, TextureData.tex);
 	      _MESSAGE("Texture %s = %d", TextureData.Name, TextureData.tex);
 	      break;
@@ -2118,16 +2308,14 @@ void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
 	      IntType IntData;
 
 	      Interface->ReadRecordData(&IntData, length);
-
-	      pEffect->SetIntArray(IntData.Name, (int *)&IntData.data, IntData.size);
+	      NewEffect->SetEffectConstantI(IntData.Name, (int *)&IntData.data, IntData.size);
 	      _MESSAGE("Int %s = %d(%d)", IntData.Name, IntData.data[0], IntData.size);
 	      break;
 	    case 'SFLT':
 	      FloatType FloatData;
 
 	      Interface->ReadRecordData(&FloatData, length);
-
-	      pEffect->SetFloatArray(FloatData.Name, (float *)&FloatData.data, FloatData.size);
+	      NewEffect->SetEffectConstantF(FloatData.Name, (float *)&FloatData.data, FloatData.size);
 	      _MESSAGE("Float %s = %f(%d)", FloatData.Name, FloatData.data[0], FloatData.size);
 	      break;
 	}
@@ -2224,43 +2412,12 @@ bool EffectManager::GetEffectState(int EffectNum) {
   return false;
 }
 
-void EffectManager::PurgeTexture(IDirect3DBaseTexture9 *texture) {
+void EffectManager::PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum) {
   ManagedEffectList::iterator pEffect = ManagedEffects.begin();
 
   while (pEffect != ManagedEffects.end()) {
-    if (*pEffect) {
-      D3DXEFFECT_DESC Description;
-      ID3DXEffect *DX9Effect;
-
-      DX9Effect = (*pEffect)->GetEffect();
-      DX9Effect->GetDesc(&Description);
-
-      for (int par = 0; par < Description.Parameters; par++) {
-	D3DXHANDLE handle;
-
-	if ((handle = DX9Effect->GetParameter(NULL, par))) {
-	  D3DXPARAMETER_DESC Description;
-
-	  DX9Effect->GetParameterDesc(handle, &Description);
-
-	  if ((Description.Type = D3DXPT_TEXTURE) ||
-	      (Description.Type = D3DXPT_TEXTURE1D) ||
-	      (Description.Type = D3DXPT_TEXTURE2D) ||
-	      (Description.Type = D3DXPT_TEXTURE3D) ||
-	      (Description.Type = D3DXPT_TEXTURECUBE)) {
-	    // NB must set to NULL otherwise strange things happen
-	    IDirect3DBaseTexture9 *ShaderTexture = NULL;
-	    DX9Effect->GetTexture(handle, &ShaderTexture);
-
-	    if (ShaderTexture == texture) {
-	      DX9Effect->SetTexture(handle, NULL);
-
-	      _DMESSAGE("Removing texture %s from effect %s", Description.Name, (*pEffect)->GetPath());
-	    }
-	  }
-	}
-      }
-    }
+    if (*pEffect && (*pEffect)->HasEffect())
+      (*pEffect)->PurgeTexture(texture, TexNum);
 
     pEffect++;
   }
@@ -2291,4 +2448,16 @@ bool EffectManager::CompileSources() {
 
 bool EffectManager::Optimize() {
   return ::Optimize.Get();
+}
+
+const char *EffectManager::EffectDirectory() {
+  return ::EffectDirectory.Get();
+}
+
+const char *EffectManager::EffectListFile() {
+  return ::EffectListFile.Get();
+}
+
+bool EffectManager::UseEffectList() {
+  return ::UseEffectList.Get();
 }
