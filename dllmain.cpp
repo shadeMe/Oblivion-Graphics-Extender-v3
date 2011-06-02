@@ -11,6 +11,11 @@
 #include "EffectManager.h"
 
 void GlobalCleanup() {
+	/* this is strange, none of the destructors has been called
+	 * but we can't free any resources ...
+	 */
+	return;
+
 #ifdef	OBGE_DEVLING
 	DebugWindow::Exit();
 #endif

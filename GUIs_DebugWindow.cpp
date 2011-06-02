@@ -222,7 +222,11 @@ HWND DebugWindow::ControlActiveWindow(HWND org) {
 #include <wx/xy/xyarearenderer.h>
 #include <wx/chart.h>
 #include <wx/chartpanel.h>
+#ifndef	NDEBUG
 #pragma comment(lib,"D:/Development/wxWidgets/additions-more/freechart/lib/vc_lib/wxcode_msw28d_freechart")
+#else
+#pragma comment(lib,"D:/Development/wxWidgets/additions-more/freechart/lib/vc_lib/wxcode_msw28_freechart")
+#endif
 #endif
 
 #include "EffectManager.h"
@@ -2217,8 +2221,8 @@ public:
 	if (surfaceTexture[pSurface]->map->Usage & D3DUSAGE_AUTOGENMIPMAP) {
 	  int v = surfaceTexture[pSurface]->tex->GetLevelCount();
 	  int l = 0, s = (VDesc.Width < VDesc.Height ? VDesc.Width : VDesc.Height);
-	  while ((s << 1) >= 1)
-	    s <<= 1, l++;
+	  while ((s >> 1) >= 1)
+	    s >>= 1, l++;
 
 	  sprintf(buf, "%s, AutoMip %d levels", buf, l);
 	}
@@ -2529,7 +2533,10 @@ public:
 	      const char *fmt = GetViewStatus(p, scene, NULL, true);
 
 	      /* info with pass-id */
-	      sprintf(buf, "Pass %d, scene %d%s", p, scene, fmt);
+	      if (t->frame_name[scene])
+		sprintf(buf, "Pass %d, Scene %d%s: %s", p, scene, fmt, t->frame_name[scene]);
+	      else
+		sprintf(buf, "Pass %d, Scene %d%s", p, scene, fmt);
 
 	      SDChoiceScene->Append(wxString(buf));
 	    }
@@ -2548,7 +2555,10 @@ public:
 	    const char *fmt = GetViewStatus(pass, scene, NULL, true);
 
 	    /* info with frame-number */
-	    sprintf(buf, "Scene %d%s [frame %d]", t->frame_pass[scene], fmt, t->frame_used[scene]);
+	    if (t->frame_name[scene])
+	      sprintf(buf, "Scene %d%s [frame %d]: %s", t->frame_pass[scene], fmt, t->frame_used[scene], t->frame_name[scene]);
+	    else
+	      sprintf(buf, "Scene %d%s [frame %d]", t->frame_pass[scene], fmt, t->frame_used[scene]);
 
 	    SDChoiceScene->Append(wxString(buf));
 	  }
@@ -3420,7 +3430,7 @@ public:
 
     if (o) {
       FILE *f;
-      if (!fopen_s(&f, o->GetPath(), "wb"/*"wt"*/)) {
+      if (!fopen_s(&f, o->Filepath, "wb"/*"wt"*/)) {
 	fwrite(ooo, 1, size, f);
 	fclose(f);
 

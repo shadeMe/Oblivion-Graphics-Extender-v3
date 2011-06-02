@@ -11,7 +11,7 @@
 #include "Hooking/detours/detours.h"
 #include "Hooking/D3DX.hpp"
 
-std::map <std::string, IDirect3DBaseTexture9 *> textureFiles;
+std::map<std::string, IDirect3DBaseTexture9 *> textureFiles;
 
 /* ------------------------------------------------------------------------------------------------- */
 

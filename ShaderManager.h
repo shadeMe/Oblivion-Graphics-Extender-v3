@@ -7,6 +7,7 @@
 #include <map>
 #include <list>
 #include <queue>
+#include <string>
 #include <utility>
 
 #include "Nodes/NiVector4.h"
@@ -101,6 +102,16 @@ public:
 	  IDirect3DPixelShader9 *			pDX9PixelShader;
 	  IUnknown *					pDX9ShaderClss;
 	};
+};
+
+struct RuntimeConstant {
+  union mem {
+    bool condition;
+    struct iv { int vec[4]; } integer;
+    struct fv { float vec[4]; } floating;
+    struct tv { D3DSAMPLERSTATETYPE Type; DWORD Value; } state;
+//  IDirect3DBaseTexture9 *texture;
+  } vals;
 };
 
 struct RuntimeVariable {
@@ -202,9 +213,10 @@ public:
 #endif
 };
 
-typedef std::list<RuntimeShaderRecord*> RuntimeShaderList;
-typedef std::list<ShaderRecord*> BuiltInShaderList;
-typedef std::map<IUnknown*, RuntimeShaderRecord*> ShaderList;
+typedef std::list<RuntimeShaderRecord *> RuntimeShaderList;
+typedef std::list<ShaderRecord *> BuiltInShaderList;
+typedef std::map<IUnknown *, RuntimeShaderRecord *> ShaderList;
+typedef std::map<std::string, RuntimeConstant::mem> ConstsList;
 
 struct ShaderConstants
 {
@@ -223,6 +235,15 @@ struct ShaderConstants
 	v1_2_416::NiVector4		SunTiming;
 	v1_2_416::NiVector4		GameTime;
 	v1_2_416::NiVector4		TikTiming;
+};
+
+struct GlobalConstants
+{
+//	ConstsList		pBool;
+	ConstsList		pInt4;
+	ConstsList		pFloat4;
+//	ConstsList		pTexture;
+//	ConstsList		pSampler;
 };
 
 class ShaderManager
@@ -244,6 +265,8 @@ public:
 private:
 	void						Reset();
 public:
+	template<class ReturnType> ReturnType *		GetGlobalConst(const char *Name, int length, ReturnType *vs);
+	template<class ReturnType> bool			SetGlobalConst(const char *Name, int length, ReturnType *vs);
 	void						UpdateFrameConstants();
 
 public:
@@ -269,6 +292,7 @@ private:
 
 public:
 	ShaderConstants					ShaderConst;
+	GlobalConstants					GlobalConst;
 
 public:
 	void UseShaderOverride(bool yes);
@@ -330,6 +354,7 @@ public:
 
 	  int					frame_used[OBGESCENE_NUM];	// upto 256 scenes
 	  int					frame_pass[OBGESCENE_NUM];
+	  const char *                          frame_name[OBGESCENE_NUM];
 #ifdef	OBGE_PROFILE
 	  LARGE_INTEGER				frame_time[OBGESCENE_NUM];
 #endif

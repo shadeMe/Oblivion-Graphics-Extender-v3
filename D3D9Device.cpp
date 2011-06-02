@@ -14,6 +14,7 @@ IDirect3DSurface9 *passSurface[OBGEPASS_NUM];
 IDirect3DSurface9 *passDepth  [OBGEPASS_NUM];
 int                passFrames [OBGEPASS_NUM] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 int                passPasses [OBGEPASS_NUM] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+const char        *passScene;
 
 /* ----------------------------------------------------------------------------- */
 
@@ -791,6 +792,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::EndScene(voi
     if (frame_cntr < OBGESCENE_NUM) {
       m_shaders->trackd[currentPass].frame_used[frame_cntr] = frame_num;
       m_shaders->trackd[currentPass].frame_pass[frame_cntr] = frame_bge;
+      m_shaders->trackd[currentPass].frame_name[frame_cntr] = passScene; passScene = NULL;
 #ifdef	OBGE_PROFILE
       m_shaders->trackd[currentPass].frame_time[frame_cntr].QuadPart = frame_end.QuadPart - frame_bgn.QuadPart;
 #endif

@@ -957,6 +957,10 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectConstants *C
 
   pEffect->End();
 
+#ifdef	OBGE_DEVLING
+  passScene = this->GetName();
+#endif
+
   D3DDevice->EndScene();
 
   Queue->End(pEffect);

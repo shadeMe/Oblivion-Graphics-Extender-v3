@@ -26,6 +26,7 @@ extern IDirect3DSurface9 *passDepth  [OBGEPASS_NUM];
 extern int                passFrames [OBGEPASS_NUM];
 extern int                passPasses [OBGEPASS_NUM];
 extern const char        *passNames  [OBGEPASS_NUM];
+extern const char        *passScene; // named scene
 
 /* ----------------------------------------------------------------------------- */
 

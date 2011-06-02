@@ -77,6 +77,45 @@ static HLSLIncludeManager incl;
 /* #################################################################################################
  */
 
+template<>
+RuntimeVariable::mem::iv *ShaderManager::GetGlobalConst(const char *Name, int length, RuntimeVariable::mem::iv *vs) {
+  assert(length == 1);
+
+  /* no need to check if it exist */
+  return (RuntimeVariable::mem::iv *)&GlobalConst.pInt4[Name].integer;
+}
+
+template<>
+RuntimeVariable::mem::fv *ShaderManager::GetGlobalConst(const char *Name, int length, RuntimeVariable::mem::fv *vs) {
+  assert(length == 1);
+
+  /* no need to check if it exist */
+  return (RuntimeVariable::mem::fv *)&GlobalConst.pFloat4[Name].floating;
+}
+
+template<>
+bool ShaderManager::SetGlobalConst(const char *Name, int length, RuntimeVariable::mem::iv *vs) {
+  assert(length == 1);
+
+  /* no need to check if it exist */
+  memcpy(&GlobalConst.pInt4[Name].integer, vs, sizeof(RuntimeVariable::mem::iv));
+
+  return true;
+}
+
+template<>
+bool ShaderManager::SetGlobalConst(const char *Name, int length, RuntimeVariable::mem::fv *vs) {
+  assert(length == 1);
+
+  /* no need to check if it exist */
+  memcpy(&GlobalConst.pFloat4[Name].floating, vs, sizeof(RuntimeVariable::mem::fv));
+
+  return true;
+}
+
+/* #################################################################################################
+ */
+
 ShaderRecord::ShaderRecord() {
   Filepath[0] = '\0';
   Name[0] = '\0';
@@ -973,6 +1012,7 @@ inline void RuntimeShaderRecord::OnResetDevice(void) {
 void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
   Release();
 
+  ShaderManager *SMan = ShaderManager::GetSingleton();
   TextureManager *TexMan = TextureManager::GetSingleton();
   std::vector<int> prevTextures = Textures; Textures.clear();
 
@@ -1000,10 +1040,12 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 
 	if (cnst.RegisterSet <= 4) {
 	  if ((cnst.Name == strstr(cnst.Name, "cust_")) ||
+	      (cnst.Name == strstr(cnst.Name, "glob_")) ||
 	      (cnst.Name == strstr(cnst.Name, "oblv_")))
 	    lcls[cnst.RegisterSet] += cnst.RegisterCount;
 	  if ((cnst.Name == strstr(cnst.Name, "obge_")) ||
 	      (cnst.Name == strstr(cnst.Name, "oblv_")) ||
+	      (cnst.Name == strstr(cnst.Name, "glob_")) ||
 	      (cnst.Name == strstr(cnst.Name, "cust_")))
 	    nums[cnst.RegisterSet] += 1;
 	}
@@ -1057,6 +1099,7 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	  continue;
 	if ((cnst.Name != strstr(cnst.Name, "obge_")) &&
 	    (cnst.Name != strstr(cnst.Name, "oblv_")) &&
+	    (cnst.Name != strstr(cnst.Name, "glob_")) &&
 	    (cnst.Name != strstr(cnst.Name, "cust_")))
 	  continue;
 
@@ -1069,6 +1112,8 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	    /**/ if (cnst.Name == strstr(cnst.Name, "obge_"))
 	      break;
 	    else if (cnst.Name == strstr(cnst.Name, "oblv_"))
+	      break;
+	    else if (cnst.Name == strstr(cnst.Name, "glob_"))
 	      break;
 	    else if (cnst.Name == strstr(cnst.Name, "cust_")) {
 	      if (cnst.DefaultValue)
@@ -1086,6 +1131,8 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	      break;
 	    else if (cnst.Name == strstr(cnst.Name, "oblv_"))
 	      break;
+	    else if (cnst.Name == strstr(cnst.Name, "glob_"))
+	      pInt4[cnts[D3DXRS_INT4]].vals.integer = SMan->GetGlobalConst(cnst.Name, cnst.RegisterCount, ivs);
 	    else if (cnst.Name == strstr(cnst.Name, "cust_")) {
 	      if (cnst.DefaultValue)
 		memcpy(ivs, cnst.DefaultValue, cnst.RegisterCount * sizeof(int) * 4);
@@ -1129,6 +1176,8 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	      else
 		break;
 	    }
+	    else if (cnst.Name == strstr(cnst.Name, "glob_"))
+	      pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = SMan->GetGlobalConst(cnst.Name, cnst.RegisterCount, fvs);
 	    else if (cnst.Name == strstr(cnst.Name, "cust_")) {
 	      if (cnst.DefaultValue)
 		memcpy(fvs, cnst.DefaultValue, cnst.RegisterCount * sizeof(float) * 4);
@@ -1174,7 +1223,8 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 		break;
 	      }
 	    }
-	    else if (cnst.Name == strstr(cnst.Name, "cust_")) {
+	    else if ((cnst.Name == strstr(cnst.Name, "glob_")) ||
+		     (cnst.Name == strstr(cnst.Name, "cust_"))) {
 	      pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL;
 
 	      /* read and interprete the source and extract optional information */
@@ -1794,7 +1844,11 @@ IDirect3DVertexShader9 *ShaderManager::GetShader(IDirect3DVertexShader9 *Shader)
 bool ShaderManager::SetShaderConstantB(const char *ShaderName, char *name, bool value) {
   RuntimeShaderRecord *pShader;
 
-  if ((pShader = GetRuntimeShader(ShaderName))) {
+/*if (!strcmp(ShaderName, "*")) {
+    char nm[256]; sprintf(nm, "glob_%s", name);
+    return SetGlobalConst(nm, 1, value);
+  }
+  else*/ if ((pShader = GetRuntimeShader(ShaderName))) {
     char nm[256]; sprintf(nm, "cust_%s", name);
     return pShader->SetShaderConstantB(nm, value);
   }
@@ -1805,7 +1859,11 @@ bool ShaderManager::SetShaderConstantB(const char *ShaderName, char *name, bool 
 bool ShaderManager::SetShaderConstantI(const char *ShaderName, char *name, int *values) {
   RuntimeShaderRecord *pShader;
 
-  if ((pShader = GetRuntimeShader(ShaderName))) {
+  if (!strcmp(ShaderName, "*")) {
+    char nm[256]; sprintf(nm, "glob_%s", name);
+    return SetGlobalConst(nm, 1, (RuntimeVariable::mem::iv *)values);
+  }
+  else if ((pShader = GetRuntimeShader(ShaderName))) {
     char nm[256]; sprintf(nm, "cust_%s", name);
     return pShader->SetShaderConstantI(nm, values);
   }
@@ -1816,7 +1874,11 @@ bool ShaderManager::SetShaderConstantI(const char *ShaderName, char *name, int *
 bool ShaderManager::SetShaderConstantF(const char *ShaderName, char *name, float *values) {
   RuntimeShaderRecord *pShader;
 
-  if ((pShader = GetRuntimeShader(ShaderName))) {
+  if (!strcmp(ShaderName, "*")) {
+    char nm[256]; sprintf(nm, "glob_%s", name);
+    return SetGlobalConst(nm, 1, (RuntimeVariable::mem::fv *)values);
+  }
+  else if ((pShader = GetRuntimeShader(ShaderName))) {
     char nm[256]; sprintf(nm, "cust_%s", name);
     return pShader->SetShaderConstantF(nm, values);
   }
@@ -1827,7 +1889,11 @@ bool ShaderManager::SetShaderConstantF(const char *ShaderName, char *name, float
 bool ShaderManager::SetShaderSamplerTexture(const char *ShaderName, char *name, int TextureNum) {
   RuntimeShaderRecord *pShader;
 
-  if ((pShader = GetRuntimeShader(ShaderName))) {
+/*if (!strcmp(ShaderName, "*")) {
+    char nm[256]; sprintf(nm, "glob_%s", name);
+    return SetGlobalConst(nm, 1, (RuntimeVariable::mem::tv *)value);
+  }
+  else*/ if ((pShader = GetRuntimeShader(ShaderName))) {
     char nm[256]; sprintf(nm, "cust_%s", name);
     return pShader->SetShaderSamplerTexture(nm, TextureNum);
   }
