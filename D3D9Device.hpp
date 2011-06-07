@@ -53,6 +53,9 @@ extern int frame_bge;
 #if	defined(OBGE_DEVLING) && defined(OBGE_PROFILE)
 extern LARGE_INTEGER frame_bgn;
 extern LARGE_INTEGER frame_end;
+
+extern bool frame_prf;
+extern bool frame_ntx;
 #endif
 
 extern bool frame_trk;
@@ -245,6 +248,10 @@ private:
 	ShaderManager *m_shaders;
 	RuntimeShaderRecord *m_shadercv;
 	RuntimeShaderRecord *m_shadercp;
+
+#if	defined(OBGE_DEVLING) && defined(OBGE_PROFILE)
+	IDirect3DQuery9* pEvent;
+#endif
 };
 
 #endif

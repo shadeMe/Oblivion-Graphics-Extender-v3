@@ -25,6 +25,7 @@ static global<bool> SaveFix(false, NULL, "Effects", "bNoShadersInMenus");
 static global<bool> Enabled(true, NULL, "General", "bEnabled");
 static global<bool> ExtHDR(false, "Oblivion.ini", "BlurShaderHDR", "bDoHighDynamicRange");
 static global<bool> IntHDR(false, "Oblivion.ini", "BlurShaderHDRInterior", "bDoHighDynamicRange");
+static global<bool> Bloom(false, "Oblivion.ini", "BlurShader", "bUseBlurShader");
 
 static enum OBGEPass previousPass;
 
@@ -67,8 +68,10 @@ OBSEShaderInterface *OBSEShaderInterface::GetSingleton() {
     // as I haven't written a destructor it will fail.
     Singleton->RefCount++;
 
-//  obImageSpaceShaderList->p->AddTail(Singleton);	// put after alllll other effects
-    obImageSpaceShaderList->p->AddHead(Singleton);	// put before allll other effects
+    if (IsPlain())
+      obImageSpaceShaderList->p->AddTail(Singleton);	// put after alllll other effects
+    else
+      obImageSpaceShaderList->p->AddHead(Singleton);	// put before allll other effects
 
     Singleton->InitializeEffects();
     Singleton->ActivateShader = true;
@@ -279,4 +282,12 @@ bool IsEnabled() {
 
 bool IsHDR() {
   return ExtHDR.Get() || IntHDR.Get();
+}
+
+bool IsBloom() {
+  return Bloom.Get();
+}
+
+bool IsPlain() {
+  return !(IsHDR() || IsBloom());
 }

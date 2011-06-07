@@ -100,15 +100,23 @@ static FXIncludeManager incl;
 #define	EFFECTCOND_ISDAY	(1 << 16)
 #define	EFFECTCOND_ISNIGHT	(1 << 17)
 #define	EFFECTCOND_HASREFL	(1 << 24)
-#define	EFFECTCOND_HASMIPS	(1 << 30)	// special one
+#define	EFFECTCOND_HASMIPS	(1 << 27)	// special one
+#define	EFFECTCOND_HASNBUF	(1 << 28)	// special one
+#define	EFFECTCOND_HASPBUF	(1 << 29)	// special one
+#define	EFFECTCOND_HASLBUF	(1 << 30)	// special one
 #define	EFFECTCOND_HASZBUF	(1 << 31)	// special one
 
-#define	EFFECTBUF_COPY		(1 << 28)	// need frame "copy" because the effect surfaces have other format
-#define	EFFECTBUF_PREV		(1 << 29)	// need previous effect "copy"
-#define	EFFECTBUF_PAST		(1 << 30)	// need previous frame "copy"
+#define	EFFECTBUF_COPY		(1 << 25)	// need frame "copy" because the effect surfaces have other format
+#define	EFFECTBUF_PREV		(1 << 26)	// need previous effect "copy"
+#define	EFFECTBUF_PAST		(1 << 27)	// need previous frame "copy"
+#define	EFFECTBUF_NBUF		EFFECTCOND_HASNBUF
+#define	EFFECTBUF_PBUF		EFFECTCOND_HASPBUF
+#define	EFFECTBUF_LBUF		EFFECTCOND_HASLBUF
 #define	EFFECTBUF_ZBUF		EFFECTCOND_HASZBUF
 
 static D3DXMACRO defs[] = {
+  {"IN_RAWZ"	        	, "0"},
+
   {"EFFECTGROUP_FIRST"		, stringify(EFFECTGROUP_FIRST		)},
   {"EFFECTGROUP_PRE"		, stringify(EFFECTGROUP_PRE		)},
   {"EFFECTGROUP_MAIN"		, stringify(EFFECTGROUP_MAIN		)},
@@ -135,6 +143,9 @@ static D3DXMACRO defs[] = {
   {"EFFECTCOND_ISNIGHT"	        , stringify(EFFECTCOND_ISNIGHT	        )},
 
   {"EFFECTCOND_ZBUFFER"		, stringify(EFFECTCOND_HASZBUF		)}, // hm, error
+  {"EFFECTCOND_LBUFFER"		, stringify(EFFECTCOND_HASLBUF		)}, // hm, error
+  {"EFFECTCOND_PBUFFER"		, stringify(EFFECTCOND_HASPBUF		)}, // hm, error
+  {"EFFECTCOND_NBUFFER"		, stringify(EFFECTCOND_HASNBUF		)}, // hm, error
   {"EFFECTCOND_MIPMAPS"		, stringify(EFFECTCOND_HASMIPS		)}, // hm, error
 
   {"D3DFMT_DEFAULT"	        , "0"},		// same format as main-pass surface
@@ -198,7 +209,7 @@ inline HRESULT EffectBuffer::Initialise(D3DFORMAT rt0, D3DFORMAT rt1, D3DFORMAT 
   UInt32 Height = v1_2_416::GetRenderer()->SizeHeight;
   HRESULT hr;
 
-#if	defined(OBGE_AUTOMIPMAP) && 0
+#if	defined(OBGE_AUTOMIPMAP)
 #define EFFECT_USAGE  D3DUSAGE_RENDERTARGET | D3DUSAGE_AUTOGENMIPMAP
 #else
 #define EFFECT_USAGE  D3DUSAGE_RENDERTARGET
@@ -207,21 +218,37 @@ inline HRESULT EffectBuffer::Initialise(D3DFORMAT rt0, D3DFORMAT rt1, D3DFORMAT 
   if (!Tex[0] && (rt0 != D3DFMT_UNKNOWN)) {
     if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, EFFECT_USAGE, rt0, D3DPOOL_DEFAULT, &Tex[0], 0)) == D3D_OK)
       Tex[0]->GetSurfaceLevel(0, &Srf[0]);
+#if	defined(OBGE_AUTOMIPMAP)
+    if (Tex[0] && (AMFilter != D3DTEXF_NONE))
+      Tex[0]->SetAutoGenFilterType(AMFilter);
+#endif
   }
 
   if (!Tex[1] && (rt1 != D3DFMT_UNKNOWN)) {
     if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, EFFECT_USAGE, rt1, D3DPOOL_DEFAULT, &Tex[1], 0)) == D3D_OK)
       Tex[1]->GetSurfaceLevel(0, &Srf[1]);
+#if	defined(OBGE_AUTOMIPMAP)
+    if (Tex[1] && (AMFilter != D3DTEXF_NONE))
+      Tex[1]->SetAutoGenFilterType(AMFilter);
+#endif
   }
 
   if (!Tex[2] && (rt2 != D3DFMT_UNKNOWN)) {
     if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, EFFECT_USAGE, rt2, D3DPOOL_DEFAULT, &Tex[2], 0)) == D3D_OK)
       Tex[2]->GetSurfaceLevel(0, &Srf[2]);
+#if	defined(OBGE_AUTOMIPMAP)
+    if (Tex[2] && (AMFilter != D3DTEXF_NONE))
+      Tex[2]->SetAutoGenFilterType(AMFilter);
+#endif
   }
 
   if (!Tex[3] && (rt3 != D3DFMT_UNKNOWN)) {
     if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, EFFECT_USAGE, rt3, D3DPOOL_DEFAULT, &Tex[3], 0)) == D3D_OK)
       Tex[3]->GetSurfaceLevel(0, &Srf[3]);
+#if	defined(OBGE_AUTOMIPMAP)
+    if (Tex[3] && (AMFilter != D3DTEXF_NONE))
+      Tex[3]->SetAutoGenFilterType(AMFilter);
+#endif
   }
 
   return D3D_OK;
@@ -394,6 +421,7 @@ EffectRecord::EffectRecord() {
   pEffect = NULL;
   pSource = NULL; sourceLen = 0;
   pErrorMsgs = NULL;
+  pDisasmbly = NULL;
 
   Parameters = 0;
   Priority = 0;
@@ -406,6 +434,7 @@ EffectRecord::~EffectRecord() {
   if (pEffect) pEffect->Release();
   if (pSource) delete[] pSource;
   if (pErrorMsgs) pErrorMsgs->Release();
+  if (pDisasmbly) pDisasmbly->Release();
 
   /* release previous texture */
   TextureManager *TexMan = TextureManager::GetSingleton();
@@ -422,12 +451,14 @@ void EffectRecord::Kill() {
   if (pEffect) while (pEffect->Release()) {};
   if (pSource) delete[] pSource;
   if (pErrorMsgs) pErrorMsgs->Release();
+  if (pDisasmbly) pDisasmbly->Release();
 
   this->pDefine = NULL;
   this->pBinary = NULL;
   this->pEffect = NULL;
   this->pSource = NULL;
   this->pErrorMsgs = NULL;
+  this->pDisasmbly = NULL;
 
   this->Name[0] = '\0';
   this->Filepath[0] = '\0';
@@ -522,10 +553,12 @@ bool EffectRecord::RuntimeFlush() {
   if (pBinary) pBinary->Release();
   if (pEffect) pEffect->Release();
   if (pErrorMsgs) pErrorMsgs->Release();
+  if (pDisasmbly) pDisasmbly->Release();
 
   pBinary = NULL;
   pEffect = NULL;
   pErrorMsgs = NULL;
+  pDisasmbly = NULL;
 
   return true;
 }
@@ -588,8 +621,12 @@ bool EffectRecord::CompileEffect(bool forced) {
 
   /* recompile only, if there is one already, just ignore */
   if (!x && src) {
+    if (pDisasmbly)
+    pDisasmbly->Release();
+    pDisasmbly = NULL;
+
     if (pErrorMsgs)
-      pErrorMsgs->Release();
+    pErrorMsgs->Release();
     pErrorMsgs = NULL;
 
     D3DXCreateEffect(
@@ -615,7 +652,7 @@ bool EffectRecord::CompileEffect(bool forced) {
 	GetD3DDevice(),
 	src,
 	len,
-	defs,
+	pDefine,
 	&incl,
 	D3DXSHADER_DEBUG | (
 	D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
@@ -646,8 +683,16 @@ bool EffectRecord::CompileEffect(bool forced) {
   if (save)
     SaveEffect();
 
-  if (x)
+  if (x) {
+    if (!pDisasmbly)
+      D3DXDisassembleEffect(
+        x,
+        FALSE,
+        &pDisasmbly
+      );
+
     ApplyCompileDirectives();
+  }
 
   return (pSource && (pEffect != NULL));
 }
@@ -704,8 +749,8 @@ void EffectRecord::ApplyCompileDirectives() {
 	}
       }
       else if ((Description.Type == D3DXPT_TEXTURE) ||
-	(Description.Type == D3DXPT_TEXTURE1D) ||
-	(Description.Type == D3DXPT_TEXTURE2D)) {
+	       (Description.Type == D3DXPT_TEXTURE1D) ||
+	       (Description.Type == D3DXPT_TEXTURE2D)) {
 	  D3DXHANDLE handle2;
 
 	  if ((handle2 = pEffect->GetAnnotationByName(handle, "filename"))) {
@@ -728,6 +773,10 @@ void EffectRecord::ApplyCompileDirectives() {
 	      Parameters |= EFFECTBUF_ZBUF;
 	    else if (Description.Name == strstr(Description.Name, "oblv_CurrDepthStencilW"))
 	      Parameters |= EFFECTBUF_ZBUF;
+	    else if (Description.Name == strstr(Description.Name, "oblv_CurrLinearDepthZ"))
+	      Parameters |= EFFECTBUF_ZBUF | EFFECTBUF_LBUF;
+	    else if (Description.Name == strstr(Description.Name, "oblv_CurrProjectedXYZD_EFFECTPASS"))
+	      Parameters |= EFFECTBUF_ZBUF | EFFECTBUF_LBUF | EFFECTBUF_PBUF;
 	  }
       }
     }
@@ -837,6 +886,9 @@ void EffectRecord::ApplyCompileDirectives() {
     TexMan->ReleaseTexture(*PTexture);
     PTexture++;
   }
+
+  /* reflect changes in the applicable conditions */
+  EffectManager::GetSingleton()->Recalculate();
 }
 
 inline void EffectRecord::ApplyPermanents(EffectConstants *ConstList, EffectManager *FXMan) {
@@ -849,8 +901,20 @@ inline void EffectRecord::ApplyPermanents(EffectConstants *ConstList, EffectMana
 //pEffect->SetTexture("obge_PrevRendertarget0_EFFECTPASS", FXMan->thisframeTex);
 //pEffect->SetTexture("obge_LastRendertarget0_EFFECTPASS", FXMan->lastpassTex);
 //pEffect->SetTexture("obge_PastRendertarget0_MAINPASS"  , FXMan->lastframeTex);
-  FXMan->CurrDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect); if (FXMan->RenderRawZ)
-  FXMan->OrigDS.SetTexture("oblv_CurrDepthStencilR_MAINPASS", pEffect);
+
+  /* convert WHATEVER to linearized form (CurrDS) */
+  /* convert linearized to unlinearize form (OrigDS) */
+  if (FXMan->RenderLinZ || FXMan->RenderPrjZ) {
+    FXMan->CurrDS.SetTexture("oblv_CurrProjectedXYZD_EFFECTPASS", pEffect);
+    FXMan->CurrDS.SetTexture("oblv_CurrLinearDepthZ_EFFECTPASS", pEffect);
+    FXMan->OrigDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect);
+  }
+  else if (FXMan->RenderRawZ)
+    /* convert linearized to unlinearize form (OrigDS) */
+    FXMan->CurrDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect);
+  else
+    /* convert linearized to unlinearize form (OrigDS) */
+    FXMan->OrigDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect);
 #endif
 
   pEffect->SetVector("oblv_ReciprocalResolution_MAINPASS", &ConstList->rcpres);
@@ -867,6 +931,7 @@ inline void EffectRecord::ApplyConstants(EffectConstants *ConstList) {
   pEffect->SetMatrix("oblv_ViewTransform_MAINPASS", &ConstList->view);
   pEffect->SetMatrix("oblv_ProjectionTransform_MAINPASS", &ConstList->proj);
   pEffect->SetVector("oblv_ProjectionDepthRange_MAINPASS", &ConstList->ZRange);
+  pEffect->SetVector("oblv_ProjectionFoV_MAINPASS", &ConstList->FoV);
   pEffect->SetFloatArray("oblv_CameraForward_MAINPASS", &ConstList->EyeForward.x, 3);
 
   pEffect->SetIntArray("oblv_GameTime", &ConstList->GameTime.x, 4);
@@ -968,7 +1033,7 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectConstants *C
   return true;
 }
 
-inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice) {
+inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectConstants *ConstList) {
   if (!IsEnabled())
     return;
 
@@ -977,6 +1042,9 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice) {
   // Have to do this in case the effect has no vertex effect. The stupid effect system
   // uses the last vertex effect that was active and much strangeness occurs.
   D3DDevice->SetVertexShader(NULL);
+
+  ApplyConstants(ConstList);
+  ApplyDynamics();
 
   UINT pass = 0;
   UINT passes; pEffect->Begin(&passes, NULL);
@@ -1004,6 +1072,10 @@ inline bool EffectRecord::HasEffect() const {
 }
 
 inline void EffectRecord::Enable(bool Enabled) {
+  /* do nothing */
+  if (this->Enabled == Enabled)
+    return;
+
   this->Enabled = Enabled;
 
   /* reflect changes in the applicable conditions */
@@ -1292,7 +1364,10 @@ EffectManager::EffectManager() {
 
   RAWZflag = false;
 #else
+  RenderTransferZ = 0;
   RenderRawZ = false;
+  RenderLinZ = false;
+  RenderPrjZ = false;
   RenderBuf = 0;
   RenderCnd = 0;
   RenderFmt = D3DFMT_UNKNOWN;
@@ -1323,12 +1398,13 @@ EffectManager::~EffectManager() {
   if (IsRAWZ() && depth)
     while (depth->Release()) {};
 #else
-  if (RenderBuf & EFFECTBUF_ZBUF) if (RenderRawZ)
-				  CurrDS.Release();
   if (RenderBuf & EFFECTBUF_COPY) CopyRT.Release();
   if (RenderBuf & EFFECTBUF_PAST) PastRT.Release();
   if (RenderBuf & EFFECTBUF_PREV) PrevRT.Release();
                                   LastRT.Release();
+
+  if (RenderBuf & EFFECTBUF_ZBUF) if (RenderTransferZ)
+				  CurrDS.Release();
 #endif
 }
 
@@ -1354,22 +1430,101 @@ void EffectManager::Reset() {
 }
 
 bool EffectManager::SetRAWZ(bool enabled) {
-  RenderRawZ = enabled;
+  /* nodo */
+  if (RenderRawZ == enabled)
+    return true;
+  /* redo */
+  if ((RenderLinZ || RenderPrjZ) && (RenderRawZ != enabled))
+    CurrDS.Release();
 
-  if (RenderRawZ && !EffectDepth) {
+  if ((RenderRawZ = enabled))
+    *((char *)defs[0].Definition) = '1';
+  else
+    *((char *)defs[0].Definition) = '0';
+
+  if (RenderTransferZ && !EffectDepth) {
     EffectDepth = new EffectRecord();
 
-    if (!EffectDepth->LoadEffect("RAWZfix.fx", 0)) {
+    if (!EffectDepth->LoadEffect("TransferZ.fx", 0) ||
+	!EffectDepth->CompileEffect()) {
       delete EffectDepth;
       EffectDepth = NULL;
 
-      _MESSAGE("ERROR - RAWZfix.fx is missing and required! Please reinstall OBGEv2.2");
+      _MESSAGE("ERROR - TransferZ.fx is missing and required! Please reinstall OBGEv2.2");
       return false;
     }
 
-    EffectDepth->CompileEffect();
+    EffectDepth->Enable(true);
   }
-  else if (!RenderRawZ && EffectDepth) {
+  else if (!RenderTransferZ && EffectDepth) {
+    CurrDS.Release();
+
+    delete EffectDepth;
+    EffectDepth = NULL;
+  }
+
+  return true;
+}
+
+bool EffectManager::SetLinearZ(bool enabled) {
+  /* nodo */
+  if (RenderLinZ == enabled)
+    return true;
+  /* redo */
+  if (RenderLinZ != enabled)
+    CurrDS.Release();
+
+  RenderLinZ = enabled;
+
+  if (RenderTransferZ && !EffectDepth) {
+    EffectDepth = new EffectRecord();
+
+    if (!EffectDepth->LoadEffect("TransferZ.fx", 0) ||
+        !EffectDepth->CompileEffect()) {
+      delete EffectDepth;
+      EffectDepth = NULL;
+
+      _MESSAGE("ERROR - TransferZ.fx is missing and required! Please reinstall OBGEv2.2");
+      return false;
+    }
+
+    EffectDepth->Enable(true);
+  }
+  else if (!RenderTransferZ && EffectDepth) {
+    CurrDS.Release();
+
+    delete EffectDepth;
+    EffectDepth = NULL;
+  }
+
+  return true;
+}
+
+bool EffectManager::SetProjectZ(bool enabled) {
+  /* nodo */
+  if (RenderPrjZ == enabled)
+    return true;
+  /* redo */
+  if (RenderPrjZ != enabled)
+    CurrDS.Release();
+
+  RenderPrjZ = enabled;
+
+  if (RenderTransferZ && !EffectDepth) {
+    EffectDepth = new EffectRecord();
+
+    if (!EffectDepth->LoadEffect("TransferZ.fx", 0) ||
+	!EffectDepth->CompileEffect()) {
+      delete EffectDepth;
+      EffectDepth = NULL;
+
+      _MESSAGE("ERROR - TransferZ.fx is missing and required! Please reinstall OBGEv2.2");
+      return false;
+    }
+
+    EffectDepth->Enable(true);
+  }
+  else if (!RenderTransferZ && EffectDepth) {
     CurrDS.Release();
 
     delete EffectDepth;
@@ -1514,16 +1669,26 @@ void EffectManager::InitialiseFrameTextures() {
     else
       RenderBuf |= (RenderFmt != D3DFMT_A8R8G8B8     ) ? EFFECTBUF_COPY : 0;
 
-    if (RenderBuf & EFFECTBUF_ZBUF)
-      if (!RenderRawZ)		    CurrDS.Initialise(GetDepthBufferTexture());
-      else			    OrigDS.Initialise(GetDepthBufferTexture()),
-	  			    CurrDS.Initialise(bitz == 32 ? D3DFMT_R32F : D3DFMT_R16F);
+    if (RenderBuf & EFFECTBUF_ZBUF) OrigDS.Initialise(GetDepthBufferTexture());
     if (RenderBuf & EFFECTBUF_COPY) CopyRT.Initialise(RenderFmt);
     if (RenderBuf & EFFECTBUF_PAST) PastRT.Initialise(RenderFmt);
     if (RenderBuf & EFFECTBUF_PREV) PrevRT.Initialise(RenderFmt);
 				    LastRT.Initialise(RenderFmt);
-  }
+
+    if (RenderBuf & EFFECTBUF_ZBUF) if (RenderTransferZ)
+      CurrDS.Initialise(
+	RenderPrjZ
+	  ? (bitz == 32 || 1 ? D3DFMT_A32B32G32R32F : D3DFMT_A16B16G16R16)  // linear
+	  :
+	RenderLinZ
+	  ? (bitz == 32 || 1 ? D3DFMT_R32F : D3DFMT_R16F)  // linear
+	  : (bitz == 32 || 1 ? D3DFMT_R32F : D3DFMT_R16F)  // non-linear
+      );
+ }
 #endif
+
+  RenderCnd = (RenderCnd & ~EFFECTCOND_HASZBUF) | (OrigDS.IsValid() || CurrDS.IsValid() ? EFFECTCOND_HASZBUF : 0);
+  RenderCnd = (RenderCnd & ~EFFECTCOND_HASMIPS) | (AMFilter != D3DTEXF_NONE		? EFFECTCOND_HASMIPS : 0);
 }
 
 void EffectManager::ReleaseFrameTextures() {
@@ -1571,11 +1736,12 @@ void EffectManager::ReleaseFrameTextures() {
   }
 #else
   /* over frames */
-  if (RenderBuf & EFFECTBUF_ZBUF) if (RenderRawZ)
-				  CurrDS.Release();
   if (RenderBuf & EFFECTBUF_PAST) PastRT.Release();
   if (RenderBuf & EFFECTBUF_PREV) PrevRT.Release();
 				  LastRT.Release();
+
+  if (RenderBuf & EFFECTBUF_ZBUF) if (RenderTransferZ)
+				  CurrDS.Release();
 #endif
 }
 
@@ -1701,16 +1867,11 @@ void EffectManager::UpdateFrameConstants(v1_2_416::NiDX9Renderer *Renderer) {
 			-(*pMainCamera)->m_worldTranslate.y,
 			-(*pMainCamera)->m_worldTranslate.z);
 
-  EffectConst.view = (D3DXMATRIX)Renderer->m44View;
-  EffectConst.proj = (D3DXMATRIX)Renderer->m44Projection;
+  EffectConst.UpdateView((D3DXMATRIX)Renderer->m44View);
+  EffectConst.UpdateProjection((D3DXMATRIX)Renderer->m44Projection);
 
   CamName = (*pMainCamera)->m_pcName;
   (*pMainCamera)->m_worldRotate.GetForwardVector(&EffectConst.EyeForward);
-
-  EffectConst.ZRange.y = (EffectConst.proj._43 / EffectConst.proj._33);
-  EffectConst.ZRange.x = (EffectConst.proj._33 * EffectConst.ZRange.y) / (EffectConst.proj._33 - 1.0f);
-  EffectConst.ZRange.z = EffectConst.ZRange.x - EffectConst.ZRange.y;
-  EffectConst.ZRange.w = EffectConst.ZRange.x + EffectConst.ZRange.y;
 
   QueryPerformanceCounter(&tick);
 
@@ -1768,8 +1929,6 @@ void EffectManager::UpdateFrameConstants(v1_2_416::NiDX9Renderer *Renderer) {
   RenderCnd = (RenderCnd & ~EFFECTCOND_ISNIGHT) | (!DayTime			    ? EFFECTCOND_ISNIGHT : 0);
   RenderCnd = (RenderCnd & ~EFFECTCOND_HASSUN ) | (!SunHasBenCulled                 ? EFFECTCOND_HASSUN  : 0);
   RenderCnd = (RenderCnd & ~EFFECTCOND_HASREFL) | (passTexture[OBGEPASS_REFLECTION] ? EFFECTCOND_HASREFL : 0);
-  RenderCnd = (RenderCnd & ~EFFECTCOND_HASZBUF) | (CurrDS.IsValid()                 ? EFFECTCOND_HASZBUF : 0);
-  RenderCnd = (RenderCnd & ~EFFECTCOND_HASMIPS) | (AMFilter != D3DTEXF_NONE         ? EFFECTCOND_HASMIPS : 0);
 }
 
 void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo, IDirect3DSurface9 *RenderFrom) {
@@ -1851,11 +2010,38 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
 
   D3DDevice->EndScene();
 
-  if (RenderBuf & EFFECTBUF_ZBUF) if (RenderRawZ) {
-    OrigDS.SetTexture("RAWZdepth", EffectDepth->GetEffect());
+//if (RenderBuf & EFFECTBUF_ZBUF) {
+  if (EffectDepth) {
+    D3DXHANDLE tec;
+
+    OrigDS.SetTexture("zbufferTexture", EffectDepth->GetEffect());
     CurrDS.SetRenderTarget(D3DDevice);
 
-    EffectDepth->Render(D3DDevice);
+    if (RenderLinZ || RenderPrjZ) {
+      /* convert WHATEVER to linearized form (CurrDS) */
+      if (RenderPrjZ)
+	tec = EffectDepth->GetEffect()->GetTechniqueByName("project");
+      else
+	tec = EffectDepth->GetEffect()->GetTechniqueByName("linearize");
+
+      if (RenderRawZ) {
+	EffectDepth->GetEffect()->SetTechnique(tec);
+	EffectDepth->Render(D3DDevice, &EffectConst);
+
+        CurrDS.SetTexture("zbufferTexture", EffectDepth->GetEffect());
+        OrigDS.SetRenderTarget(D3DDevice);
+
+	/* convert linearized to unlinearize form (OrigDS) */
+        tec = EffectDepth->GetEffect()->GetTechniqueByName("unlinearize");
+      }
+    }
+    else if (RenderRawZ) {
+      /* convert WHATEVER to unlinearize form (CurrDS) */
+      tec = EffectDepth->GetEffect()->GetTechniqueByName("copy");
+    }
+
+    EffectDepth->GetEffect()->SetTechnique(tec);
+    EffectDepth->Render(D3DDevice, &EffectConst);
   }
 
   RenderQueue.device = D3DDevice;
@@ -2064,6 +2250,9 @@ void EffectManager::Recalculate() {
       RenderCnd |= (*e)->GetConditions();
     }
   }
+
+  SetLinearZ(!!(RenderBuf & EFFECTBUF_LBUF));
+  SetProjectZ(!!(RenderBuf & EFFECTBUF_PBUF));
 
   /* update the buffers */
   InitialiseFrameTextures();

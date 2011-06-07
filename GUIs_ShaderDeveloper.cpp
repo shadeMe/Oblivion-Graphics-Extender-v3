@@ -76,6 +76,19 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	
 	SDMenubar->Append( SDEffectOptions, wxT("Effects") ); 
 	
+	SDProfileOptions = new wxMenu();
+	wxMenuItem* SDProfileGPU;
+	SDProfileGPU = new wxMenuItem( SDProfileOptions, wxID_PROFILE, wxString( wxT("Profile GPU") ) , wxEmptyString, wxITEM_CHECK );
+	SDProfileOptions->Append( SDProfileGPU );
+	SDProfileGPU->Enable( false );
+	
+	wxMenuItem* SDProfileTex;
+	SDProfileTex = new wxMenuItem( SDProfileOptions, wxID_KILLTEX, wxString( wxT("Remove Texture-accesses") ) , wxEmptyString, wxITEM_CHECK );
+	SDProfileOptions->Append( SDProfileTex );
+	SDProfileTex->Enable( false );
+	
+	SDMenubar->Append( SDProfileOptions, wxT("Effects") ); 
+	
 	this->SetMenuBar( SDMenubar );
 	
 	wxBoxSizer* bSizer1;
@@ -420,6 +433,19 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDEffectErrors->Layout();
 	bSizer91->Fit( SDEffectErrors );
 	SDEffectCodeSwitch->AddPage( SDEffectErrors, wxT("Errors and Warnings"), false );
+	SDEffectDisassembly = new wxPanel( SDEffectCodeSwitch, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
+	wxBoxSizer* bSizer101;
+	bSizer101 = new wxBoxSizer( wxVERTICAL );
+	
+	SDEffectDisassemblyView = new wxTextCtrl( SDEffectDisassembly, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_DONTWRAP|wxTE_MULTILINE|wxTE_NOHIDESEL|wxTE_PROCESS_TAB|wxTE_READONLY|wxTE_RICH|wxTE_RICH2 );
+	SDEffectDisassemblyView->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), 76, 90, 90, false, wxEmptyString ) );
+	
+	bSizer101->Add( SDEffectDisassemblyView, 1, wxALL|wxEXPAND, 5 );
+	
+	SDEffectDisassembly->SetSizer( bSizer101 );
+	SDEffectDisassembly->Layout();
+	bSizer101->Fit( SDEffectDisassembly );
+	SDEffectCodeSwitch->AddPage( SDEffectDisassembly, wxT("Disassembly"), false );
 	
 	bSizer1111->Add( SDEffectCodeSwitch, 1, wxEXPAND | wxALL, 5 );
 	
@@ -809,6 +835,8 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	this->Connect( SDEffectSaveBinary->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
 	this->Connect( SDEffectLegacy->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
 	this->Connect( SDEffectOptimize->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
+	this->Connect( SDProfileGPU->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
+	this->Connect( SDProfileTex->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
 	SDChoicePass->Connect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoRenderpassSwitch ), NULL, this );
 	SDViewSwitch->Connect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxNotebookEventHandler( wxShaderDeveloper::DoViewSwitch ), NULL, this );
 	SDComboShader->Connect( wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderSwitch ), NULL, this );
@@ -867,6 +895,8 @@ wxShaderDeveloper::~wxShaderDeveloper()
 	this->Disconnect( wxID_SAVEBIN, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
 	this->Disconnect( wxID_LEGACY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
 	this->Disconnect( wxID_OPTIMIZE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
+	this->Disconnect( wxID_PROFILE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
+	this->Disconnect( wxID_KILLTEX, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
 	SDChoicePass->Disconnect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoRenderpassSwitch ), NULL, this );
 	SDViewSwitch->Disconnect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxNotebookEventHandler( wxShaderDeveloper::DoViewSwitch ), NULL, this );
 	SDComboShader->Disconnect( wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderSwitch ), NULL, this );

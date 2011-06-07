@@ -296,20 +296,9 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 	obse->RegisterCommand(&kCommandInfo_GetAvailableGraphicsMemory);		// 2100
 	obse->RegisterCommand(&kCommandInfo_GetScreenWidth);				// 2101
 	obse->RegisterCommand(&kCommandInfo_GetScreenHeight);				// 2102
-	obse->RegisterCommand(&kCommandInfo_ForceGraphicsReset);			// 210A
 
-	/* effects -------------------------------------------------------------------- */
-	obse->RegisterCommand(&kCommandInfo_LoadEffect);				// 2103
-	obse->RegisterCommand(&kCommandInfo_EnableEffect);				// 2104
-	obse->RegisterCommand(&kCommandInfo_DisableEffect);				// 2105
-	obse->RegisterCommand(&kCommandInfo_ReleaseEffect);				// 2105
-	obse->RegisterCommand(&kCommandInfo_SetEffectConstantB);			// 2106
-	obse->RegisterCommand(&kCommandInfo_SetEffectConstantI);			// 2106
-	obse->RegisterCommand(&kCommandInfo_SetEffectConstantF);			// 2106
-	obse->RegisterCommand(&kCommandInfo_SetEffectConstantV);			// 2106
-	obse->RegisterCommand(&kCommandInfo_SetEffectSamplerTexture);			// 2106
-	obse->RegisterCommand(&kCommandInfo_IsEffectEnabled);				// 2114
 #ifndef	NO_DEPRECATED
+	/* effects -------------------------------------------------------------------- */
 	obse->RegisterCommand(&kCommandInfo_LoadShader);				// 2103
 	obse->RegisterCommand(&kCommandInfo_ApplyFullscreenShader);			// 2104
 	obse->RegisterCommand(&kCommandInfo_RemoveFullscreenShader);			// 2105
@@ -317,24 +306,13 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 	obse->RegisterCommand(&kCommandInfo_SetShaderFloat);				// 2107
 	obse->RegisterCommand(&kCommandInfo_SetShaderVector);				// 2108
 	obse->RegisterCommand(&kCommandInfo_SetShaderTexture);				// 2109
-	obse->RegisterCommand(&kCommandInfo_IsShaderEnabled);				// 2114
 #endif
 
-	/* shaders -------------------------------------------------------------------- */
-	obse->RegisterCommand(&kCommandInfo_SetShaderConstantB);			// 2106
-	obse->RegisterCommand(&kCommandInfo_SetShaderConstantI);			// 2106
-	obse->RegisterCommand(&kCommandInfo_SetShaderConstantF);			// 2106
-	obse->RegisterCommand(&kCommandInfo_SetShaderSamplerTexture);			// 2106
+	obse->RegisterCommand(&kCommandInfo_ForceGraphicsReset);			// 210A
 
 	/* textures ------------------------------------------------------------------- */
 	obse->RegisterCommand(&kCommandInfo_LoadTexture);				// 210B
-	obse->RegisterCommand(&kCommandInfo_LoadCubeTexture);				// 210C
-	obse->RegisterCommand(&kCommandInfo_LoadVolumeTexture);				// 210D
-	obse->RegisterCommand(&kCommandInfo_ReleaseTexture);				// 210E
-	obse->RegisterCommand(&kCommandInfo_PurgeManagedTextures);			// 2110
-#ifndef	NO_DEPRECATED
-	obse->RegisterCommand(&kCommandInfo_FreeTexture);				// 210F
-#endif
+	obse->RegisterCommand(&kCommandInfo_FreeTexture);				// 210C
 
 	/* hud ------------------------------------------------------------------------ */
 	obse->RegisterCommand(&kCommandInfo_CreateHUDElement);				// 210D
@@ -344,13 +322,42 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 	obse->RegisterCommand(&kCommandInfo_SetHUDElementScale);			// 2111
 	obse->RegisterCommand(&kCommandInfo_SetHUDElementRotation);			// 2112
 
-	/* dev ------------------------------------------------------------------------ */
-#ifdef	OBGE_LOGGING
-	obse->RegisterCommand(&kCommandInfo_DumpFrameScript);				// 2115
-	obse->RegisterCommand(&kCommandInfo_DumpFrameSurfaces);				// 2116
+	/* textures ------------------------------------------------------------------- */
+	obse->RegisterCommand(&kCommandInfo_PurgeManagedTextures);			// 2113
+#ifndef	NO_DEPRECATED
+	obse->RegisterCommand(&kCommandInfo_IsShaderEnabled);				// 2114
 #endif
+
+	/* textures ------------------------------------------------------------------- */
+	obse->RegisterCommand(&kCommandInfo_LoadCubeTexture);				// 2115
+	obse->RegisterCommand(&kCommandInfo_LoadVolumeTexture);				// 2116
+	obse->RegisterCommand(&kCommandInfo_ReleaseTexture);				// 2117
+
+	/* effects -------------------------------------------------------------------- */
+	obse->RegisterCommand(&kCommandInfo_LoadEffect);				// 2118
+	obse->RegisterCommand(&kCommandInfo_EnableEffect);				// 2119
+	obse->RegisterCommand(&kCommandInfo_DisableEffect);				// 211A
+	obse->RegisterCommand(&kCommandInfo_ReleaseEffect);				// 211B
+	obse->RegisterCommand(&kCommandInfo_SetEffectConstantB);			// 211C
+	obse->RegisterCommand(&kCommandInfo_SetEffectConstantI);			// 211D
+	obse->RegisterCommand(&kCommandInfo_SetEffectConstantF);			// 211E
+	obse->RegisterCommand(&kCommandInfo_SetEffectConstantV);			// 211F
+	obse->RegisterCommand(&kCommandInfo_SetEffectSamplerTexture);			// 2120
+	obse->RegisterCommand(&kCommandInfo_IsEffectEnabled);				// 2121
+
+	/* shaders -------------------------------------------------------------------- */
+	obse->RegisterCommand(&kCommandInfo_SetShaderConstantB);			// 2122
+	obse->RegisterCommand(&kCommandInfo_SetShaderConstantI);			// 2123
+	obse->RegisterCommand(&kCommandInfo_SetShaderConstantF);			// 2124
+	obse->RegisterCommand(&kCommandInfo_SetShaderSamplerTexture);			// 2125
+
+	/* dev ------------------------------------------------------------------------ */
 #ifdef	OBGE_DEVLING
-	obse->RegisterCommand(&kCommandInfo_OpenShaderDeveloper);			// 2117
+	obse->RegisterCommand(&kCommandInfo_OpenShaderDeveloper);			// 2126
+#endif
+#ifdef	OBGE_LOGGING
+	obse->RegisterCommand(&kCommandInfo_DumpFrameScript);				// 2127
+	obse->RegisterCommand(&kCommandInfo_DumpFrameSurfaces);				// 2128
 #endif
 
 // We don't want to hook the construction set.

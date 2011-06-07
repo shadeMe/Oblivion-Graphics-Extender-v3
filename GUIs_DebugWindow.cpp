@@ -231,6 +231,29 @@ HWND DebugWindow::ControlActiveWindow(HWND org) {
 
 #include "EffectManager.h"
 
+#define RETURN_RGB(r,g,b) (((int)(r * 0xFF) & 0xFF) | ((int)(g * 0xFFFF) & 0xFF00) | ((int)(b * 0xFFFFFF) & 0xFF0000))
+static int POStoRGB(int pos, int max) {
+  // RGB are each returned on [0, 1].
+  float h = (6.0 * pos) / max, s = 1.0, v = 1.0, m, n, f;
+  int i;
+
+  i = floor(h);
+  f = h - i;
+  if ( !(i&1) ) f = 1 - f; // if i is even
+  m = v * (1 - s);
+  n = v * (1 - s * f);
+  switch (i) {
+		  case 6:
+		  case 0: return RETURN_RGB(v, n, m);
+		  case 1: return RETURN_RGB(n, v, m);
+		  case 2: return RETURN_RGB(m, v, n);
+		  case 3: return RETURN_RGB(m, n, v);
+		  case 4: return RETURN_RGB(n, m, v);
+		  case 5: return RETURN_RGB(v, m, n);
+  } 
+  return 0;
+}
+
 #include "GUIs_ShaderDeveloper.h"
 #include "GUIs_ShaderDeveloper.cpp"
 
@@ -275,19 +298,32 @@ public:
     // first step: create plot
     plot = new XYPlot();
 
-    // set line renderer to dataset
+    // set line renderer to dataset & prevent deletion
 //  rndr = new XYLineStepRenderer();
 //  rndr = new XYLineRenderer();
-    rndr = new XYAreaRenderer();
+    rndrP = new XYAreaRenderer(); rndrP->AddRef();
+    rndrS = new XYAreaRenderer(); rndrS->AddRef();
 
     // create dataset
-    hist[OBGEPASS_ANY].dset = new XYDynamicDataset();
-
+    vset = new XYDynamicDataset();
+    vset->AddRef();
+  
     // set line renderer to dataset
-    hist[OBGEPASS_ANY].dset->SetRenderer(rndr);
+    vset->SetRenderer(rndrP);
 
     // add our dataset to plot
-    plot->AddDataset(hist[OBGEPASS_ANY].dset);
+    plot->AddDataset(vset);
+
+    for (int p = OBGEPASS_NUM - 1; p >= 0; p--) {
+      // create dataset
+      hist[p].dset = new XYDynamicDataset();
+      hist[p].dset->AddRef();
+
+      // set line renderer to dataset
+      hist[p].dset->SetRenderer(rndrS);
+    }
+
+    aset = NULL;
 
     // create left and bottom number axes
     leftAxis = new NumberAxis(AXIS_LEFT);
@@ -304,7 +340,7 @@ public:
     // link axes and dataset
     plot->LinkDataVerticalAxis(0, 0);
     plot->LinkDataHorizontalAxis(0, 0);
-
+ 
     // set legend to plot
     plot->SetLegend(new Legend(wxTOP, wxLEFT));
 
@@ -315,14 +351,14 @@ public:
     st = new wxChartPanel(SDStatsView, wxID_ANY, chrt, wxPoint(0,0), wxSize(256, 256));
     st->SetAntialias(true);
 
-    wxBoxSizer* ChartSizer;
     ChartSizer = new wxBoxSizer( wxVERTICAL );
 
     ChartSizer->Add(st, 1, wxEXPAND | wxALL, 0);
     SDStatsView->SetSizer(ChartSizer);
-    SDStatsView->Layout();
+//    SDStatsView->Layout();
     ChartSizer->Fit(SDStatsView);
-    ChartSizer->Layout();
+//    ChartSizer->Layout();
+    SDPanelStatsTop->Layout();
 
     normed = false;
 #endif
@@ -334,14 +370,17 @@ public:
   wxMemoryDC crt, grt, cds, sts;
 #if 1//def OGBE_PROFILE
   NumberAxis *leftAxis, *bottomAxis;
-  XYAreaRenderer *rndr;
+  XYAreaRenderer *rndrP;
+  XYAreaRenderer *rndrS;
   XYPlot *plot;
   Chart *chrt;
   wxChartPanel *st;
+  wxBoxSizer *ChartSizer;
+  XYDynamicDataset *vset, *aset;
 
   bool normed;
   struct history {
-    int hconsm;
+    int hconsm, maxcol;
     XYDynamicDataset *dset;
     XYDynamicSerie *series[OBGESCENE_NUM + 1];
   } hist[OBGEPASS_NUM];
@@ -370,6 +409,11 @@ public:
   /* --------------------------------------------------------------
    */
   IDirect3DSurface9 *FindGrabbedRT(int offs = 0) {
+    if (pass == OBGEPASS_EFFECTS) {
+      if (em && em->CurrDS.Srf[0])
+	return em->CurrDS.Srf[0];
+    }
+
     /* search shader render-targets */
     RuntimeShaderList::iterator RS = sm->RuntimeShaders.begin();
     while (RS != sm->RuntimeShaders.end()) {
@@ -422,28 +466,32 @@ public:
 	  return "Last pass effects-rendertarget copy";
 	if (em->PastRT.IsTexture(tex))
 	  return "Last frame effects-rendertarget copy";
+	if (em->OrigDS.IsTexture(tex))
+	  return "Incoming effects-zbuffer";
+	if (em->CurrDS.IsTexture(tex))
+	  return "Converted effects-zbuffer";
       }
 
       /* search shader render-targets */
       RuntimeShaderList::iterator RS = sm->RuntimeShaders.begin();
       while (RS != sm->RuntimeShaders.end()) {
-	if ((*RS)->pTextRT && (*((*RS)->pTextRT) == tex)) {
+	if ((*RS)->pTextRT == tex) {
 	  if ((*RS)->pAssociate)
-	    sprintf(buf, "%s local rendertarget copy", (*RS)->pAssociate->Name);
+	    sprintf(buf, "%s global rendertarget copy", (*RS)->pAssociate->Name);
 	  else
 	    sprintf(buf, "Unknown shader local rendertarget copy");
 	  return buf;
 	}
 
-	if ((*RS)->pTextDS && (*((*RS)->pTextDS) == tex)) {
+	if ((*RS)->pTextDS == tex) {
 	  if ((*RS)->pAssociate)
-	    sprintf(buf, "%s local depth-stencil copy", (*RS)->pAssociate->Name);
+	    sprintf(buf, "%s global depth-stencil copy", (*RS)->pAssociate->Name);
 	  else
 	    sprintf(buf, "Unknown shader local depth-stencil copy");
 	  return buf;
 	}
 
-	if ((*RS)->pTextDZ && (*((*RS)->pTextDZ) == tex)) {
+	if ((*RS)->pTextDZ == tex) {
 	  if ((*RS)->pAssociate)
 	    sprintf(buf, "%s global depth-stencil", (*RS)->pAssociate->Name);
 	  else
@@ -617,7 +665,11 @@ public:
 
 	      /* non-editable cell */
 	      wxString Description = gt->GetCellValue(pos + x, col - 1);
-	      if ((Description.GetData() == strstr(Description.GetData(), "cust_"))) {
+	      if ((Description.GetData() == strstr(Description.GetData(), "glob_"))) {
+		gt->SetReadOnly(pos + x, col, false);
+		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ));
+	      }
+	      else if ((Description.GetData() == strstr(Description.GetData(), "cust_"))) {
 		gt->SetReadOnly(pos + x, col, false);
 		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ));
 	      }
@@ -645,7 +697,11 @@ public:
 
 	      /* non-editable cell */
 	      wxString Description = gt->GetCellValue(pos + x, col - 1);
-	      if ((Description.GetData() == strstr(Description.GetData(), "cust_"))) {
+	      if ((Description.GetData() == strstr(Description.GetData(), "glob_"))) {
+		gt->SetReadOnly(pos + x, col, false);
+		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ));
+	      }
+	      else if ((Description.GetData() == strstr(Description.GetData(), "cust_"))) {
 		gt->SetReadOnly(pos + x, col, false);
 		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ));
 	      }
@@ -672,7 +728,11 @@ public:
 
 	      /* non-editable cell */
 	      wxString Description = gt->GetCellValue(pos + x, col - 1);
-	      if ((Description.GetData() == strstr(Description.GetData(), "cust_"))) {
+	      if ((Description.GetData() == strstr(Description.GetData(), "glob_"))) {
+		gt->SetReadOnly(pos + x, col, false);
+		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ));
+	      }
+	      else if ((Description.GetData() == strstr(Description.GetData(), "cust_"))) {
 		gt->SetReadOnly(pos + x, col, false);
 		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ));
 	      }
@@ -718,7 +778,11 @@ public:
 
 	      /* non-editable cell */
 	      wxString Description = gt->GetCellValue(pos + x, col - 1);
-	      if ((Description.GetData() == strstr(Description.GetData(), "cust_"))) {
+	      if ((Description.GetData() == strstr(Description.GetData(), "glob_"))) {
+		gt->SetReadOnly(pos + x, col, false);
+		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ));
+	      }
+	      else if ((Description.GetData() == strstr(Description.GetData(), "cust_"))) {
 		gt->SetReadOnly(pos + x, col, false);
 		gt->SetCellBackgroundColour(pos + x, col + 0, wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ));
 	      }
@@ -2009,6 +2073,16 @@ public:
       UpdateEffectText(SDEffectErrorView, "");
     }
 
+    /* Disassembly is only deactivated */
+    if (o && o->pDisasmbly) {
+      SDEffectDisassemblyView->Enable();
+      UpdateEffectText(SDEffectDisassemblyView, (char *)o->pDisasmbly->GetBufferPointer());
+    }
+    else {
+      SDEffectDisassemblyView->Disable();
+      UpdateEffectText(SDEffectDisassemblyView, "");
+    }
+
 #if 0
     SDEffectSourceEditor->ShowPosition(epos);
 
@@ -2305,19 +2379,21 @@ public:
     }
 
     if ((hist[pass].hconsm != sm->frame_capt) || forced) {
+      char buf[256];
       LARGE_INTEGER freq;
       QueryPerformanceFrequency(&freq);
 
       /* cap shifting-in new data to OBGESCENE_NUM */
       int toadd = sm->frame_capt - hist[pass].hconsm;
-      if (toadd > OBGESCENE_NUM)
-	toadd = OBGESCENE_NUM;
+      if (toadd > OBGEFRAME_NUM)
+	toadd = OBGEFRAME_NUM;
       hist[pass].hconsm = sm->frame_capt - toadd;
 
       if (pass == OBGEPASS_ANY) {
 	XYDynamicSerie *serie;
 
 	/* start updating */
+	vset->BeginUpdate();
 	hist[pass].dset->BeginUpdate();
 
 	/* loop over passes */
@@ -2332,36 +2408,36 @@ public:
 	      serie->SetName(wxString(passNames[p]));
 
 	    hist[pass].dset->AddSerie(serie);
-	    hist[pass].series[p] = serie; int s =
+	    hist[pass].series[p] = serie; int c =
 	    hist[pass].dset->GetSerieCount() - 1;
 
 	    switch(p) {
 	      case OBGEPASS_REFLECTION:
-		rndr->SetSerieColour(s, new wxColour(0x00EFEFFFUL)); break;
+		rndrP->SetSerieColour(c, new wxColour(0x0090E000UL)); break;
 	      case OBGEPASS_WATER:
-		rndr->SetSerieColour(s, new wxColour(0x00FF0000UL)); break;
+		rndrP->SetSerieColour(c, new wxColour(0x00FF0000UL)); break;
 	      case OBGEPASS_WATERHEIGHTMAP:
-		rndr->SetSerieColour(s, new wxColour(0x007F7F7FUL)); break;
+		rndrP->SetSerieColour(c, new wxColour(0x007F7F7FUL)); break;
 	      case OBGEPASS_WATERDISPLACEMENT:
-		rndr->SetSerieColour(s, new wxColour(0x00007F7FUL)); break;
+		rndrP->SetSerieColour(c, new wxColour(0x00007F9FUL)); break;
 	      case OBGEPASS_SHADOW:
-		rndr->SetSerieColour(s, new wxColour(0x00010101UL)); break;
+		rndrP->SetSerieColour(c, new wxColour(0x00010101UL)); break;
 	      case OBGEPASS_MAIN:
-		rndr->SetSerieColour(s, new wxColour(0x00FFFF7FUL)); break;
+		rndrP->SetSerieColour(c, new wxColour(0x0010C000UL)); break;
 	      case OBGEPASS_EFFECTS:
-		rndr->SetSerieColour(s, new wxColour(0x00FF7FFFUL)); break;
+		rndrP->SetSerieColour(c, new wxColour(0x00E09000UL)); break;
 	      case OBGEPASS_HDR:
-		rndr->SetSerieColour(s, new wxColour(0x00FFEFDFUL)); break;
+		rndrP->SetSerieColour(c, new wxColour(0x00F0E000UL)); break;
 	      case OBGEPASS_POST:
-		rndr->SetSerieColour(s, new wxColour(0x00CFCFCFUL)); break;
+		rndrP->SetSerieColour(c, new wxColour(0x00CFCFCFUL)); break;
 
 	      case OBGEPASS_VIDEO:
-		rndr->SetSerieColour(s, new wxColour(0x00CFCFCFUL)); break;
+		rndrP->SetSerieColour(c, new wxColour(0x00CFCFCFUL)); break;
 	      case OBGEPASS_UNKNOWN:
-		rndr->SetSerieColour(s, new wxColour(0x00CFCFCFUL)); break;
+		rndrP->SetSerieColour(c, new wxColour(0x00CFCFCFUL)); break;
 
 	      case OBGEPASS_NUM:
-		rndr->SetSerieColour(s, new wxColour(0x00FFFFFFUL)); break;
+		rndrP->SetSerieColour(c, new wxColour(0x00FFFFFFUL)); break;
 	    }
 	  }
 	}
@@ -2370,8 +2446,8 @@ public:
 	for (int p = OBGEPASS_NUM; p > 0; p--) {
 	  serie = hist[pass].series[p];
 
-	  /* cap the number of resulting data to OBGESCENE_NUM */
-	  int tokll = (serie->GetCount() + toadd) - OBGESCENE_NUM;
+	  /* cap the number of resulting data to OBGEFRAME_NUM */
+	  int tokll = (serie->GetCount() + toadd) - OBGEFRAME_NUM;
 	  if (tokll < 0)
 	    tokll = 0;
 	  if (tokll > serie->GetCount())
@@ -2380,11 +2456,15 @@ public:
 	    serie->Remove(0, tokll);
 	}
 
-	LARGE_INTEGER xbase; int xmul;
+	LARGE_INTEGER xbase; int xmul; int smth = 0;
 	LARGE_INTEGER fsum; fsum.QuadPart = 0;
 	LARGE_INTEGER csum; csum.QuadPart = 0;
 	for (int h = hist[pass].hconsm; h < sm->frame_capt; h++) {
 	  int frame_wrp = h % OBGEFRAME_NUM;
+
+	  /* we assume this is wrong ... */
+	  if (sm->trackh[frame_wrp].frame_totl.QuadPart > freq.QuadPart)
+	    continue;
 
 	  /* define renormalization ranged */
 	  if (!normed)
@@ -2410,9 +2490,14 @@ public:
 	  }
 
 	  /* total frame-time incl. code */
-	  fsum.QuadPart = fsum.QuadPart + tsum.QuadPart;
+	  if (sm->trackh[frame_wrp].frame_totl.QuadPart < freq.QuadPart) {
+	    smth++; /* take out frames that took more than a second */
+
+	    fsum.QuadPart = fsum.QuadPart + tsum.QuadPart;
+	    csum.QuadPart = csum.QuadPart + sm->trackh[frame_wrp].frame_totl.QuadPart;
+	  }
+
 	  tsum.QuadPart = sm->trackh[frame_wrp].frame_totl.QuadPart;
-	  csum.QuadPart = csum.QuadPart + tsum.QuadPart;
 
 	  serie = hist[pass].series[OBGEPASS_NUM];
 	  serie->AddXY(h, (double)(tsum.QuadPart * xmul) / xbase.QuadPart);
@@ -2420,9 +2505,7 @@ public:
 
 	/* start updating */
 	hist[pass].dset->EndUpdate();
-
-	char buf[256];
-	int smth = sm->frame_capt - hist[pass].hconsm;
+	vset->EndUpdate();
 
 	double fps = (double)freq.QuadPart / (fsum.QuadPart / smth);
 	double prc = (100.0 * fsum.QuadPart) / csum.QuadPart;
@@ -2432,11 +2515,151 @@ public:
 	SDStatusStats->SetLabel(buf);
       }
       else {
+	XYDynamicSerie *serie;
+
+	/* start updating */
+	vset->BeginUpdate();
+	hist[pass].dset->BeginUpdate();
+
+	/* determine till where to go */
+	int OBGESCENE_CNT = 0;
+	for (int h = hist[pass].hconsm; h < sm->frame_capt; h++) {
+	  int frame_wrp = h % OBGEFRAME_NUM;
+	  if (OBGESCENE_CNT < sm->trackh[frame_wrp].trackd[pass].frame_cntr)
+	    OBGESCENE_CNT = sm->trackh[frame_wrp].trackd[pass].frame_cntr;
+	}
+
+	if (hist[pass].maxcol < OBGESCENE_CNT)
+	  hist[pass].maxcol = OBGESCENE_CNT;
+
+	/* loop over scenes */
+	for (int s = OBGESCENE_CNT/* - 1*/; s >= 0; s--) {
+	  if (!(serie = hist[pass].series[s])) {
+	    serie = new XYDynamicSerie();
+
+	    hist[pass].dset->AddSerie(serie);
+	    hist[pass].series[s] = serie; int c =
+	    hist[pass].dset->GetSerieCount() - 1;
+	  }
+
+	  int col = POStoRGB(s, hist[pass].maxcol);
+	  rndrS->SetSerieColour(s, new wxColour(col));
+
+	  /* if we switch an effect off for example, we have to re-assign names */
+	  if (1) {
+	    if (s == OBGESCENE_CNT)
+	      serie->SetName(wxString("Total"));
+	    else {
+	      /* info with pass-id */
+	      if ((int)sm->trackd[pass].frame_name[s] > 0)
+		sprintf(buf, "Scene %d: %s", s, sm->trackd[pass].frame_name[s]);
+	      else
+		sprintf(buf, "Scene %d", s);
+
+	      serie->SetName(wxString(buf));
+	    }
+	  }
+	}
+
+	/* loop over scenes */
+	for (int s = OBGESCENE_CNT/* - 1*/; s >= 0; s--) {
+	  serie = hist[pass].series[s];
+
+	  /* cap the number of resulting data to OBGEFRAME_NUM */
+	  int tokll = (serie->GetCount() + toadd) - OBGEFRAME_NUM;
+	  if (tokll < 0)
+	    tokll = 0;
+	  if (tokll > serie->GetCount())
+	    tokll = serie->GetCount();
+	  if (tokll > 0)
+	    serie->Remove(0, tokll);
+	}
+
+	LARGE_INTEGER xbase; int xmul; int smth = 0;
+	LARGE_INTEGER fsum; fsum.QuadPart = 0;
+	LARGE_INTEGER csum; csum.QuadPart = 0;
+	for (int h = hist[pass].hconsm; h < sm->frame_capt; h++) {
+	  int frame_wrp = h % OBGEFRAME_NUM;
+
+	  /* we assume this is wrong ... */
+	  if (sm->trackh[frame_wrp].frame_totl.QuadPart > freq.QuadPart)
+	    continue;
+
+	  /* loop over scenes */
+	  LARGE_INTEGER totl; totl.QuadPart = 0;
+	  for (int s = 0; s < sm->trackh[frame_wrp].trackd[pass].frame_cntr; s++)
+	    totl.QuadPart += sm->trackh[frame_wrp].trackd[pass].frame_hist[s].QuadPart;
+
+	  /* define renormalization ranged */
+	  if (!normed)
+	    xmul = 1000, xbase.QuadPart = freq.QuadPart;
+	  else
+	    xmul =  100, xbase.QuadPart = totl.QuadPart;
+
+	  LARGE_INTEGER tsum; tsum.QuadPart = 0;
+	  /* loop over scenes */
+	  for (int s = 0; s < sm->trackh[frame_wrp].trackd[pass].frame_cntr; s++) {
+
+	    LARGE_INTEGER psum; psum.QuadPart = 0;
+	    psum.QuadPart += sm->trackh[frame_wrp].trackd[pass].frame_hist[s].QuadPart;
+
+	    /* sum up times */
+	    tsum.QuadPart += psum.QuadPart;
+
+	    serie = hist[pass].series[s];
+	    serie->AddXY(h, (double)(tsum.QuadPart * xmul) / xbase.QuadPart);
+	  }
+
+	  /* total frame-time incl. code */
+	  if (sm->trackh[frame_wrp].frame_totl.QuadPart < freq.QuadPart) {
+	    smth++; /* take out frames that took more than a second */
+
+	    fsum.QuadPart = fsum.QuadPart + tsum.QuadPart;
+	    csum.QuadPart = csum.QuadPart + sm->trackh[frame_wrp].frame_totl.QuadPart;
+	  }
+
+	  tsum.QuadPart = totl.QuadPart;
+
+	  serie = hist[pass].series[OBGESCENE_CNT];
+	  serie->AddXY(h, (double)(tsum.QuadPart * xmul) / xbase.QuadPart);
+	}
+
+	/* loop over scenes */
+	for (int s = OBGESCENE_CNT/* - 1*/; s >= 0; s--) {
+	  serie = hist[pass].series[s];
+
+	  if (serie->GetCount() == 0)
+	    serie->AddXY(hist[pass].hconsm % OBGEFRAME_NUM, 0);
+	}
+
+	/* start updating */
+	hist[pass].dset->EndUpdate();
+	vset->EndUpdate();
+
+	double fps = (double)freq.QuadPart / (fsum.QuadPart / smth);
+	double prc = (100.0 * fsum.QuadPart) / csum.QuadPart;
+
+	sprintf(buf, "Global: %f FPS, %f%% frame-time", (float)fps, (float)prc);
+
+	SDStatusStats->SetLabel(buf);
       }
 
       hist[pass].hconsm = sm->frame_capt;
     //st->ChartChanged(chrt);
     //st->SetChart(chrt);
+    }
+
+    /* replace active dataset */
+    if (aset != hist[pass].dset) {
+      vset->BeginUpdate();
+
+      if (pass == OBGEPASS_ANY)
+	vset->SetRenderer(rndrP);
+      else
+	vset->SetRenderer(rndrS);
+
+      vset->TakeoverSeries(aset = hist[pass].dset);
+      vset->EndUpdate();
     }
   }
 
@@ -2828,14 +3051,14 @@ public:
     sm = NULL;
     if ((sm = ShaderManager::GetSingleton())) {
       wxMenuItem *mi;
-
-      mi = SDShaderOptions->FindChildItem(wxID_COMPILE, NULL); mi->Check(sm->CompileSources());
-      mi = SDShaderOptions->FindChildItem(wxID_SAVEBIN, NULL); mi->Check(sm->SaveShaderOverride());
-      mi = SDShaderOptions->FindChildItem(wxID_LEGACY, NULL); mi->Check(sm->UseLegacyCompiler());
+ 
+      mi = SDShaderOptions->FindChildItem(wxID_COMPILE,  NULL); mi->Check(sm->CompileSources());
+      mi = SDShaderOptions->FindChildItem(wxID_SAVEBIN,  NULL); mi->Check(sm->SaveShaderOverride());
+      mi = SDShaderOptions->FindChildItem(wxID_LEGACY,   NULL); mi->Check(sm->UseLegacyCompiler());
       mi = SDShaderOptions->FindChildItem(wxID_OPTIMIZE, NULL); mi->Check(sm->Optimize());
-      mi = SDShaderOptions->FindChildItem(wxID_MAXIMUM, NULL); mi->Check(sm->MaximumSM());
-      mi = SDShaderOptions->FindChildItem(wxID_UPGRADE, NULL); mi->Check(sm->UpgradeSM());
-      mi = SDShaderOptions->FindChildItem(wxID_RUNTIME, NULL); mi->Check(sm->RuntimeSources());
+      mi = SDShaderOptions->FindChildItem(wxID_MAXIMUM,  NULL); mi->Check(sm->MaximumSM());
+      mi = SDShaderOptions->FindChildItem(wxID_UPGRADE,  NULL); mi->Check(sm->UpgradeSM());
+      mi = SDShaderOptions->FindChildItem(wxID_RUNTIME,  NULL); mi->Check(sm->RuntimeSources());
     }
 
     /* options have changed since last activation */
@@ -2843,11 +3066,20 @@ public:
     if ((em = EffectManager::GetSingleton())) {
       wxMenuItem *mi;
 
-      mi = SDEffectOptions->FindChildItem(wxID_COMPILE, NULL); mi->Check(em->CompileSources());
-//    mi = SDEffectOptions->FindChildItem(wxID_SAVEBIN, NULL); mi->Check(em->SaveEffectOverride());
-      mi = SDEffectOptions->FindChildItem(wxID_LEGACY, NULL); mi->Check(em->UseLegacyCompiler());
+      mi = SDEffectOptions->FindChildItem(wxID_COMPILE,  NULL); mi->Check(em->CompileSources());
+//    mi = SDEffectOptions->FindChildItem(wxID_SAVEBIN,  NULL); mi->Check(em->SaveEffectOverride());
+      mi = SDEffectOptions->FindChildItem(wxID_LEGACY,   NULL); mi->Check(em->UseLegacyCompiler());
       mi = SDEffectOptions->FindChildItem(wxID_OPTIMIZE, NULL); mi->Check(em->Optimize());
     }
+
+#if 1//def OGBE_PROFILE
+    if (1) {
+      wxMenuItem *mi;
+
+      mi = SDProfileOptions->FindChildItem(wxID_PROFILE, NULL); mi->Enable(true);
+      mi = SDProfileOptions->FindChildItem(wxID_KILLTEX, NULL); mi->Enable(true);
+    }
+#endif
 
     /* renderpasses might have changed since last activation */
     int j = SDChoicePass->GetSelection(), h = 0;
@@ -3081,7 +3313,118 @@ public:
 
   virtual void DoShaderConstantChange(wxGridEvent& event) {
     DoShaderConstantChange();
-    event.Skip();
+
+    wxGrid *gd = SDShaderConstSetGrid;
+    wxString label = gd->GetRowLabelValue(event.GetRow());
+    wxString newvl = gd->GetCellValue(event.GetRow(), event.GetCol());
+    char name[256]; int rw = 0; bool arr = false;
+
+    if (sscanf(label.GetData(), "%s[%d]", name, rw) == 2)
+      arr = true;
+    else if (sscanf(label.GetData(), "%s", name) == 1)
+      arr = false;
+    else
+      return;
+
+    LPD3DXCONSTANTTABLE x = currs->pDX9ShaderCoTa;
+    D3DXHANDLE handle;
+
+    if ((handle = x->GetConstantByName(NULL, name))) {
+      D3DXCONSTANT_DESC Description;
+      UINT count = 1;
+      x->GetConstantDesc(handle, &Description, &count);
+
+      switch (Description.Type) {
+	case D3DXPT_INT:
+	  IntType IntData;
+
+	  IntData.size = Description.Elements;
+	  if (IntData.size == 0)
+	    IntData.size = 1;
+	  IntData.size *= Description.Columns;
+
+//	  x->GetIntArray(handle, (int *)&IntData.data, IntData.size * Description.Rows);
+
+	  switch (Description.Columns) {
+	    case 4:
+	      if (sscanf(newvl, "%g,%g,%g,%g", 
+		    &IntData.data[rw * IntData.size + 0], 
+		    &IntData.data[rw * IntData.size + 1], 
+		    &IntData.data[rw * IntData.size + 2], 
+		    &IntData.data[rw * IntData.size + 3]
+		  ) == 4)
+		break;
+	    case 3:
+	      if (sscanf(newvl, "%g,%g,%g", 
+		    &IntData.data[rw * IntData.size + 0], 
+		    &IntData.data[rw * IntData.size + 1], 
+		    &IntData.data[rw * IntData.size + 2]
+		  ) == 3)
+		break;
+	    case 2:
+	      if (sscanf(newvl, "%g,%g", 
+		    &IntData.data[rw * IntData.size + 0], 
+		    &IntData.data[rw * IntData.size + 1]
+		  ) == 2)
+		break;
+	    case 1:
+	      if (sscanf(newvl, "%g", 
+		    &IntData.data[rw * IntData.size + 0]
+		  ) == 1)
+		break;
+	    default:
+	      break;
+	  }
+
+	  currs->pAssociate->SetShaderConstantI(name, (int *)&IntData.data);
+	  break;
+	case D3DXPT_FLOAT:
+	  FloatType FloatData;
+
+	  FloatData.size = Description.Elements;
+	  if (FloatData.size == 0)
+	    FloatData.size = 1;
+	  FloatData.size *= Description.Columns;
+
+//	  x->GetFloatArray(handle, (float *)&FloatData.data, FloatData.size * Description.Rows);
+
+	  switch (Description.Columns) {
+	    case 4:
+	      if (sscanf(newvl, "%g,%g,%g,%g", 
+		    &FloatData.data[rw * FloatData.size + 0], 
+		    &FloatData.data[rw * FloatData.size + 1], 
+		    &FloatData.data[rw * FloatData.size + 2], 
+		    &FloatData.data[rw * FloatData.size + 3]
+		  ) == 4)
+		break;
+	    case 3:
+	      if (sscanf(newvl, "%g,%g,%g", 
+		    &FloatData.data[rw * FloatData.size + 0], 
+		    &FloatData.data[rw * FloatData.size + 1], 
+		    &FloatData.data[rw * FloatData.size + 2]
+		  ) == 3)
+		break;
+	    case 2:
+	      if (sscanf(newvl, "%g,%g", 
+		&FloatData.data[rw * FloatData.size + 0], 
+		&FloatData.data[rw * FloatData.size + 1]
+	      ) == 2)
+		break;
+	    case 1:
+	      if (sscanf(newvl, "%g", 
+		    &FloatData.data[rw * FloatData.size + 0]
+		  ) == 1)
+		break;
+	    default:
+	      break;
+	  }
+
+	  currs->pAssociate->SetShaderConstantF(name, (float *)&FloatData.data);
+	  break;
+      }
+    }
+
+//  event.Skip();
   }
 
   void DoShaderConstantChange() {
@@ -3121,7 +3464,7 @@ public:
 
   virtual void DoShaderSave(wxCommandEvent& event) {
     DoShaderSave();
-    event.Skip();
+//  event.Skip();
   }
 
   void DoShaderSave() {
@@ -3266,7 +3609,117 @@ public:
 
   virtual void DoEffectConstantChange(wxGridEvent& event) {
     DoEffectConstantChange();
-    event.Skip();
+
+    wxGrid *gd = SDEffectConstSetGrid;
+    wxString label = gd->GetRowLabelValue(event.GetRow());
+    wxString newvl = gd->GetCellValue(event.GetRow(), event.GetCol());
+    char name[256]; int rw = 0; bool arr = false;
+
+    if (sscanf(label.GetData(), "%s[%d]", name, rw) == 2)
+      arr = true;
+    else if (sscanf(label.GetData(), "%s", name) == 1)
+      arr = false;
+    else
+      return;
+
+    ID3DXEffect *x = currx->GetEffect();
+    D3DXHANDLE handle;
+
+    if ((handle = x->GetParameterByName(NULL, name))) {
+      D3DXPARAMETER_DESC Description;
+      x->GetParameterDesc(handle, &Description);
+
+      switch (Description.Type) {
+	case D3DXPT_INT:
+	  IntType IntData;
+
+	  IntData.size = Description.Elements;
+	  if (IntData.size == 0)
+	    IntData.size = 1;
+	  IntData.size *= Description.Columns;
+
+	  x->GetIntArray(handle, (int *)&IntData.data, IntData.size * Description.Rows);
+
+	  switch (Description.Columns) {
+	    case 4:
+	      if (sscanf(newvl, "%g,%g,%g,%g", 
+		    &IntData.data[rw * IntData.size + 0], 
+		    &IntData.data[rw * IntData.size + 1], 
+		    &IntData.data[rw * IntData.size + 2], 
+		    &IntData.data[rw * IntData.size + 3]
+		  ) == 4)
+		break;
+	    case 3:
+	      if (sscanf(newvl, "%g,%g,%g", 
+		    &IntData.data[rw * IntData.size + 0], 
+		    &IntData.data[rw * IntData.size + 1], 
+		    &IntData.data[rw * IntData.size + 2]
+		  ) == 3)
+		break;
+	    case 2:
+	      if (sscanf(newvl, "%g,%g", 
+		    &IntData.data[rw * IntData.size + 0], 
+		    &IntData.data[rw * IntData.size + 1]
+		  ) == 2)
+		break;
+	    case 1:
+	      if (sscanf(newvl, "%g", 
+		    &IntData.data[rw * IntData.size + 0]
+		  ) == 1)
+		break;
+	    default:
+	      break;
+	  }
+
+	  x->SetIntArray(handle, (int *)&IntData.data, IntData.size * Description.Rows);
+	  break;
+	case D3DXPT_FLOAT:
+	  FloatType FloatData;
+
+	  FloatData.size = Description.Elements;
+	  if (FloatData.size == 0)
+	    FloatData.size = 1;
+	  FloatData.size *= Description.Columns;
+
+	  x->GetFloatArray(handle, (float *)&FloatData.data, FloatData.size * Description.Rows);
+
+	  switch (Description.Columns) {
+	    case 4:
+	      if (sscanf(newvl, "%g,%g,%g,%g", 
+		    &FloatData.data[rw * FloatData.size + 0], 
+		    &FloatData.data[rw * FloatData.size + 1], 
+		    &FloatData.data[rw * FloatData.size + 2], 
+		    &FloatData.data[rw * FloatData.size + 3]
+		  ) == 4)
+		break;
+	    case 3:
+	      if (sscanf(newvl, "%g,%g,%g", 
+		    &FloatData.data[rw * FloatData.size + 0], 
+		    &FloatData.data[rw * FloatData.size + 1], 
+		    &FloatData.data[rw * FloatData.size + 2]
+		  ) == 3)
+		break;
+	    case 2:
+	      if (sscanf(newvl, "%g,%g", 
+		    &FloatData.data[rw * FloatData.size + 0], 
+		    &FloatData.data[rw * FloatData.size + 1]
+		  ) == 2)
+		break;
+	    case 1:
+	      if (sscanf(newvl, "%g", 
+		    &FloatData.data[rw * FloatData.size + 0]
+		  ) == 1)
+		break;
+	    default:
+	      break;
+	  }
+
+	  x->SetFloatArray(handle, (float *)&FloatData.data, FloatData.size * Description.Rows);
+	  break;
+      }
+    }
+
+//  event.Skip();
   }
 
   void DoEffectConstantChange() {
@@ -3303,11 +3756,11 @@ public:
 
   void DoEffectAdd() {
     wxFileDialog dlg(
-	this, 
-	_T("Open effect"), 
-	wxT(em->EffectDirectory()), 
+	this,
+	_T("Open effect"),
+	wxT(em->EffectDirectory()),
 	wxEmptyString,
-	_T("Effects file (*.fx)|*.fx"), 
+	_T("Effects file (*.fx)|*.fx"),
 	wxFD_OPEN | wxFD_FILE_MUST_EXIST
     );
 
@@ -3323,9 +3776,9 @@ public:
     int eid = -1;
     if ((eid = em->FindEffect(m_filename)) != -1) {
       wxMessageDialog dlg(
-	this, 
+	this,
 	_T("Effect already exist. Do you want to overwrite it?"),
-	_T("Confirmation"), 
+	_T("Confirmation"),
 	wxYES_NO
 	);
 
@@ -3334,9 +3787,9 @@ public:
     }
     else if (em->UseEffectList()) {
       wxMessageDialog dlg(
-	this, 
+	this,
 	_T("Do you want to add the effect to the shaderlist?"),
-	_T("Confirmation"), 
+	_T("Confirmation"),
 	wxYES_NO
 	);
 
@@ -3417,7 +3870,7 @@ public:
 
   virtual void DoEffectSave(wxCommandEvent& event) {
     DoEffectSave();
-    event.Skip();
+//  event.Skip();
   }
 
   void DoEffectSave() {
@@ -3514,7 +3967,7 @@ public:
       ;
     else //if (SDStatsNormalize->GetValue() == wxCHK_UNCHECKED)
       ;
-    
+
     SetStats(currh, true);
   }
 
@@ -3559,6 +4012,21 @@ public:
       mi = SDEffectOptions->FindChildItem(wxID_LEGACY,   NULL); em->UseLegacyCompiler(mi->IsChecked());
 
       GetEffectRecordStatus(o);
+    }
+
+    event.Skip();
+  }
+
+  virtual void DoProfileOptions(wxCommandEvent& event) {
+
+    /* ------------------------------------------------ */
+//  UpdateProfileOptions();
+
+    if (1) {
+      wxMenuItem *mi;
+
+      mi = SDProfileOptions->FindChildItem(wxID_PROFILE, NULL); frame_prf = mi->IsChecked();
+      mi = SDProfileOptions->FindChildItem(wxID_KILLTEX, NULL); frame_ntx = mi->IsChecked();
     }
 
     event.Skip();

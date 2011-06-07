@@ -38,6 +38,9 @@ int frame_bge = 0;
 #if	defined(OBGE_DEVLING) && defined(OBGE_PROFILE)
 LARGE_INTEGER frame_bgn;
 LARGE_INTEGER frame_end;
+
+bool frame_prf = false;
+bool frame_ntx = false;
 #endif
 
 bool frame_trk = true;
@@ -74,6 +77,11 @@ OBGEDirect3DDevice9::OBGEDirect3DDevice9(IDirect3D9 *d3d, IDirect3DDevice9 *devi
 #if	defined(OBGE_DEVLING) || defined(OBGE_LOGGING)
   frame_num = 0;
   frame_bge = 0;
+
+  frame_prf = false;
+  frame_ntx = false;
+
+  pEvent = NULL;
 #endif
 
 #define HasShaderManager	1	// m_shaders
@@ -212,7 +220,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::Present(CONS
     LARGE_INTEGER moment;
     QueryPerformanceCounter(&moment);
 
-    m_shaders->trackh[frame_wrp].frame_totl.QuadPart = 
+    m_shaders->trackh[frame_wrp].frame_totl.QuadPart =
     moment.QuadPart - m_shaders->frame_time.QuadPart;
     m_shaders->frame_time.QuadPart = moment.QuadPart;
 
@@ -223,7 +231,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::Present(CONS
       memcpy(
 	m_shaders->trackh[frame_wrp].trackd[p].frame_hist,
 	m_shaders->                  trackd[p].frame_time,
-	sizeof(m_shaders->trackd[p].frame_time[0]) * 
+	sizeof(m_shaders->trackd[p].frame_time[0]) *
 	       m_shaders->trackd[p].frame_cntr
       );
     }
@@ -744,15 +752,17 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::BeginScene(v
 //m_shadercv = NULL;
 //m_shadercp = NULL;
 
-#if	defined(OBGE_DEVLING)
   if (HasShaderManager) {
+    m_shaders->Begin();
+
+#if	defined(OBGE_DEVLING)
     /* clean all on first scene, and partial on successive scenes */
     int frame_numr = m_shaders->trackd[currentPass].frame_numr;
 
     m_shaders->Clear(currentPass, frame_numr != frame_num);
     m_shaders->trackd[currentPass].frame_numr = frame_num;
-  }
 #endif
+  }
 
 #if	defined(OBGE_DEVLING) || defined(OBGE_LOGGING)
   passFrames[currentPass] = frame_num;
@@ -764,6 +774,20 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::BeginScene(v
   }
 
 #if	defined(OBGE_DEVLING) && defined(OBGE_PROFILE)
+  if (frame_prf) {
+    // 1. Create an event query from the current device
+    CreateQuery(D3DQUERYTYPE_EVENT, &pEvent);
+
+    // 2. Add an end marker to the command buffer queue.
+    pEvent->Issue(D3DISSUE_END);
+
+    // 3. Empty the command buffer and wait until the GPU is idle.
+    while(S_FALSE == pEvent->GetData(NULL, 0, D3DGETDATA_FLUSH))
+      ;
+
+    // 4. Start profiling
+  }
+
   QueryPerformanceCounter(&frame_bgn);
 #endif
 
@@ -771,11 +795,25 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::BeginScene(v
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::EndScene(void) {
+  HRESULT res = m_device->EndScene();
+
 #if	defined(OBGE_DEVLING) && defined(OBGE_PROFILE)
+  if (frame_prf || pEvent) {
+    // 6. Add an end marker to the command buffer queue.
+    pEvent->Issue(D3DISSUE_END);
+
+    // 7. Force the driver to execute the commands from the command buffer.
+    // Empty the command buffer and wait until the GPU is idle.
+    while(S_FALSE == pEvent->GetData(NULL, 0, D3DGETDATA_FLUSH))
+      ;
+
+    // 8. End profiling
+    pEvent->Release();
+    pEvent = NULL;
+  }
+
   QueryPerformanceCounter(&frame_end);
 #endif
-
-  HRESULT res = m_device->EndScene();
 
   if (frame_log) {
     frame_log->Outdent();
@@ -869,11 +907,11 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::Clear(DWORD 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTransform(D3DTRANSFORMSTATETYPE State, CONST D3DMATRIX *pMatrix) {
   if (HasShaderManager) {
     /**/ if (State == D3DTS_VIEW)
-      m_shaders->ShaderConst.view = *pMatrix;
+      m_shaders->ShaderConst.UpdateView(pMatrix);
     else if (State == D3DTS_PROJECTION)
-      m_shaders->ShaderConst.proj = *pMatrix;
+      m_shaders->ShaderConst.UpdateProjection(pMatrix);
     else if (State == D3DTS_WORLD)
-      m_shaders->ShaderConst.wrld = *pMatrix;
+      m_shaders->ShaderConst.UpdateWorld(pMatrix);
 
 #ifdef	OBGE_DEVLING
     /* record exact position of occurance */
@@ -1034,16 +1072,20 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::GetClipPlane
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetRenderState(D3DRENDERSTATETYPE State, DWORD Value) {
-#ifdef	OBGE_DEVLING
   if (HasShaderManager) {
+    /* blow the fuse, if manually set */
+    if (State == D3DRS_ZWRITEENABLE)
+      RuntimeShaderRecord::bZLoaded = 0;
+
+#ifdef	OBGE_DEVLING
     /* record exact position of occurance */
     int frame_cntr = m_shaders->trackd[currentPass].frame_cntr;
 
     /* huh, going into menu provokes huge numbers here */
     if (frame_cntr < OBGESCENE_NUM)
       m_shaders->trackd[currentPass].states[frame_cntr][State] = Value;
-  }
 #endif
+  }
 
   if (frame_log) {
     frame_log->Message("SetRenderState");
@@ -1084,6 +1126,11 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::GetTexture(D
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTexture(DWORD Sampler, IDirect3DBaseTexture9 *pTexture) {
+#if	defined(OBGE_DEVLING) && defined(OBGE_PROFILE)
+  if (frame_ntx)
+    pTexture = NULL;
+#endif
+
 #ifdef	OBGE_DEVLING
   if (HasShaderManager)
     m_shaders->traced[currentPass].values_s[Sampler] = pTexture;
@@ -1555,7 +1602,6 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetPixelShad
     /* apply dynamic runtime parameters */
     m_shadercp->SetRuntimeParams(m_device, m_device);
 #else
-
     m_shadercp->frame_used[OBGEPASS_UNKNOWN] = frame_num;
     m_shadercp->frame_pass[OBGEPASS_UNKNOWN] = frame_bge;
 

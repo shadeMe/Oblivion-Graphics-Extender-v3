@@ -2,6 +2,9 @@
 
 #include <d3dx9.h>
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 #include "Nodes/NiVector4.h"
 #include "Nodes/NiDX9Renderer.h"
 #include "Nodes/NiCamera.h"
@@ -58,6 +61,7 @@ struct EffectConstants
 	D3DXMATRIX			proj;
 
 	v1_2_416::NiVector4		ZRange;
+	v1_2_416::NiVector4		FoV;
 	v1_2_416::NiVector4		SunDir;
 	v1_2_416::NiVector4		SunTiming;
 	v1_2_416::NiVector3		EyeForward;
@@ -69,10 +73,31 @@ struct EffectConstants
 #ifndef	NO_DEPRECATED
 	v1_2_416::NiVector4		time;
 #endif
+
+	inline void UpdateView(const D3DXMATRIX &mx) {
+	  view = mx;
+	}
+
+	inline void UpdateProjection(const D3DXMATRIX &mx) {
+	  proj = mx;
+
+	  ZRange.y = (proj._43 / proj._33);
+	  ZRange.x = (proj._33 * ZRange.y) / (proj._33 - 1.0f);
+	  ZRange.z = ZRange.x - ZRange.y;
+	  ZRange.w = ZRange.x + ZRange.y;
+
+#define acot(x)	(M_PI_2 - atan(x))
+	  FoV.x = acot(proj._11) * 1;
+	  FoV.y = acot(proj._22) * 1;
+	  FoV.z = (FoV.x * 360.0) / M_PI;
+	  FoV.w = (FoV.y * 360.0) / M_PI;
+	}
 };
 
 class EffectBuffer
 {
+	friend class GUIs_ShaderDeveloper;
+
 public:
 	EffectBuffer();
 	~EffectBuffer();
@@ -152,7 +177,7 @@ public:
 
 	void Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo, IDirect3DSurface9 *RenderCopy);
 	bool Render(IDirect3DDevice9 *D3DDevice, EffectConstants *ConstList, EffectQueue *Queue);
-	void Render(IDirect3DDevice9 *D3DDevice);
+	void Render(IDirect3DDevice9 *D3DDevice, EffectConstants *ConstList);
 
 	bool SetEffectConstantB(const char *name, bool value);
 	bool SetEffectConstantI(const char *name, int value);
@@ -208,6 +233,7 @@ private:
 	D3DXMACRO *			pDefine;
 	LPD3DXBUFFER			pBinary;
 	LPD3DXBUFFER			pErrorMsgs;
+	LPD3DXBUFFER			pDisasmbly;
 	ID3DXEffect *			pEffect;
 
 	/* re-allocate textures after kill() */
@@ -266,6 +292,8 @@ public:
 	void						ReleaseFrameTextures();
 
 	bool						SetRAWZ(bool enabled);
+	bool						SetLinearZ(bool enabled);
+	bool						SetProjectZ(bool enabled);
 	void						LoadEffectList(void);
 
 	void						NewGame(void);
@@ -321,7 +349,15 @@ private:
 	EffectBuffer					LastRT, PrevRT, PastRT;
 	EffectBuffer					OrigDS, CurrDS;
 
-	bool						RenderRawZ;
+	union {
+	  long						RenderTransferZ;
+	  struct {
+	    bool					RenderRawZ;
+	    bool					RenderLinZ;
+	    bool					RenderPrjZ;
+	  };
+	};
+
 	EffectQueue					RenderQueue;
 	unsigned long					RenderBuf;
 	unsigned long					RenderCnd;

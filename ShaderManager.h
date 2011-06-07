@@ -3,6 +3,9 @@
 #include <d3dx9.h>
 #include <d3dx9shader.h>
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 #include <vector>
 #include <map>
 #include <list>
@@ -42,6 +45,7 @@ public:
 
 	bool						ConstructDX9Shader(char which);
 	DWORD *						GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *States);
+	DWORD *						GetDX9RenderStates(DWORD *States);
 	bool						DestroyDX9Shader();
 
 public:
@@ -132,6 +136,11 @@ public:
 	RuntimeShaderRecord();
 	~RuntimeShaderRecord();
 
+	static inline void Reset() {
+	  bCLoaded = bDLoaded = bZLoaded = 0;
+	  bCFilled = bDFilled = bZFilled = 0;
+	};
+
 	void Release();
 	void OnLostDevice(void);
 	void OnResetDevice(void);
@@ -155,14 +164,18 @@ public:
 	ShaderRecord *			pAssociate;
 	bool				bActive;
 	void *				pCustomCT;
+	bool				bIO;
 
 	/* get a copy of the z-buffer right from before and pass it to the shader */
-	IDirect3DSurface9 *		pGrabRT;
-	IDirect3DSurface9 *		pGrabDS;
-	IDirect3DSurface9 *		pGrabDZ;
-	IDirect3DTexture9 **		pTextRT;
-	IDirect3DTexture9 **		pTextDS;
-	IDirect3DTexture9 **		pTextDZ;
+	static IDirect3DSurface9 *	pGrabRT; static char bCLoaded; bool bCFused;
+	static IDirect3DSurface9 *	pGrabDS; static char bDLoaded; bool bDFused;
+	static IDirect3DSurface9 *	pGrabDZ; static char bZLoaded; bool bZFused;
+	static IDirect3DTexture9 * 	pTextRT; static bool bCFilled; bool bCLazy;
+	static IDirect3DTexture9 * 	pTextDS; static bool bDFilled; bool bDLazy;
+	static IDirect3DTexture9 * 	pTextDZ; static bool bZFilled; bool bZLazy;
+	       IDirect3DTexture9 **	pCopyRT;
+	       IDirect3DTexture9 **	pCopyDS;
+	       IDirect3DTexture9 **	pCopyDZ;
 
 	RuntimeVariable *		pBool;
 	RuntimeVariable *		pInt4;
@@ -226,15 +239,41 @@ struct ShaderConstants
 	v1_2_416::NiVector4		rcpresd;	// displacement
 
 	// ****** Global shader constants (Updated each scene) ******
-	D3DXMATRIX			wrld;
-	D3DXMATRIX			view;
-	D3DXMATRIX			proj;
+	D3DMATRIX			wrld;
+	D3DMATRIX			view;
+	D3DMATRIX			proj;
 
-	v1_2_416::NiVector4		PlayerPosition;
+	v1_2_416::NiVector4		ZRange;
+	v1_2_416::NiVector4		FoV;
 	v1_2_416::NiVector4		SunDir;
 	v1_2_416::NiVector4		SunTiming;
+	v1_2_416::NiVector4		PlayerPosition;
+
 	v1_2_416::NiVector4		GameTime;
 	v1_2_416::NiVector4		TikTiming;
+
+	inline void UpdateWorld(const D3DMATRIX *mx) {
+	  wrld = *mx;
+	}
+
+	inline void UpdateView(const D3DMATRIX *mx) {
+	  view = *mx;
+	}
+
+	inline void UpdateProjection(const D3DMATRIX *mx) {
+	  proj = *mx;
+
+	  ZRange.y = (proj._43 / proj._33);
+	  ZRange.x = (proj._33 * ZRange.y) / (proj._33 - 1.0f);
+	  ZRange.z = ZRange.x - ZRange.y;
+	  ZRange.w = ZRange.x + ZRange.y;
+
+#define acot(x)	(M_PI_2 - atan(x))
+	  FoV.x = acot(proj._11) * 1;
+	  FoV.y = acot(proj._22) * 1;
+	  FoV.z = (FoV.x * 360.0) / M_PI;
+	  FoV.w = (FoV.y * 360.0) / M_PI;
+	}
 };
 
 struct GlobalConstants
@@ -245,7 +284,7 @@ struct GlobalConstants
 //	ConstsList		pTexture;
 //	ConstsList		pSampler;
 };
-
+ 
 class ShaderManager
 {
 	friend class ShaderRecord;
@@ -268,6 +307,7 @@ public:
 	template<class ReturnType> ReturnType *		GetGlobalConst(const char *Name, int length, ReturnType *vs);
 	template<class ReturnType> bool			SetGlobalConst(const char *Name, int length, ReturnType *vs);
 	void						UpdateFrameConstants();
+	inline void					Begin() { RuntimeShaderRecord::Reset(); };
 
 public:
 	ShaderRecord *					GetBuiltInShader(const char *Name);

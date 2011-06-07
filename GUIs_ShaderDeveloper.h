@@ -43,6 +43,8 @@
 #define wxID_MAXIMUM 1004
 #define wxID_OPTIMIZE 1005
 #define wxID_RUNTIME 1006
+#define wxID_PROFILE 1007
+#define wxID_KILLTEX 1008
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Class wxShaderDeveloper
@@ -55,6 +57,7 @@ class wxShaderDeveloper : public wxFrame
 		wxMenuBar* SDMenubar;
 		wxMenu* SDShaderOptions;
 		wxMenu* SDEffectOptions;
+		wxMenu* SDProfileOptions;
 		wxChoice* SDChoicePass;
 		wxNotebook* SDViewSwitch;
 		wxPanel* SDPanelShaders;
@@ -101,6 +104,8 @@ class wxShaderDeveloper : public wxFrame
 		wxTextCtrl* SDEffectSourceEditor;
 		wxPanel* SDEffectErrors;
 		wxTextCtrl* SDEffectErrorView;
+		wxPanel* SDEffectDisassembly;
+		wxTextCtrl* SDEffectDisassemblyView;
 		wxStaticText* SDStatusEffect;
 		wxCheckBox* SDEffectEnable;
 		wxPanel* SDPanelEffectsBottom;
@@ -149,6 +154,7 @@ class wxShaderDeveloper : public wxFrame
 		virtual void DoUpdate( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void DoShaderOptions( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoEffectOptions( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoProfileOptions( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoRenderpassSwitch( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoViewSwitch( wxNotebookEvent& event ) { event.Skip(); }
 		virtual void DoShaderSwitch( wxCommandEvent& event ) { event.Skip(); }

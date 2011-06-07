@@ -54,3 +54,5 @@ OBSEMessagingInterface	*GetMessaging(void);
 PluginHandle		 GetHandle(void);
 bool IsEnabled();
 bool IsHDR();
+bool IsBloom();
+bool IsPlain();

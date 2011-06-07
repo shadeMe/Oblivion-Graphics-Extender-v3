@@ -12,9 +12,9 @@
 
 #include "Hooking/detours/detours.h"
 
-static global<int> ReflectionMapSize(256, NULL, "ScreenBuffers", "iReflectionMapSize");
-static global<int> WaterHeightMapSize(512, NULL, "ScreenBuffers", "iWaterHeightMapSize");
-static global<int> WaterDisplacementMapSize(256, NULL, "ScreenBuffers", "iWaterDisplacementMapSize");
+static global<float> ReflectionMapSize(0, NULL, "ScreenBuffers", "iReflectionMapSize");
+static global<int> WaterHeightMapSize(0, NULL, "ScreenBuffers", "iWaterHeightMapSize");
+static global<int> WaterDisplacementMapSize(0, NULL, "ScreenBuffers", "iWaterDisplacementMapSize");
 static global<int> AutoGenerateMipMaps(D3DTEXF_LINEAR, NULL, "ScreenBuffers", "iAutoGenerateMipMaps");
 static global<int> RendererWidth(0, "Oblivion.ini", "Display", "iSize W");
 static global<bool> UseWaterReflectionsMisc(0, "Oblivion.ini", "Water", "bUseWaterReflectionsMisc");
@@ -749,16 +749,23 @@ void __stdcall TrackRenderedSurfaceParameters(v1_2_416::NiDX9Renderer *renderer,
 		case SURFACE_ID_REFL13:
 		case SURFACE_ID_REFL14:
 		  /* Reflection Render-Surface Dimension (square) */
-		  if ((ReflectionMapSize.data >= 256) &&
-		      (ReflectionMapSize.data <= 2560)) {
+		  if ((ReflectionMapSize.Get() >= 256) &&
+		      (ReflectionMapSize.Get() <= 2560)) {
 
-		      *pWidth = *pHeight = ReflectionMapSize.data;
+		      *pWidth = *pHeight = ReflectionMapSize.Get();
 		  }
-		  else if ((ReflectionMapSize.data == 0) &&
-			   (RendererWidth.data >= 256) &&
-			   (RendererWidth.data <= 2560)) {
+		  else if ((ReflectionMapSize.Get() == 0) &&
+			   (RendererWidth.Get() >= 256) &&
+			   (RendererWidth.Get() <= 2560)) {
 
-		      *pWidth = *pHeight = RendererWidth.data;
+		      *pWidth = *pHeight = RendererWidth.Get();
+		  }
+		  else if ((ReflectionMapSize.Get() >  0) &&
+			   (ReflectionMapSize.Get() <= 1) &&
+			   (ReflectionMapSize.Get() * RendererWidth.Get() >= 256) &&
+			   (ReflectionMapSize.Get() * RendererWidth.Get() <= 2560)) {
+
+		      *pWidth = *pHeight = ReflectionMapSize.Get() * RendererWidth.Get();
 		  }
 
 		  break;
@@ -888,6 +895,13 @@ void CreateRenderSurfaceHook(void) {
 	         (RendererWidth.Get() <= 2560)) {
 
 		SafeWrite32(0x0049BFAF, RendererWidth.Get());
+	}
+	else if ((ReflectionMapSize.Get() >  0) &&
+	         (ReflectionMapSize.Get() <= 1) &&
+	         (ReflectionMapSize.Get() * RendererWidth.Get() >= 256) &&
+	         (ReflectionMapSize.Get() * RendererWidth.Get() <= 2560)) {
+
+		SafeWrite32(0x0049BFAF, ReflectionMapSize.Get() * RendererWidth.Get());
 	}
 
 	//00B07058	// flagUseWaterHiRes

@@ -77,6 +77,31 @@ static HLSLIncludeManager incl;
 /* #################################################################################################
  */
 
+#define	strprete(i)	#i
+#define	stringify(i)	strprete(i)
+
+#define	DEFAULT		0
+#define	FUSED		1
+#define	OFF		2
+#define	LAZY		3
+#define	GREEDY		4
+
+static D3DXMACRO defs[] = {
+  {"FUSED"		, stringify(FUSED  )},
+  {"OFF"		, stringify(OFF	   )},
+  {"DEFAULT"		, stringify(DEFAULT)},
+  {"LAZY"		, stringify(LAZY   )},
+  {"GREEDY"		, stringify(GREEDY )},
+};
+
+#define SHADER_COLORWRITE	0
+#define SHADER_COLORBUFFER	1
+#define SHADER_ZWRITE		2
+#define SHADER_ZBUFFER		3
+
+/* #################################################################################################
+ */
+
 template<>
 RuntimeVariable::mem::iv *ShaderManager::GetGlobalConst(const char *Name, int length, RuntimeVariable::mem::iv *vs) {
   assert(length == 1);
@@ -569,7 +594,7 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	  const char *bc = strstr(buf, "Bordercolor");
 
 	  if (au) {
-	    char *end = (char *)strchr(au, ';'); *end = '\0';
+	    char *end = (char *)strchr(au, ';'); if (end) *end = '\0';
 	    /**/ if (strstr(au, "WRAP"      )) { *States++ = D3DSAMP_ADDRESSU; *States++ = D3DTADDRESS_WRAP; }
 	    else if (strstr(au, "MIRROR"    )) { *States++ = D3DSAMP_ADDRESSU; *States++ = D3DTADDRESS_MIRROR; }
 	    else if (strstr(au, "CLAMP"     )) { *States++ = D3DSAMP_ADDRESSU; *States++ = D3DTADDRESS_CLAMP; }
@@ -577,7 +602,7 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	    else if (strstr(au, "MIRRORONCE")) { *States++ = D3DSAMP_ADDRESSU; *States++ = D3DTADDRESS_MIRRORONCE; }
 	  }
 	  if (av) {
-	    char *end = (char *)strchr(av, ';'); *end = '\0';
+	    char *end = (char *)strchr(av, ';'); if (end) *end = '\0';
 	    /**/ if (strstr(av, "WRAP"      )) { *States++ = D3DSAMP_ADDRESSV; *States++ = D3DTADDRESS_WRAP; }
 	    else if (strstr(av, "MIRROR"    )) { *States++ = D3DSAMP_ADDRESSV; *States++ = D3DTADDRESS_MIRROR; }
 	    else if (strstr(av, "CLAMP"     )) { *States++ = D3DSAMP_ADDRESSV; *States++ = D3DTADDRESS_CLAMP; }
@@ -585,7 +610,7 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	    else if (strstr(av, "MIRRORONCE")) { *States++ = D3DSAMP_ADDRESSV; *States++ = D3DTADDRESS_MIRRORONCE; }
 	  }
 	  if (aw) {
-	    char *end = (char *)strchr(aw, ';'); *end = '\0';
+	    char *end = (char *)strchr(aw, ';'); if (end) *end = '\0';
 	    /**/ if (strstr(aw, "WRAP"      )) { *States++ = D3DSAMP_ADDRESSW; *States++ = D3DTADDRESS_WRAP; }
 	    else if (strstr(aw, "MIRROR"    )) { *States++ = D3DSAMP_ADDRESSW; *States++ = D3DTADDRESS_MIRROR; }
 	    else if (strstr(aw, "CLAMP"     )) { *States++ = D3DSAMP_ADDRESSW; *States++ = D3DTADDRESS_CLAMP; }
@@ -593,7 +618,7 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	    else if (strstr(aw, "MIRRORONCE")) { *States++ = D3DSAMP_ADDRESSW; *States++ = D3DTADDRESS_MIRRORONCE; }
 	  }
 	  if (mp) {
-	    char *end = (char *)strchr(mp, ';'); *end = '\0';
+	    char *end = (char *)strchr(mp, ';'); if (end) *end = '\0';
 	    /**/ if (strstr(mp, "NONE"         )) { *States++ = D3DSAMP_MIPFILTER; *States++ = D3DTEXF_NONE; }
 	    else if (strstr(mp, "POINT"        )) { *States++ = D3DSAMP_MIPFILTER; *States++ = D3DTEXF_POINT; }
 	    else if (strstr(mp, "LINEAR"       )) { *States++ = D3DSAMP_MIPFILTER; *States++ = D3DTEXF_LINEAR; }
@@ -602,7 +627,7 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	    else if (strstr(mp, "GAUSSIANQUAD" )) { *States++ = D3DSAMP_MIPFILTER; *States++ = D3DTEXF_GAUSSIANQUAD; }
 	  }
 	  if (mn) {
-	    char *end = (char *)strchr(mn, ';'); *end = '\0';
+	    char *end = (char *)strchr(mn, ';'); if (end) *end = '\0';
 	    /**/ if (strstr(mn, "NONE"         )) { *States++ = D3DSAMP_MINFILTER; *States++ = D3DTEXF_NONE; }
 	    else if (strstr(mn, "POINT"        )) { *States++ = D3DSAMP_MINFILTER; *States++ = D3DTEXF_POINT; }
 	    else if (strstr(mn, "LINEAR"       )) { *States++ = D3DSAMP_MINFILTER; *States++ = D3DTEXF_LINEAR; }
@@ -611,7 +636,7 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	    else if (strstr(mn, "GAUSSIANQUAD" )) { *States++ = D3DSAMP_MINFILTER; *States++ = D3DTEXF_GAUSSIANQUAD; }
 	  }
 	  if (mg) {
-	    char *end = (char *)strchr(mg, ';'); *end = '\0';
+	    char *end = (char *)strchr(mg, ';'); if (end) *end = '\0';
 	    /**/ if (strstr(mg, "NONE"         )) { *States++ = D3DSAMP_MAGFILTER; *States++ = D3DTEXF_NONE; }
 	    else if (strstr(mg, "POINT"        )) { *States++ = D3DSAMP_MAGFILTER; *States++ = D3DTEXF_POINT; }
 	    else if (strstr(mg, "LINEAR"       )) { *States++ = D3DSAMP_MAGFILTER; *States++ = D3DTEXF_LINEAR; }
@@ -620,13 +645,81 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	    else if (strstr(mg, "GAUSSIANQUAD" )) { *States++ = D3DSAMP_MAGFILTER; *States++ = D3DTEXF_GAUSSIANQUAD; }
 	  }
 	  if (bc) {
-	    char *end = (char *)strchr(bc, ';'); *end = '\0';
+	    char *end = (char *)strchr(bc, ';'); if (end) *end = '\0';
 
 	    /* currently fixed */
 	    float col = 0.0;
 	    *States++ = D3DSAMP_BORDERCOLOR;
 	    *States++ = *((DWORD *)&col);
 	  }
+	}
+      }
+    }
+  }
+
+  return States;
+}
+
+DWORD *ShaderRecord::GetDX9RenderStates(DWORD *States) {
+  const char *src = NULL, *main;
+
+  /**/ if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_RUNTIME))
+    src = pSourceRuntime;
+  else if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_REPLACED))
+    src = pSourceReplaced;
+  else if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_ORIGINAL))
+    src = NULL;
+  else if (pShaderRuntime  && (pOblivionBinary == (const DWORD *)pShaderRuntime->GetBufferPointer()))
+    src = pSourceRuntime;
+  else if (pShaderReplaced && (pOblivionBinary == (const DWORD *)pShaderReplaced->GetBufferPointer()))
+    src = pSourceReplaced;
+  else if (pShaderOriginal && (pOblivionBinary == (const DWORD *)pShaderOriginal->GetBufferPointer()))
+    src = NULL;
+
+  if (src && (main = strstr(src, "main"))) {
+    const char *maint = (main  ? strchr(main     , '{') : NULL);
+    const char *mainb = (main  ? strchr(main     , '<') : NULL);
+    const char *maine = (mainb ? strchr(mainb + 1, '>') : NULL);
+
+    if ((mainb < maint) &&
+	(maine > main )) {
+      char buf[1024];
+      int len;
+
+      len = maine - (mainb + 1); if (len > 0)
+      strncpy(buf, mainb + 1, len);
+
+      if (len > 0) {
+	buf[len] = '\0';
+
+	const char *cw = strstr(buf, "ColorWrite");
+	const char *cb = strstr(buf, "ColorBuffer");
+	const char *zw = strstr(buf, "ZWrite");
+	const char *zb = strstr(buf, "ZBuffer");
+
+	if (cb) {
+	  char *end = (char *)strchr(cb, ';'); if (end) *end = '\0';
+	  /**/ if (strstr(cb, "LAZY"         )) { *States++ = SHADER_COLORBUFFER; *States++ = LAZY; }
+	  else if (strstr(cb, "GREEDY"       )) { *States++ = SHADER_COLORBUFFER; *States++ = GREEDY; }
+	  else if (strstr(cb, "DEFAULT"      )) { *States++ = SHADER_COLORBUFFER; *States++ = DEFAULT; }
+	}
+	if (cw) {
+	  char *end = (char *)strchr(cw, ';'); if (end) *end = '\0';
+	  /**/ if (strstr(cw, "FUSED"        )) { *States++ = SHADER_COLORWRITE; *States++ = FUSED; }
+	  else if (strstr(cw, "OFF"          )) { *States++ = SHADER_COLORWRITE; *States++ = OFF; }
+	  else if (strstr(cw, "DEFAULT"      )) { *States++ = SHADER_COLORWRITE; *States++ = DEFAULT; }
+	}
+	if (zb) {
+	  char *end = (char *)strchr(zb, ';'); if (end) *end = '\0';
+	  /**/ if (strstr(zb, "LAZY"         )) { *States++ = SHADER_ZBUFFER; *States++ = LAZY; }
+	  else if (strstr(zb, "GREEDY"       )) { *States++ = SHADER_ZBUFFER; *States++ = GREEDY; }
+	  else if (strstr(zb, "DEFAULT"      )) { *States++ = SHADER_ZBUFFER; *States++ = DEFAULT; }
+	}
+	if (zw) {
+	  char *end = (char *)strchr(zw, ';'); if (end) *end = '\0';
+	  /**/ if (strstr(zw, "FUSED"        )) { *States++ = SHADER_ZWRITE; *States++ = FUSED; }
+	  else if (strstr(zw, "OFF"          )) { *States++ = SHADER_ZWRITE; *States++ = OFF; }
+	  else if (strstr(zw, "DEFAULT"      )) { *States++ = SHADER_ZWRITE; *States++ = DEFAULT; }
 	}
       }
     }
@@ -782,7 +875,7 @@ bool ShaderRecord::CompileShader(bool forced) {
     D3DXCompileShader(
 	src,
 	len,
-	NULL,
+	defs,
 	&incl,
 	"main",
 	pProfile,
@@ -802,7 +895,7 @@ bool ShaderRecord::CompileShader(bool forced) {
       D3DXCompileShader(
 	  src,
 	  len,
-	  NULL,
+	  defs,
 	  &incl,
 	  "main",
 	  pProfile,
@@ -950,12 +1043,11 @@ RuntimeShaderRecord::RuntimeShaderRecord() {
   pFloat4   = NULL;
   pTexture  = NULL;
 
-  pGrabRT = NULL;
-  pGrabDS = NULL;
-  pGrabDZ = NULL;
-  pTextRT = NULL;
-  pTextDS = NULL;
-  pTextDZ = NULL;
+  pCopyRT = NULL; bCFused = true; bCLazy = true;
+  pCopyDS = NULL; bDFused = true; bDLazy = true;
+  pCopyDZ = NULL; bZFused = true; bZLazy = true;
+
+  bIO = false;
 
 #ifdef	OBGE_DEVLING
   memset(frame_used, -1, sizeof(frame_used));
@@ -963,11 +1055,12 @@ RuntimeShaderRecord::RuntimeShaderRecord() {
 }
 
 RuntimeShaderRecord::~RuntimeShaderRecord() {
-  /* first release (text points into pCustomCT) */
-  if (            pGrabRT)   pGrabRT ->Release();
-  if (pTextRT && *pTextRT) (*pTextRT)->Release();
-  if (            pGrabDS)   pGrabDS ->Release();
-  if (pTextDS && *pTextDS) (*pTextDS)->Release();
+  /* first release (text points into pCustomCT)
+  if (pGrabRT) pGrabRT->Release(); pGrabRT = NULL;
+  if (pTextRT) pTextRT->Release(); pTextRT = NULL;
+  if (pGrabDS) pGrabDS->Release(); pGrabDS = NULL;
+  if (pTextDS) pTextDS->Release(); pTextDS = NULL;
+   */
 
   if (pCustomCT)
     free(pCustomCT);
@@ -992,6 +1085,12 @@ void RuntimeShaderRecord::Release() {
   pInt4    = NULL;
   pFloat4  = NULL;
   pTexture = NULL;
+
+  pCopyRT = NULL; bCFused = true; bCLazy = true;
+  pCopyDS = NULL; bDFused = true; bDLazy = true;
+  pCopyDZ = NULL; bZFused = true; bZLazy = true;
+
+  bIO = false;
 }
 
 inline void RuntimeShaderRecord::OnLostDevice(void) {
@@ -1008,6 +1107,19 @@ inline void RuntimeShaderRecord::OnResetDevice(void) {
 
 /* -------------------------------------------------------------------------------------------------
  */
+IDirect3DSurface9 *RuntimeShaderRecord::pGrabRT = NULL;
+IDirect3DSurface9 *RuntimeShaderRecord::pGrabDS = NULL;
+IDirect3DSurface9 *RuntimeShaderRecord::pGrabDZ = NULL;
+IDirect3DTexture9 *RuntimeShaderRecord::pTextRT = NULL;
+IDirect3DTexture9 *RuntimeShaderRecord::pTextDS = NULL;
+IDirect3DTexture9 *RuntimeShaderRecord::pTextDZ = NULL;
+
+char RuntimeShaderRecord::bCLoaded = 0;
+char RuntimeShaderRecord::bDLoaded = 0;
+char RuntimeShaderRecord::bZLoaded = 0;
+bool RuntimeShaderRecord::bCFilled = false;
+bool RuntimeShaderRecord::bDFilled = false;
+bool RuntimeShaderRecord::bZFilled = false;
 
 void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
   Release();
@@ -1159,6 +1271,10 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	        pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.view;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_ProjectionTransform_CURRENTPASS"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.proj;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_ProjectionDepthRange_CURRENTPASS"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.ZRange;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_ProjectionFoV_CURRENTPASS"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.FoV;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_ReciprocalResolution_CURRENTPASS"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.rcpres;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_ReciprocalResolution_WATERHEIGHTMAPPASS"))
@@ -1195,11 +1311,11 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	      break;
 	    else if (cnst.Name == strstr(cnst.Name, "oblv_")) {
 	      /**/ if (cnst.Name == strstr(cnst.Name, "oblv_CurrRendertarget0_CURRENTPASS"))
-		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL, pTextRT = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture, pGrabRT = NULL;
+		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL, pCopyRT = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_CurrDepthStenzilZ_CURRENTPASS"))
-		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL, pTextDS = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture, pGrabDS = NULL;
+		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL, pCopyDS = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_CurrDepthStenzilR_CURRENTPASS"))
-		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL, pTextDZ = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture, pGrabDZ = NULL;
+		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL, pCopyDZ = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture;
 	      else {
 	        /* read and interprete the source and extract optional information */
 	        int sts = (RuntimeVariable::mem::tv *)
@@ -1277,6 +1393,31 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
     }
   }
 
+  /* prepare statechanges */
+  if ((bIO = (pCopyRT || pCopyDS || pCopyDZ))) {
+    DWORD States[16], *SBegin, *SEnd;
+
+    SEnd = pAssociate->GetDX9RenderStates(SBegin = States);
+    while (SBegin < SEnd) {
+      switch (SBegin[0]) {
+	case SHADER_COLORBUFFER:
+	  /**/ if (SBegin[1] == LAZY) bCLazy = true;
+	  else if (SBegin[1] == GREEDY) bCLazy = false; break;
+	case SHADER_COLORWRITE:
+	  /**/ if (SBegin[1] == FUSED) bCFused = true;
+	  else if (SBegin[1] == OFF) bCFused = false; break;
+	case SHADER_ZBUFFER:
+	  /**/ if (SBegin[1] == LAZY) bDLazy = true;
+	  else if (SBegin[1] == GREEDY) bDLazy = false; break;
+	case SHADER_ZWRITE:
+	  /**/ if (SBegin[1] == FUSED) bZFused = true;
+	  else if (SBegin[1] == OFF) bZFused = false; break;
+      }
+
+      SBegin += 2;
+    }
+  }
+
   /* release previous texture */
   std::vector<int>::iterator PTexture = prevTextures.begin();
 
@@ -1287,64 +1428,88 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 }
 
 void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice) {
+  /* blow the fuse (vertex shader comes after pixel shader and clears?) */
+  if ((bZLoaded < 0) && !pCopyDZ && (iType == SHADER_PIXEL)) {
+    bZLoaded = 0;
+
+    /* well, I don't really know if it was on before ... */
+    StateDevice->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
+  }
+
   if (pCustomCT) {
-    if (pTextRT || pTextDS)
-      SceneDevice->EndScene();
+    if (bIO) {
+      /* check what needs to go on here */
+      const bool doRT = pCopyRT && (!pTextRT || !bCFilled || !bCLazy),
+		 doDS = pCopyDS && (!pTextDS || !bDFilled || !bDLazy),
+		 doDZ = pCopyDZ && (!pTextDZ || !bZLoaded);
 
-    if (pTextRT) {
-      IDirect3DSurface9 *pCurrRT;
-      if (SceneDevice->GetRenderTarget(0, &pCurrRT) == D3D_OK) {
-	D3DSURFACE_DESC CurrD;              pCurrRT->GetDesc(&CurrD);
-	D3DSURFACE_DESC GrabD; if (pGrabRT) pGrabRT->GetDesc(&GrabD);
+      if (doRT || doDS)
+	SceneDevice->EndScene();
 
-	/* different */
-	if (!(*pTextRT) || memcmp(&CurrD, &GrabD, sizeof(D3DSURFACE_DESC))) {
-	  if ( pGrabRT)   pGrabRT ->Release();
-	  if (*pTextRT) (*pTextRT)->Release();
+      if (doRT) {
+	IDirect3DSurface9 *pCurrRT;
+	if (SceneDevice->GetRenderTarget(0, &pCurrRT) == D3D_OK) {
+	  D3DSURFACE_DESC CurrD;              pCurrRT->GetDesc(&CurrD);
+	  D3DSURFACE_DESC GrabD; if (pGrabRT) pGrabRT->GetDesc(&GrabD);
 
-	  pGrabRT = NULL; (*pTextRT) = NULL;
-	  if (StateDevice->CreateTexture(CurrD.Width, CurrD.Height, 1, CurrD.Usage, CurrD.Format, CurrD.Pool, pTextRT, NULL) == D3D_OK)
-	    (*pTextRT)->GetSurfaceLevel(0, &pGrabRT);
-	}
+	  /* different */
+	  if (!pTextRT || memcmp(&CurrD, &GrabD, sizeof(D3DSURFACE_DESC))) {
+	    if (pGrabRT) pGrabRT->Release();
+	    if (pTextRT) pTextRT->Release();
 
-	if (pGrabRT)
-	  SceneDevice->StretchRect(pCurrRT, NULL, pGrabRT, NULL, D3DTEXF_NONE);
-      }
-    }
+	    pGrabRT = NULL; pTextRT = NULL;
+	    if (StateDevice->CreateTexture(CurrD.Width, CurrD.Height, 1, CurrD.Usage, CurrD.Format, CurrD.Pool, &pTextRT, NULL) == D3D_OK)
+	      pTextRT->GetSurfaceLevel(0, &pGrabRT);
+	  }
 
-    if (pTextDS) {
-      IDirect3DSurface9 *pCurrDS;
-      if (SceneDevice->GetDepthStencilSurface(&pCurrDS) == D3D_OK) {
-	D3DSURFACE_DESC CurrD;              pCurrDS->GetDesc(&CurrD);
-	D3DSURFACE_DESC GrabD; if (pGrabDS) pGrabDS->GetDesc(&GrabD);
-
-	/* different */
-	if (!(*pTextDS) || memcmp(&CurrD, &GrabD, sizeof(D3DSURFACE_DESC))) {
-	  if ( pGrabDS)   pGrabDS ->Release();
-	  if (*pTextDS) (*pTextDS)->Release();
-
-	  pGrabDS = NULL; (*pTextDS) = NULL;
-	  if (StateDevice->CreateTexture(CurrD.Width, CurrD.Height, 1, CurrD.Usage, CurrD.Format, CurrD.Pool, pTextDS, NULL) == D3D_OK)
-	    (*pTextDS)->GetSurfaceLevel(0, &pGrabDS);
-	}
-
-	if (pGrabDS)
-	  SceneDevice->StretchRect(pCurrDS, NULL, pGrabDS, NULL, D3DTEXF_NONE);
-      }
-    }
-
-    if (pTextRT || pTextDS)
-      SceneDevice->BeginScene();
-
-    if (pTextDZ) {
-      (*pTextDZ) = NULL; IDirect3DSurface9 *pCurrDZ;
-      if (SceneDevice->GetDepthStencilSurface(&pCurrDZ) == D3D_OK) {
-	if (surfaceTexture[pCurrDZ]) {
-	  (*pTextDZ) = surfaceTexture[pCurrDZ]->tex;
-
-	  StateDevice->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+	  if (pGrabRT) {
+	    SceneDevice->StretchRect(pCurrRT, NULL, pGrabRT, NULL, D3DTEXF_NONE);
+	    bCFilled = true;
+	  }
 	}
       }
+
+      if (doDS) {
+	IDirect3DSurface9 *pCurrDS;
+	if (SceneDevice->GetDepthStencilSurface(&pCurrDS) == D3D_OK) {
+	  D3DSURFACE_DESC CurrD;              pCurrDS->GetDesc(&CurrD);
+	  D3DSURFACE_DESC GrabD; if (pGrabDS) pGrabDS->GetDesc(&GrabD);
+
+	  /* different */
+	  if (!pTextDS || memcmp(&CurrD, &GrabD, sizeof(D3DSURFACE_DESC))) {
+	    if (pGrabDS) pGrabDS->Release();
+	    if (pTextDS) pTextDS->Release();
+
+	    pGrabDS = NULL; pTextDS = NULL;
+	    if (StateDevice->CreateTexture(CurrD.Width, CurrD.Height, 1, CurrD.Usage, CurrD.Format, CurrD.Pool, &pTextDS, NULL) == D3D_OK)
+	      pTextDS->GetSurfaceLevel(0, &pGrabDS);
+	  }
+
+	  if (pGrabDS) {
+	    SceneDevice->StretchRect(pCurrDS, NULL, pGrabDS, NULL, D3DTEXF_NONE);
+	    bDFilled = true;
+	  }
+	}
+      }
+
+      if (doRT || doDS)
+	SceneDevice->BeginScene();
+
+      if (doDZ) {
+	pTextDZ = NULL; IDirect3DSurface9 *pCurrDZ;
+	if (SceneDevice->GetDepthStencilSurface(&pCurrDZ) == D3D_OK) {
+	  if (surfaceTexture[pCurrDZ]) {
+	    pTextDZ = surfaceTexture[pCurrDZ]->tex;
+
+	    StateDevice->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+	    bZLoaded = (bZFused ? -1 : 1);
+	  }
+	}
+      }
+
+      if (pCopyRT) (*pCopyRT) = pTextRT;
+      if (pCopyDS) (*pCopyDS) = pTextDS;
+      if (pCopyDZ) (*pCopyDZ) = pTextDZ;
     }
 
     if (iType == SHADER_VERTEX) {
@@ -1670,9 +1835,9 @@ void ShaderManager::UpdateFrameConstants() {
 
   QueryPerformanceCounter(&tick);
 
-  ShaderConst.TikTiming.z = (float)(tick.QuadPart * 1000 * 1000) / ShaderConst.TikTiming.w;
-  ShaderConst.TikTiming.y = (float)(tick.QuadPart * 1000 * 1   ) / ShaderConst.TikTiming.w;
-  ShaderConst.TikTiming.x = (float)(tick.QuadPart * 1    * 1   ) / ShaderConst.TikTiming.w;
+  ShaderConst.TikTiming.z = (float)(tick.QuadPart) * 1000 * 1000 / ShaderConst.TikTiming.w;
+  ShaderConst.TikTiming.y = (float)(tick.QuadPart) * 1000 * 1    / ShaderConst.TikTiming.w;
+  ShaderConst.TikTiming.x = (float)(tick.QuadPart) * 1    * 1    / ShaderConst.TikTiming.w;
 
   ShaderConst.SunTiming.x = climate->sunriseBegin * 10 * 60;
   ShaderConst.SunTiming.y = climate->sunriseEnd   * 10 * 60;
