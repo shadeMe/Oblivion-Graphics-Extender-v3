@@ -16,6 +16,7 @@ static IDirect3DTexture9 *pDepthTexture = NULL;
 static IDirect3DSurface9 *pDepthSurface = NULL;
 static IDirect3DSurface9 *pOldSurface = NULL;
 static bool HasDepthVar;
+static bool DoesRESZflag = false;
 static bool IsRAWZflag = false;
 
 struct DFLIST {
@@ -36,6 +37,7 @@ bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3
 
   _MESSAGE("Re-attaching depth buffer texture.");
 
+  DoesRESZflag = false;
   IsRAWZflag = false;
 
   Width = v1_2_416::GetRenderer()->SizeWidth;
@@ -57,8 +59,9 @@ bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3
     else
       _MESSAGE("RESZ not supported.");
 
-    int DepthCount;
+    DoesRESZflag = (hr == D3D_OK);
 
+    int DepthCount;
     for (DepthCount = 0; DepthCount < 4; DepthCount++) {
       hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_SURFACE, DepthList[DepthCount].FourCC);
 
@@ -316,4 +319,8 @@ bool HasDepth(void) {
 
 bool IsRAWZ(void) {
   return IsRAWZflag;
+};
+
+bool DoesRESZ(void) {
+  return DoesRESZflag;
 };

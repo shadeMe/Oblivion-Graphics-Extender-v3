@@ -12,6 +12,7 @@
 
 #include "EffectManager.h"
 #include "ShaderManager.h"
+#include "TextureConversions.h"
 #include "TextureManager.h"
 #include "TextureIOHook.hpp"
 #include "Half.hpp"
@@ -209,12 +210,13 @@ HWND DebugWindow::ControlActiveWindow(HWND org) {
 #include <wx/dialog.h>
 #include <wx/filedlg.h>
 #include <wx/string.h>
+#include <wx/gauge.h>
 #include <wx/dcclient.h>
 #include <wx/dcmemory.h>
 #pragma comment(lib,"Comctl32")
 #pragma comment(lib,"Rpcrt4")
 
-#if 1 //def OGBE_PROFILE
+#if defined(OGBE_PROFILE) || 1
 #include <wx/xy/xyplot.h>
 #include <wx/xy/xysimpledataset.h>
 #include <wx/xy/xydynamicdataset.h>
@@ -291,9 +293,30 @@ public:
     /* start enabling these functions */
     SDButtonEffectNew->Enable();
 
-#if 1//def OGBE_PROFILE
+#if 0
+    SDStatusGauge = new wxGauge(SDStatusBar, wxID_ANY, 100);
+    SDStatusGauge->SetValue(50);
+    SDStatusGauge->SetSize(400, 8);
+
+    SDStatusText = new wxStaticText(SDStatusBar, wxID_ANY, wxT("..."), wxDefaultPosition, wxDefaultSize, 0);
+
+    SDStatusSizerV = new wxBoxSizer( wxVERTICAL );
+    SDStatusSizerH = new wxBoxSizer( wxHORIZONTAL );
+
+    SDStatusSizerH->Add(SDStatusText, 1, wxALL | wxALIGN_CENTER_VERTICAL, 0);
+    SDStatusSizerH->Add(SDStatusGauge, 1, wxALL | wxALIGN_CENTER_VERTICAL, 0);
+    SDStatusSizerV->Add(SDStatusSizerH, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
+
+    SDStatusBar->SetSizer(SDStatusSizerV);
+    SDStatusBar->Layout();
+    SDStatusSizerV->Fit(SDStatusBar);
+#endif
+
+    SDStatusBar->SetStatusText(wxT("Ready"), 0);
+
+#if defined(OGBE_PROFILE) || 1
     memset(hist, 0, sizeof(hist));
-    assert(NULL);
+//  assert(NULL);
 
     // first step: create plot
     plot = new XYPlot();
@@ -364,11 +387,16 @@ public:
 #endif
   }
 
+//wxGauge *SDStatusGauge; 
+//wxStaticText *SDStatusText; 
+//wxBoxSizer *SDStatusSizerV;
+//wxBoxSizer *SDStatusSizerH;
+
   ShaderManager *sm;
   EffectManager *em;
   wxImage rt, gt, ds;
   wxMemoryDC crt, grt, cds, sts;
-#if 1//def OGBE_PROFILE
+#if defined(OGBE_PROFILE) || 1
   NumberAxis *leftAxis, *bottomAxis;
   XYAreaRenderer *rndrP;
   XYAreaRenderer *rndrS;
@@ -417,9 +445,10 @@ public:
     /* search shader render-targets */
     RuntimeShaderList::iterator RS = sm->RuntimeShaders.begin();
     while (RS != sm->RuntimeShaders.end()) {
-      if ((*RS)->pTextRT && (*RS)->pGrabRT)
-	if (--offs < 0)
-	  return (*RS)->pGrabRT;
+      for (int p = 0; p < OBGEPASS_NUM; p++)
+	if ((*RS)->rsb[p].pTextRT && (*RS)->rsb[p].pGrabRT)
+	  if (--offs < 0)
+	    return (*RS)->rsb[p].pGrabRT;
 
       RS++;
     }
@@ -475,28 +504,30 @@ public:
       /* search shader render-targets */
       RuntimeShaderList::iterator RS = sm->RuntimeShaders.begin();
       while (RS != sm->RuntimeShaders.end()) {
-	if ((*RS)->pTextRT == tex) {
-	  if ((*RS)->pAssociate)
-	    sprintf(buf, "%s global rendertarget copy", (*RS)->pAssociate->Name);
-	  else
-	    sprintf(buf, "Unknown shader local rendertarget copy");
-	  return buf;
-	}
+	for (int p = 0; p < OBGEPASS_NUM; p++) {
+	  if ((*RS)->rsb[p].pTextRT == tex) {
+	    if ((*RS)->pAssociate)
+	      sprintf(buf, "%s pass %d rendertarget copy", (*RS)->pAssociate->Name, p);
+	    else
+	      sprintf(buf, "Unknown shader pass %d rendertarget copy", p);
+	    return buf;
+	  }
 
-	if ((*RS)->pTextDS == tex) {
-	  if ((*RS)->pAssociate)
-	    sprintf(buf, "%s global depth-stencil copy", (*RS)->pAssociate->Name);
-	  else
-	    sprintf(buf, "Unknown shader local depth-stencil copy");
-	  return buf;
-	}
+	  if ((*RS)->rsb[p].pTextDS == tex) {
+	    if ((*RS)->pAssociate)
+	      sprintf(buf, "%s pass %d depth-stencil copy", (*RS)->pAssociate->Name, p);
+	    else
+	      sprintf(buf, "Unknown shader pass %d depth-stencil copy", p);
+	    return buf;
+	  }
 
-	if ((*RS)->pTextDZ == tex) {
-	  if ((*RS)->pAssociate)
-	    sprintf(buf, "%s global depth-stencil", (*RS)->pAssociate->Name);
-	  else
-	    sprintf(buf, "Unknown shader global depth-stencil");
-	  return buf;
+	  if ((*RS)->rsb[p].pTextDZ == tex) {
+	    if ((*RS)->pAssociate)
+	      sprintf(buf, "%s pass %d depth-stencil", (*RS)->pAssociate->Name, p);
+	    else
+	      sprintf(buf, "Unknown shader pass %d depth-stencil", p);
+	    return buf;
+	  }
 	}
 
 	RS++;
@@ -1107,6 +1138,7 @@ public:
       SetShaderConstantTable(gt, true, o->pConstsRuntime , o->pShaderRuntime  ? o->pShaderRuntime->GetBufferSize()  : -1, 2, 0);
     }
 
+    gt->SetRowLabelSize(wxGRID_AUTOSIZE);
     wxSize sz = gt->GetClientSize();
     int dv = sz.GetWidth() - gt->GetRowLabelSize();
     gt->SetColSize(0, dv / 3);
@@ -1149,6 +1181,7 @@ public:
 	SetShaderConstSetTable(gt, false, &r->traced[pass], -1, 2, 0);
     }
 
+    gt->SetRowLabelSize(wxGRID_AUTOSIZE);
     wxSize sz = gt->GetClientSize();
     int dv = sz.GetWidth() - gt->GetRowLabelSize();
     gt->SetColSize(0, dv / 4);
@@ -1181,6 +1214,7 @@ public:
 	SetShaderSamplerTable(gt, false, &r->traced[pass], -1, 0, 0);
     }
 
+    gt->SetRowLabelSize(wxGRID_AUTOSIZE);
     wxSize sz = gt->GetClientSize();
     int dv = sz.GetWidth() - gt->GetRowLabelSize();
     gt->SetColSize(0, dv / 2);
@@ -1216,6 +1250,7 @@ public:
 	SetEffectConstSetTable(gt, false, o->GetEffect(), -1, 0, 0);
     }
 
+    gt->SetRowLabelSize(wxGRID_AUTOSIZE);
     wxSize sz = gt->GetClientSize();
     int dv = sz.GetWidth() - gt->GetRowLabelSize();
     gt->SetColSize(0, dv);
@@ -1244,6 +1279,7 @@ public:
 	SetEffectTextureTable(gt, false, o->GetEffect(), -1, 0, 0);
     }
 
+    gt->SetRowLabelSize(wxGRID_AUTOSIZE);
     wxSize sz = gt->GetClientSize();
     int dv = sz.GetWidth() - gt->GetRowLabelSize();
     gt->SetColSize(0, dv);
@@ -1276,6 +1312,7 @@ public:
         SetRenderTable(gt, false, o, &sm->trackd[p], -1, 0, 0);
     }
 
+    gt->SetRowLabelSize(wxGRID_AUTOSIZE);
     wxSize sz = gt->GetClientSize();
     int dv = sz.GetWidth() - gt->GetRowLabelSize();
     gt->SetColSize(0, dv / 2);
@@ -1654,7 +1691,7 @@ public:
     SDShaderVersion->Clear();
 
     if (o) {
-      wxMenuItem *mi; mi = SDShaderOptions->FindChildItem(wxID_UPGRADE, NULL);
+      wxMenuItem *mi; mi = SDShaderOptions->FindChildItem(wxID_SUPGRADE, NULL);
       int idx = 0, sel = wxNOT_FOUND;
 
       if (o->iType == SHADER_PIXEL) {
@@ -1804,6 +1841,27 @@ public:
 
     sprintf(buf, status, o ? o->pProfile : "-");
     SDStatusShader->SetLabel(buf);
+
+    if (o && o->pAssociate) {
+      if (!o->pAssociate->Paired.empty()) {
+	std::set<RuntimeShaderRecord *>::iterator Pair = o->pAssociate->Paired.begin();
+
+	buf[0] = '\0';
+	char pair[256]; pair[0] = '\0';
+	while (Pair != o->pAssociate->Paired.end()) {
+	  if (pair[0] != '\0')
+	    strcat(pair, ", ");
+	  strcat(pair, (*Pair)->pAssociate->Name);
+	  Pair++;
+	}
+
+	sprintf(buf, "Pair: %s", pair);
+      }
+      else
+	sprintf(buf, "Pair: -");
+
+      SDShaderPairing->SetLabel(buf);
+    }
 
     if (o && o->pSourceRuntime  && !o->pShaderRuntime )
       SDShaderCompile->Enable();
@@ -2547,12 +2605,14 @@ public:
 
 	  /* if we switch an effect off for example, we have to re-assign names */
 	  if (1) {
+	    struct ShaderManager::track *t = &sm->trackd[pass];
+
 	    if (s == OBGESCENE_CNT)
 	      serie->SetName(wxString("Total"));
 	    else {
 	      /* info with pass-id */
-	      if ((int)sm->trackd[pass].frame_name[s] > 0)
-		sprintf(buf, "Scene %d: %s", s, sm->trackd[pass].frame_name[s]);
+	      if ((t->frame_used[s] > 0) && t->frame_name[s])
+		sprintf(buf, "Scene %d: %s", s, t->frame_name[s]);
 	      else
 		sprintf(buf, "Scene %d", s);
 
@@ -3052,13 +3112,13 @@ public:
     if ((sm = ShaderManager::GetSingleton())) {
       wxMenuItem *mi;
  
-      mi = SDShaderOptions->FindChildItem(wxID_COMPILE,  NULL); mi->Check(sm->CompileSources());
-      mi = SDShaderOptions->FindChildItem(wxID_SAVEBIN,  NULL); mi->Check(sm->SaveShaderOverride());
-      mi = SDShaderOptions->FindChildItem(wxID_LEGACY,   NULL); mi->Check(sm->UseLegacyCompiler());
-      mi = SDShaderOptions->FindChildItem(wxID_OPTIMIZE, NULL); mi->Check(sm->Optimize());
-      mi = SDShaderOptions->FindChildItem(wxID_MAXIMUM,  NULL); mi->Check(sm->MaximumSM());
-      mi = SDShaderOptions->FindChildItem(wxID_UPGRADE,  NULL); mi->Check(sm->UpgradeSM());
-      mi = SDShaderOptions->FindChildItem(wxID_RUNTIME,  NULL); mi->Check(sm->RuntimeSources());
+      mi = SDShaderOptions->FindChildItem(wxID_SCOMPILE,  NULL); mi->Check(sm->CompileSources());
+      mi = SDShaderOptions->FindChildItem(wxID_SSAVEBIN,  NULL); mi->Check(sm->SaveShaderOverride());
+      mi = SDShaderOptions->FindChildItem(wxID_SLEGACY,   NULL); mi->Check(sm->UseLegacyCompiler());
+      mi = SDShaderOptions->FindChildItem(wxID_SOPTIMIZE, NULL); mi->Check(sm->Optimize());
+      mi = SDShaderOptions->FindChildItem(wxID_SMAXIMUM,  NULL); mi->Check(sm->MaximumSM());
+      mi = SDShaderOptions->FindChildItem(wxID_SUPGRADE,  NULL); mi->Check(sm->UpgradeSM());
+      mi = SDShaderOptions->FindChildItem(wxID_SRUNTIME,  NULL); mi->Check(sm->RuntimeSources());
     }
 
     /* options have changed since last activation */
@@ -3066,13 +3126,13 @@ public:
     if ((em = EffectManager::GetSingleton())) {
       wxMenuItem *mi;
 
-      mi = SDEffectOptions->FindChildItem(wxID_COMPILE,  NULL); mi->Check(em->CompileSources());
-//    mi = SDEffectOptions->FindChildItem(wxID_SAVEBIN,  NULL); mi->Check(em->SaveEffectOverride());
-      mi = SDEffectOptions->FindChildItem(wxID_LEGACY,   NULL); mi->Check(em->UseLegacyCompiler());
-      mi = SDEffectOptions->FindChildItem(wxID_OPTIMIZE, NULL); mi->Check(em->Optimize());
+      mi = SDEffectOptions->FindChildItem(wxID_ECOMPILE,  NULL); mi->Check(em->CompileSources());
+//    mi = SDEffectOptions->FindChildItem(wxID_ESAVEBIN,  NULL); mi->Check(em->SaveEffectOverride());
+      mi = SDEffectOptions->FindChildItem(wxID_ELEGACY,   NULL); mi->Check(em->UseLegacyCompiler());
+      mi = SDEffectOptions->FindChildItem(wxID_EOPTIMIZE, NULL); mi->Check(em->Optimize());
     }
 
-#if 1//def OGBE_PROFILE
+#if defined(OGBE_PROFILE) || 1
     if (1) {
       wxMenuItem *mi;
 
@@ -3080,6 +3140,14 @@ public:
       mi = SDProfileOptions->FindChildItem(wxID_KILLTEX, NULL); mi->Enable(true);
     }
 #endif
+
+    /* read changes from disk
+    if (sm->ReloadShaders()) {
+      ShaderRecord *o = FindShaderRecord(NULL, SDComboShader->GetStringSelection());
+      
+      SetShaderRecord(o);
+    }
+    */
 
     /* renderpasses might have changed since last activation */
     int j = SDChoicePass->GetSelection(), h = 0;
@@ -3511,7 +3579,7 @@ public:
 
   virtual void DoShaderVersion(wxCommandEvent& event) {
     DoShaderVersion();
-    event.Skip();
+//  event.Skip();
   }
 
   void DoShaderVersion() {
@@ -3546,7 +3614,7 @@ public:
 
   virtual void DoShaderCompile(wxCommandEvent& event) {
     DoShaderCompile();
-    event.Skip();
+//  event.Skip();
   }
 
   void DoShaderCompile() {
@@ -3575,7 +3643,7 @@ public:
 
   virtual void DoShaderToggle(wxCommandEvent& event) {
     DoShaderToggle();
-    event.Skip();
+//  event.Skip();
   }
 
   void DoShaderToggle() {
@@ -3589,6 +3657,26 @@ public:
 	o->pAssociate->ActivateShader(SHADER_REPLACED);
       else //if (SDShaderEnable->Get3StateValue() == wxCHK_UNCHECKED)
 	o->pAssociate->ActivateShader(SHADER_ORIGINAL);
+    }
+  }
+
+  virtual void DoMarkToggle(wxCommandEvent& event) {
+    DoMarkToggle();
+//  event.Skip();
+  }
+
+  void DoMarkToggle() {
+    ShaderRecord *o = FindShaderRecord(NULL, SDComboShader->GetStringSelection());
+
+    /* ------------------------------------------------ */
+    if (o && o->pAssociate) {
+      /* for identification */
+      sm->GetBuiltInShader("IDENTIFY.pso");
+
+      if (SDShaderMark->GetValue() == wxCHK_CHECKED)
+	o->pAssociate->bMark = true;
+      else //if (SDShaderEnable->Get3StateValue() == wxCHK_UNCHECKED)
+	o->pAssociate->bMark = false;
     }
   }
 
@@ -3958,7 +4046,7 @@ public:
 
   virtual void DoStatsToggle(wxCommandEvent& event) {
     DoStatsToggle();
-    event.Skip();
+//  event.Skip();
   }
 
   void DoStatsToggle() {
@@ -3983,18 +4071,18 @@ public:
     if (sm) {
       wxMenuItem *mi;
 
-      mi = SDShaderOptions->FindChildItem(wxID_COMPILE,  NULL); sm->CompileSources(mi->IsChecked());
-      mi = SDShaderOptions->FindChildItem(wxID_SAVEBIN,  NULL); sm->SaveShaderOverride(mi->IsChecked());
-      mi = SDShaderOptions->FindChildItem(wxID_OPTIMIZE, NULL); sm->Optimize(mi->IsChecked());
-      mi = SDShaderOptions->FindChildItem(wxID_LEGACY,   NULL); sm->UseLegacyCompiler(mi->IsChecked());
-      mi = SDShaderOptions->FindChildItem(wxID_MAXIMUM,  NULL); sm->MaximumSM(mi->IsChecked());
-      mi = SDShaderOptions->FindChildItem(wxID_UPGRADE,  NULL); sm->UpgradeSM(mi->IsChecked());
-      mi = SDShaderOptions->FindChildItem(wxID_RUNTIME,  NULL); sm->RuntimeSources(mi->IsChecked());
+      mi = SDShaderOptions->FindChildItem(wxID_SCOMPILE,  NULL); sm->CompileSources(mi->IsChecked());
+      mi = SDShaderOptions->FindChildItem(wxID_SSAVEBIN,  NULL); sm->SaveShaderOverride(mi->IsChecked());
+      mi = SDShaderOptions->FindChildItem(wxID_SOPTIMIZE, NULL); sm->Optimize(mi->IsChecked());
+      mi = SDShaderOptions->FindChildItem(wxID_SLEGACY,   NULL); sm->UseLegacyCompiler(mi->IsChecked());
+      mi = SDShaderOptions->FindChildItem(wxID_SMAXIMUM,  NULL); sm->MaximumSM(mi->IsChecked());
+      mi = SDShaderOptions->FindChildItem(wxID_SUPGRADE,  NULL); sm->UpgradeSM(mi->IsChecked());
+      mi = SDShaderOptions->FindChildItem(wxID_SRUNTIME,  NULL); sm->RuntimeSources(mi->IsChecked());
 
       GetShaderRecordStatus(o);
     }
 
-    event.Skip();
+//  event.Skip();
   }
 
   virtual void DoEffectOptions(wxCommandEvent& event) {
@@ -4006,10 +4094,10 @@ public:
     if (em) {
       wxMenuItem *mi;
 
-      mi = SDEffectOptions->FindChildItem(wxID_COMPILE,  NULL); em->CompileSources(mi->IsChecked());
-//    mi = SDEffectOptions->FindChildItem(wxID_SAVEBIN,  NULL); em->SaveEffectBinary(mi->IsChecked());
-      mi = SDEffectOptions->FindChildItem(wxID_OPTIMIZE, NULL); em->Optimize(mi->IsChecked());
-      mi = SDEffectOptions->FindChildItem(wxID_LEGACY,   NULL); em->UseLegacyCompiler(mi->IsChecked());
+      mi = SDEffectOptions->FindChildItem(wxID_ECOMPILE,  NULL); em->CompileSources(mi->IsChecked());
+//    mi = SDEffectOptions->FindChildItem(wxID_ESAVEBIN,  NULL); em->SaveEffectBinary(mi->IsChecked());
+      mi = SDEffectOptions->FindChildItem(wxID_EOPTIMIZE, NULL); em->Optimize(mi->IsChecked());
+      mi = SDEffectOptions->FindChildItem(wxID_ELEGACY,   NULL); em->UseLegacyCompiler(mi->IsChecked());
 
       GetEffectRecordStatus(o);
     }
@@ -4029,7 +4117,247 @@ public:
       mi = SDProfileOptions->FindChildItem(wxID_KILLTEX, NULL); frame_ntx = mi->IsChecked();
     }
 
-    event.Skip();
+//  event.Skip();
+  }
+
+  virtual void DoToolPMtoQDM(wxCommandEvent& event) {
+
+    /* ------------------------------------------------ */
+    wxFileDialog dlg1(
+      this,
+      _T("Select base-texture (RGB+Height)"),
+      wxT(em->EffectDirectory()),
+      wxEmptyString,
+      _T(
+	"Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+	"PNG images (*.png)|*.png|"
+	"JPEG images (*.jpg)|*.jpg|"
+	"Windows images (*.bmp)|*.bmp|"
+	"DirextX images (*.dds)|*.dds"
+      ),
+      wxFD_OPEN | wxFD_FILE_MUST_EXIST
+    );
+
+    if (dlg1.ShowModal() != wxID_OK)
+      return;
+
+    // get filename
+    wxString m_base_filename = dlg1.GetFilename();
+    wxString m_base_filepath = dlg1.GetPath();
+
+    wxFileDialog dlg2(
+      this,
+      _T("Select normal-texture (XYZ+Diffuse)"),
+      wxT(em->EffectDirectory()),
+      wxEmptyString,
+      _T(
+	"Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+	"PNG images (*.png)|*.png|"
+	"JPEG images (*.jpg)|*.jpg|"
+	"Windows images (*.bmp)|*.bmp|"
+	"DirextX images (*.dds)|*.dds"
+      ),
+      wxFD_OPEN | wxFD_FILE_MUST_EXIST
+    );
+
+    if (dlg2.ShowModal() != wxID_OK)
+      return;
+
+    // get filename
+    wxString m_norm_filename = dlg2.GetFilename();
+    wxString m_norm_filepath = dlg2.GetPath();
+
+    LPDIRECT3DTEXTURE9 base = NULL, norm = NULL;
+
+    D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_base_filepath, &base);
+    D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_norm_filepath, &norm);
+
+    if (base && norm) {
+//    if (TextureCompressPM(&base, &norm))
+      if (TextureCompressQDM(&base, &norm)) {
+	wxFileDialog dlg1(
+	  this,
+	  _T("Select base-texture (RGB+Height)"),
+	  wxT(em->EffectDirectory()),
+	  wxEmptyString,
+	  _T(
+	  "DirextX images (*.dds)|*.dds"
+	  ),
+	  wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+	);
+
+	if (dlg1.ShowModal() != wxID_OK)
+	  return;
+
+	// get filename
+	wxString m_base_filename = dlg1.GetFilename();
+	wxString m_base_filepath = dlg1.GetPath();
+
+	wxFileDialog dlg2(
+	  this,
+	  _T("Select normal-texture (XYZ+Diffuse)"),
+	  wxT(em->EffectDirectory()),
+	  wxEmptyString,
+	  _T(
+	  "DirextX images (*.dds)|*.dds"
+	  ),
+	  wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+	);
+
+	if (dlg2.ShowModal() != wxID_OK)
+	  return;
+
+	// get filename
+	wxString m_norm_filename = dlg2.GetFilename();
+	wxString m_norm_filepath = dlg2.GetPath();
+
+	D3DXSaveTextureToFile(m_base_filepath, D3DXIFF_DDS, base, NULL);
+	D3DXSaveTextureToFile(m_norm_filepath, D3DXIFF_DDS, norm, NULL);
+
+	base->Release();
+	norm->Release();
+      }
+    }
+
+    SDStatusBar->SetStatusText(wxT("Ready"), 0);
+//  event.Skip();
+  }
+
+//  bool TextureCompressT(LPDIRECT3DTEXTURE9 *base);
+//  bool TextureCompressNM(LPDIRECT3DTEXTURE9 *norm);
+
+  virtual void DoToolRemipCLR(wxCommandEvent& event) {
+
+    /* ------------------------------------------------ */
+    wxFileDialog dlg1(
+      this,
+      _T("Select base-texture (RGB+Height)"),
+      wxT(em->EffectDirectory()),
+      wxEmptyString,
+      _T(
+      "Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+      "PNG images (*.png)|*.png|"
+      "JPEG images (*.jpg)|*.jpg|"
+      "Windows images (*.bmp)|*.bmp|"
+      "DirextX images (*.dds)|*.dds"
+      ),
+      wxFD_OPEN | wxFD_FILE_MUST_EXIST
+    );
+
+    if (dlg1.ShowModal() != wxID_OK)
+      return;
+
+    // get filename
+    wxString m_base_filename = dlg1.GetFilename();
+    wxString m_base_filepath = dlg1.GetPath();
+
+    LPDIRECT3DTEXTURE9 base = NULL;
+
+    D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_base_filepath, &base);
+
+    if (base) {
+      if (TextureCompressT(&base)) {
+	wxFileDialog dlg1(
+	  this,
+	  _T("Select base-texture (RGB+Height)"),
+	  wxT(em->EffectDirectory()),
+	  wxEmptyString,
+	  _T(
+	  "DirextX images (*.dds)|*.dds"
+	  ),
+	  wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+	);
+
+	if (dlg1.ShowModal() != wxID_OK)
+	  return;
+
+	// get filename
+	wxString m_base_filename = dlg1.GetFilename();
+	wxString m_base_filepath = dlg1.GetPath();
+
+	D3DXSaveTextureToFile(m_base_filepath, D3DXIFF_DDS, base, NULL);
+
+	base->Release();
+      }
+    }
+
+    SDStatusBar->SetStatusText(wxT("Ready"), 0);
+//  event.Skip();
+  }
+
+  virtual void DoToolRemipNM(wxCommandEvent& event) {
+
+    /* ------------------------------------------------ */
+    wxFileDialog dlg2(
+      this,
+      _T("Select normal-texture (XYZ+Diffuse)"),
+      wxT(em->EffectDirectory()),
+      wxEmptyString,
+      _T(
+      "Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+      "PNG images (*.png)|*.png|"
+      "JPEG images (*.jpg)|*.jpg|"
+      "Windows images (*.bmp)|*.bmp|"
+      "DirextX images (*.dds)|*.dds"
+      ),
+      wxFD_OPEN | wxFD_FILE_MUST_EXIST
+    );
+
+    if (dlg2.ShowModal() != wxID_OK)
+      return;
+
+    // get filename
+    wxString m_norm_filename = dlg2.GetFilename();
+    wxString m_norm_filepath = dlg2.GetPath();
+
+    LPDIRECT3DTEXTURE9 norm = NULL;
+
+    D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_norm_filepath, &norm);
+
+    if (norm) {
+      if (TextureCompressNM(&norm)) {
+	wxFileDialog dlg2(
+	  this,
+	  _T("Select normal-texture (XYZ+Diffuse)"),
+	  wxT(em->EffectDirectory()),
+	  wxEmptyString,
+	  _T(
+	  "DirextX images (*.dds)|*.dds"
+	  ),
+	  wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+	);
+
+	if (dlg2.ShowModal() != wxID_OK)
+	  return;
+
+	// get filename
+	wxString m_norm_filename = dlg2.GetFilename();
+	wxString m_norm_filepath = dlg2.GetPath();
+
+	D3DXSaveTextureToFile(m_norm_filepath, D3DXIFF_DDS, norm, NULL);
+
+	norm->Release();
+      }
+    }
+
+    SDStatusBar->SetStatusText(wxT("Ready"), 0);
+//  event.Skip();
+  }
+
+  /* --------------------------------------------------------------
+   */
+
+  void SetProgress(int a, int amax, int b, int bmax) {
+    char buf[256];
+
+    if (bmax)
+      sprintf(buf, "Processing ... %.3f%%, %.3f%%", 100.0f * a / amax, 100.0f * b / bmax);
+    else if (amax)
+      sprintf(buf, "Processing ... %.3f%%", 100.0f * a / amax);
+    else
+      sprintf(buf, "Processing ...");
+
+    SDStatusBar->SetStatusText(wxString(buf), 0);
   }
 
   /* --------------------------------------------------------------
@@ -4134,6 +4462,10 @@ DebugWindow *DebugWindow::Expunge() {
 	return NULL;
 }
 
+DebugWindow *DebugWindow::Get() {
+	return dw;
+}
+
 void DebugWindow::Exit() {
 	if (DWEnabled.data) {
 	  Destroy();
@@ -4142,6 +4474,13 @@ void DebugWindow::Exit() {
 	    wxUninitialize();
 	  }
 	}
+}
+
+void DebugWindow::SetProgress(int a, int amax, int b, int bmax) {
+	GUIs_ShaderDeveloper *
+	sdev = (GUIs_ShaderDeveloper *)this->sdev;
+	
+	sdev->SetProgress(a, amax, b, bmax);
 }
 
 #endif

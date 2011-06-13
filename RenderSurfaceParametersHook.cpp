@@ -558,7 +558,7 @@ void *(__thiscall Anonymous::* TrackRenderedSurface)(v1_2_416::NiDX9Renderer *re
 void *Anonymous::TrackRenderedSurface(v1_2_416::NiDX9Renderer *renderer, int Width, int Height, int Flags, D3DFORMAT Format, enum SurfaceIDs SurfaceTypeID) {
 //	assert(false);
 
-#if 1	/* apparently the surface-type is always 0 here! Oblivion does not pass any!
+#if 0	/* apparently the surface-type is always 0 here! Oblivion does not pass any!
          * lok at the parameters function below to detect surface-types
          */
 	const char *SurfaceTypeName = "unknown";
@@ -635,7 +635,7 @@ void __stdcall TrackRenderedSurfaceParameters(v1_2_416::NiDX9Renderer *renderer,
 
 //	assert(NULL);
 
-#if 1	/* currently of no use ... maybe you find one :^) */
+#if 0	/* currently of no use ... maybe you find one :^) */
 	const char *SurfaceTypeName = "unknown";
 	switch (SurfaceTypeID) {
 		case SURFACE_ID_HDR0: SurfaceTypeName = "HDR-BoxSample Surface"; break;
@@ -676,7 +676,8 @@ void __stdcall TrackRenderedSurfaceParameters(v1_2_416::NiDX9Renderer *renderer,
 //	_DMESSAGE("OD3D9: Intercepted Flags: 0x%08x", Flags);
 	_DMESSAGE("OD3D9: Intercepted Format: %s", findFormat(*pFormat));
 	_DMESSAGE("OD3D9: Intercepted {W,H} before: {%d,%d}", *pWidth, *pHeight);
-
+#endif
+#if 1
 	/* enable default automipmapping */
 	AMFilter = (D3DTEXTUREFILTERTYPE)AutoGenerateMipMaps.Get();
 
@@ -771,7 +772,9 @@ void __stdcall TrackRenderedSurfaceParameters(v1_2_416::NiDX9Renderer *renderer,
 		  break;
 	}
 
+#if 0
 	_DMESSAGE("OD3D9: Intercepted {W,H} after: {%d,%d}", *pWidth, *pHeight);
+#endif
 #endif
 }
 

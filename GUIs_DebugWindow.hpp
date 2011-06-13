@@ -13,6 +13,7 @@ public:
 
 	static DebugWindow *Create();
 	static DebugWindow *Expunge();
+	static DebugWindow *Get();
 	static void Destroy();
 	static void Exit();
 
@@ -34,6 +35,7 @@ private:
 	HWND	m_button;
 	HWND	m_editText, m_editText2;
 #else
+	void SetProgress(int a, int amax, int b, int bmax);
 	void *sdev;
 #endif
 };

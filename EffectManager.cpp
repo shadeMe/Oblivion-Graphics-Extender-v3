@@ -1063,15 +1063,15 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectConstants *C
   D3DDevice->EndScene();
 }
 
-inline ID3DXEffect *EffectRecord::GetEffect() const {
+ID3DXEffect *EffectRecord::GetEffect() const {
   return this->pEffect;
 }
 
-inline bool EffectRecord::HasEffect() const {
+bool EffectRecord::HasEffect() const {
   return (this->pEffect != NULL);
 }
 
-inline void EffectRecord::Enable(bool Enabled) {
+void EffectRecord::Enable(bool Enabled) {
   /* do nothing */
   if (this->Enabled == Enabled)
     return;
@@ -1082,7 +1082,7 @@ inline void EffectRecord::Enable(bool Enabled) {
   EffectManager::GetSingleton()->Recalculate();
 }
 
-inline bool EffectRecord::IsEnabled() const {
+bool EffectRecord::IsEnabled() const {
   return this->Enabled && HasEffect();
 }
 
@@ -1118,32 +1118,32 @@ inline void EffectRecord::SetPriority(int pri) {
   this->Priority = (this->Priority & (0xFF << 24)) | (pri & ~(0xFF << 24));
 }
 
-inline bool EffectRecord::SetEffectConstantB(const char *name, bool value) {
+bool EffectRecord::SetEffectConstantB(const char *name, bool value) {
   HRESULT hr = (HasEffect() ? pEffect->SetBool(name, value) : -1);
   return (hr == D3D_OK);
 }
 
-inline bool EffectRecord::SetEffectConstantI(const char *name, int value) {
+bool EffectRecord::SetEffectConstantI(const char *name, int value) {
   HRESULT hr = (HasEffect() ? pEffect->SetInt(name, value) : -1);
   return (hr == D3D_OK);
 }
 
-inline bool EffectRecord::SetEffectConstantI(const char *name, int *values, int num) {
+bool EffectRecord::SetEffectConstantI(const char *name, int *values, int num) {
   HRESULT hr = (HasEffect() ? pEffect->SetIntArray(name, values, num) : -1);
   return (hr == D3D_OK);
 }
 
-inline bool EffectRecord::SetEffectConstantF(const char *name, float value) {
+bool EffectRecord::SetEffectConstantF(const char *name, float value) {
   HRESULT hr = (HasEffect() ? pEffect->SetFloat(name, value) : -1);
   return (hr == D3D_OK);
 }
 
-inline bool EffectRecord::SetEffectConstantF(const char *name, float *values, int num) {
+bool EffectRecord::SetEffectConstantF(const char *name, float *values, int num) {
   HRESULT hr = (HasEffect() ? pEffect->SetFloatArray(name, values, num) : -1);
   return (hr == D3D_OK);
 }
 
-inline bool EffectRecord::SetEffectConstantV(const char *name, v1_2_416::NiVector4 *value) {
+bool EffectRecord::SetEffectConstantV(const char *name, v1_2_416::NiVector4 *value) {
   HRESULT hr = (HasEffect() ? pEffect->SetVector(name, value) : -1);
   return (hr == D3D_OK);
 }
@@ -2481,7 +2481,7 @@ void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
       EffectNum = AddManagedEffect(LoadFilepath, LoadRefID);
     else
       EffectNum = FindEffect(LoadFilepath);
-
+ 
     if (EffectNum != -1) {
       ManagedEffectRecord *NewEffect = GetEffect(EffectNum);
       ID3DXEffect *pEffect = NewEffect->GetEffect();

@@ -1075,7 +1075,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetRenderSta
   if (HasShaderManager) {
     /* blow the fuse, if manually set */
     if (State == D3DRS_ZWRITEENABLE)
-      RuntimeShaderRecord::bZLoaded = 0;
+      RuntimeShaderRecord::rsb[currentPass].bZLoaded = 0;
 
 #ifdef	OBGE_DEVLING
     /* record exact position of occurance */
@@ -1131,10 +1131,28 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTexture(D
     pTexture = NULL;
 #endif
 
+  if (HasShaderManager) {
+#if 1
+    /* shaders may like to get some absolute texture information
+     * I hope this is quick ...
+     */
+    if ((m_shaders->GlobalConst.pTexture[Sampler].vals.texture.texture = pTexture)) {
+      D3DSURFACE_DESC desc; int levels =
+
+      ((IDirect3DTexture9 *)pTexture)->GetLevelCount();
+      ((IDirect3DTexture9 *)pTexture)->GetLevelDesc(0, &desc);
+
+      m_shaders->GlobalConst.pTexture[Sampler].vals.texture.data[0] = desc.Width;
+      m_shaders->GlobalConst.pTexture[Sampler].vals.texture.data[1] = desc.Height;
+      m_shaders->GlobalConst.pTexture[Sampler].vals.texture.data[2] = levels;
+      m_shaders->GlobalConst.pTexture[Sampler].vals.texture.data[3] = 0;
+    }
+#endif
+
 #ifdef	OBGE_DEVLING
-  if (HasShaderManager)
     m_shaders->traced[currentPass].values_s[Sampler] = pTexture;
 #endif
+  }
 
   if (frame_log) {
     frame_log->FormattedMessage("SetTexture[%d]", Sampler);
@@ -1253,6 +1271,13 @@ COM_DECLSPEC_NOTHROW float STDMETHODCALLTYPE OBGEDirect3DDevice9::GetNPatchMode(
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT StartVertex, UINT PrimitiveCount) {
+#ifdef	OBGE_DEVLING
+  if (m_shadercv && m_shadercp) {
+    m_shadercv->Paired.insert(m_shadercp);
+    m_shadercp->Paired.insert(m_shadercv);
+  }
+#endif
+
   if (frame_log) {
     frame_log->Message("DrawPrimitive");
 
@@ -1277,6 +1302,13 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawPrimitiv
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawIndexedPrimitive(D3DPRIMITIVETYPE PrimitiveType, INT BaseVertexIndex, UINT MinVertexIndex, UINT NumVertices, UINT startIndex, UINT primCount) {
+#ifdef	OBGE_DEVLING
+  if (m_shadercv && m_shadercp) {
+    m_shadercv->Paired.insert(m_shadercp);
+    m_shadercp->Paired.insert(m_shadercv);
+  }
+#endif
+
   if (frame_log) {
     frame_log->Message("DrawIndexedPrimitive");
 
@@ -1302,6 +1334,13 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawIndexedP
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawPrimitiveUP(D3DPRIMITIVETYPE PrimitiveType, UINT PrimitiveCount, CONST void *pVertexStreamZeroData, UINT VertexStreamZeroStride) {
+#ifdef	OBGE_DEVLING
+  if (m_shadercv && m_shadercp) {
+    m_shadercv->Paired.insert(m_shadercp);
+    m_shadercp->Paired.insert(m_shadercv);
+  }
+#endif
+
   if (frame_log) {
     frame_log->Message("DrawPrimitiveUP");
 
@@ -1327,6 +1366,13 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawPrimitiv
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawIndexedPrimitiveUP(D3DPRIMITIVETYPE PrimitiveType, UINT MinVertexIndex, UINT NumVertices, UINT PrimitiveCount, CONST void *pIndexData, D3DFORMAT IndexDataFormat, CONST void *pVertexStreamZeroData, UINT VertexStreamZeroStride) {
+#ifdef	OBGE_DEVLING
+  if (m_shadercv && m_shadercp) {
+    m_shadercv->Paired.insert(m_shadercp);
+    m_shadercp->Paired.insert(m_shadercv);
+  }
+#endif
+
   if (frame_log) {
     frame_log->Message("DrawIndexedPrimitiveUP");
 
@@ -1708,7 +1754,6 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::GetPixelShad
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetPixelShaderConstantB(UINT StartRegister, CONST BOOL *pConstantData, UINT  BoolCount) {
-#ifdef	OBGE_LOGGING
   if (frame_log) {
     frame_log->FormattedMessage("SetPixelShaderConstantB[%d+]", StartRegister);
     frame_log->Indent();
@@ -1718,7 +1763,6 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetPixelShad
 
     frame_log->Outdent();
   }
-#endif
 
   return m_device->SetPixelShaderConstantB(StartRegister, pConstantData, BoolCount);
 }

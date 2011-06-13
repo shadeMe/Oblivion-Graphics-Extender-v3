@@ -17,49 +17,49 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDMenubar = new wxMenuBar( 0 );
 	SDShaderOptions = new wxMenu();
 	wxMenuItem* SDShaderCompileSources;
-	SDShaderCompileSources = new wxMenuItem( SDShaderOptions, wxID_COMPILE, wxString( wxT("Compile Sources") ) , wxEmptyString, wxITEM_CHECK );
+	SDShaderCompileSources = new wxMenuItem( SDShaderOptions, wxID_SCOMPILE, wxString( wxT("Compile Sources") ) , wxEmptyString, wxITEM_CHECK );
 	SDShaderOptions->Append( SDShaderCompileSources );
 	
 	wxMenuItem* SDShaderSaveBinary;
-	SDShaderSaveBinary = new wxMenuItem( SDShaderOptions, wxID_SAVEBIN, wxString( wxT("Save Binary") ) , wxEmptyString, wxITEM_CHECK );
+	SDShaderSaveBinary = new wxMenuItem( SDShaderOptions, wxID_SSAVEBIN, wxString( wxT("Save Binary") ) , wxEmptyString, wxITEM_CHECK );
 	SDShaderOptions->Append( SDShaderSaveBinary );
 	
 	wxMenuItem* m_separator1;
 	m_separator1 = SDShaderOptions->AppendSeparator();
 	
 	wxMenuItem* SDShaderLegacy;
-	SDShaderLegacy = new wxMenuItem( SDShaderOptions, wxID_LEGACY, wxString( wxT("Legacy Compiler") ) , wxEmptyString, wxITEM_CHECK );
+	SDShaderLegacy = new wxMenuItem( SDShaderOptions, wxID_SLEGACY, wxString( wxT("Legacy Compiler") ) , wxEmptyString, wxITEM_CHECK );
 	SDShaderOptions->Append( SDShaderLegacy );
 	
 	wxMenuItem* SDShaderUpgradeSM1X;
-	SDShaderUpgradeSM1X = new wxMenuItem( SDShaderOptions, wxID_UPGRADE, wxString( wxT("Upgrade Legacy SM") ) , wxEmptyString, wxITEM_CHECK );
+	SDShaderUpgradeSM1X = new wxMenuItem( SDShaderOptions, wxID_SUPGRADE, wxString( wxT("Upgrade Legacy SM") ) , wxEmptyString, wxITEM_CHECK );
 	SDShaderOptions->Append( SDShaderUpgradeSM1X );
 	
 	wxMenuItem* SDShaderMaximumSM;
-	SDShaderMaximumSM = new wxMenuItem( SDShaderOptions, wxID_MAXIMUM, wxString( wxT("Maximize SM") ) , wxEmptyString, wxITEM_CHECK );
+	SDShaderMaximumSM = new wxMenuItem( SDShaderOptions, wxID_SMAXIMUM, wxString( wxT("Maximize SM") ) , wxEmptyString, wxITEM_CHECK );
 	SDShaderOptions->Append( SDShaderMaximumSM );
 	
 	wxMenuItem* SDShaderOptimize;
-	SDShaderOptimize = new wxMenuItem( SDShaderOptions, wxID_OPTIMIZE, wxString( wxT("Optimize") ) , wxEmptyString, wxITEM_CHECK );
+	SDShaderOptimize = new wxMenuItem( SDShaderOptions, wxID_SOPTIMIZE, wxString( wxT("Optimize") ) , wxEmptyString, wxITEM_CHECK );
 	SDShaderOptions->Append( SDShaderOptimize );
 	
 	wxMenuItem* m_separator2;
 	m_separator2 = SDShaderOptions->AppendSeparator();
 	
 	wxMenuItem* SDShaderRuntime;
-	SDShaderRuntime = new wxMenuItem( SDShaderOptions, wxID_RUNTIME, wxString( wxT("Runtime Replacement") ) , wxEmptyString, wxITEM_CHECK );
+	SDShaderRuntime = new wxMenuItem( SDShaderOptions, wxID_SRUNTIME, wxString( wxT("Runtime Replacement") ) , wxEmptyString, wxITEM_CHECK );
 	SDShaderOptions->Append( SDShaderRuntime );
 	
 	SDMenubar->Append( SDShaderOptions, wxT("Shaders") ); 
 	
 	SDEffectOptions = new wxMenu();
 	wxMenuItem* SDEffectCompileSources;
-	SDEffectCompileSources = new wxMenuItem( SDEffectOptions, wxID_COMPILE, wxString( wxT("Compile Sources") ) , wxEmptyString, wxITEM_CHECK );
+	SDEffectCompileSources = new wxMenuItem( SDEffectOptions, wxID_ECOMPILE, wxString( wxT("Compile Sources") ) , wxEmptyString, wxITEM_CHECK );
 	SDEffectOptions->Append( SDEffectCompileSources );
 	SDEffectCompileSources->Enable( false );
 	
 	wxMenuItem* SDEffectSaveBinary;
-	SDEffectSaveBinary = new wxMenuItem( SDEffectOptions, wxID_SAVEBIN, wxString( wxT("Save Binary") ) , wxEmptyString, wxITEM_CHECK );
+	SDEffectSaveBinary = new wxMenuItem( SDEffectOptions, wxID_ESAVEBIN, wxString( wxT("Save Binary") ) , wxEmptyString, wxITEM_CHECK );
 	SDEffectOptions->Append( SDEffectSaveBinary );
 	SDEffectSaveBinary->Enable( false );
 	
@@ -67,11 +67,11 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	m_separator11 = SDEffectOptions->AppendSeparator();
 	
 	wxMenuItem* SDEffectLegacy;
-	SDEffectLegacy = new wxMenuItem( SDEffectOptions, wxID_LEGACY, wxString( wxT("Legacy Compiler") ) , wxEmptyString, wxITEM_CHECK );
+	SDEffectLegacy = new wxMenuItem( SDEffectOptions, wxID_ELEGACY, wxString( wxT("Legacy Compiler") ) , wxEmptyString, wxITEM_CHECK );
 	SDEffectOptions->Append( SDEffectLegacy );
 	
 	wxMenuItem* SDEffectOptimize;
-	SDEffectOptimize = new wxMenuItem( SDEffectOptions, wxID_OPTIMIZE, wxString( wxT("Optimize") ) , wxEmptyString, wxITEM_CHECK );
+	SDEffectOptimize = new wxMenuItem( SDEffectOptions, wxID_EOPTIMIZE, wxString( wxT("Optimize") ) , wxEmptyString, wxITEM_CHECK );
 	SDEffectOptions->Append( SDEffectOptimize );
 	
 	SDMenubar->Append( SDEffectOptions, wxT("Effects") ); 
@@ -87,7 +87,29 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDProfileOptions->Append( SDProfileTex );
 	SDProfileTex->Enable( false );
 	
-	SDMenubar->Append( SDProfileOptions, wxT("Effects") ); 
+	SDMenubar->Append( SDProfileOptions, wxT("Profiling") ); 
+	
+	SDTools = new wxMenu();
+	SDToolsSettings = new wxMenu();
+	wxMenuItem* SDToolsSettingsAmplify;
+	SDToolsSettingsAmplify = new wxMenuItem( SDToolsSettings, wxID_AMPLIFY, wxString( wxT("Angle amplification over mip-maps for NM") ) , wxEmptyString, wxITEM_CHECK );
+	SDToolsSettings->Append( SDToolsSettingsAmplify );
+	
+	SDTools->Append( -1, wxT("Settings"), SDToolsSettings );
+	
+	wxMenuItem* SDConvertQDM;
+	SDConvertQDM = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert PM to QDM") ) , wxEmptyString, wxITEM_NORMAL );
+	SDTools->Append( SDConvertQDM );
+	
+	wxMenuItem* SDConvertCLR;
+	SDConvertCLR = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip color-map") ) , wxEmptyString, wxITEM_NORMAL );
+	SDTools->Append( SDConvertCLR );
+	
+	wxMenuItem* SDConvertNM;
+	SDConvertNM = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip normal-map") ) , wxEmptyString, wxITEM_NORMAL );
+	SDTools->Append( SDConvertNM );
+	
+	SDMenubar->Append( SDTools, wxT("Tools") ); 
 	
 	this->SetMenuBar( SDMenubar );
 	
@@ -211,6 +233,18 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	bSizer3->Add( SDShaderEnable, 0, wxALL, 5 );
 	
 	bSizer111->Add( bSizer3, 0, wxEXPAND|wxLEFT|wxRIGHT, 2 );
+	
+	wxBoxSizer* bSizer34;
+	bSizer34 = new wxBoxSizer( wxHORIZONTAL );
+	
+	SDShaderPairing = new wxStaticText( SDPanelShadersTop, wxID_ANY, wxT("Pair: ..."), wxDefaultPosition, wxDefaultSize, 0 );
+	SDShaderPairing->Wrap( -1 );
+	bSizer34->Add( SDShaderPairing, 1, wxALL, 5 );
+	
+	SDShaderMark = new wxCheckBox( SDPanelShadersTop, wxID_ANY, wxT("Mark"), wxDefaultPosition, wxDefaultSize, wxALIGN_RIGHT );
+	bSizer34->Add( SDShaderMark, 0, wxALL, 5 );
+	
+	bSizer111->Add( bSizer34, 0, wxRIGHT|wxLEFT|wxEXPAND, 2 );
 	
 	SDPanelShadersTop->SetSizer( bSizer111 );
 	SDPanelShadersTop->Layout();
@@ -837,6 +871,9 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	this->Connect( SDEffectOptimize->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
 	this->Connect( SDProfileGPU->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
 	this->Connect( SDProfileTex->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
+	this->Connect( SDConvertQDM->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDM ) );
+	this->Connect( SDConvertCLR->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipCLR ) );
+	this->Connect( SDConvertNM->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipNM ) );
 	SDChoicePass->Connect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoRenderpassSwitch ), NULL, this );
 	SDViewSwitch->Connect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxNotebookEventHandler( wxShaderDeveloper::DoViewSwitch ), NULL, this );
 	SDComboShader->Connect( wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderSwitch ), NULL, this );
@@ -850,6 +887,7 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDShaderAssemblyEditor->Connect( wxEVT_KEY_UP, wxKeyEventHandler( wxShaderDeveloper::DoAssemblerHighlight ), NULL, this );
 	SDShaderAssemblyEditor->Connect( wxEVT_COMMAND_TEXT_UPDATED, wxCommandEventHandler( wxShaderDeveloper::DoShaderUpdate ), NULL, this );
 	SDShaderEnable->Connect( wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderToggle ), NULL, this );
+	SDShaderMark->Connect( wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoMarkToggle ), NULL, this );
 	SDShaderConstSetGrid->Connect( wxEVT_GRID_CELL_CHANGE, wxGridEventHandler( wxShaderDeveloper::DoShaderConstantChange ), NULL, this );
 	SDShaderConstSetGrid->Connect( wxEVT_GRID_CELL_LEFT_CLICK, wxGridEventHandler( wxShaderDeveloper::DoShaderConstantSelect ), NULL, this );
 	SDShaderSamplerGrid->Connect( wxEVT_GRID_CELL_CHANGE, wxGridEventHandler( wxShaderDeveloper::DoShaderSamplerChange ), NULL, this );
@@ -884,19 +922,22 @@ wxShaderDeveloper::~wxShaderDeveloper()
 	this->Disconnect( wxEVT_CLOSE_WINDOW, wxCloseEventHandler( wxShaderDeveloper::DoClose ) );
 	this->Disconnect( wxEVT_SIZE, wxSizeEventHandler( wxShaderDeveloper::DoResize ) );
 	this->Disconnect( wxEVT_UPDATE_UI, wxUpdateUIEventHandler( wxShaderDeveloper::DoUpdate ) );
-	this->Disconnect( wxID_COMPILE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
-	this->Disconnect( wxID_SAVEBIN, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
-	this->Disconnect( wxID_LEGACY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
-	this->Disconnect( wxID_UPGRADE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
-	this->Disconnect( wxID_MAXIMUM, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
-	this->Disconnect( wxID_OPTIMIZE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
-	this->Disconnect( wxID_RUNTIME, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
-	this->Disconnect( wxID_COMPILE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
-	this->Disconnect( wxID_SAVEBIN, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
-	this->Disconnect( wxID_LEGACY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
-	this->Disconnect( wxID_OPTIMIZE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
+	this->Disconnect( wxID_SCOMPILE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Disconnect( wxID_SSAVEBIN, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Disconnect( wxID_SLEGACY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Disconnect( wxID_SUPGRADE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Disconnect( wxID_SMAXIMUM, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Disconnect( wxID_SOPTIMIZE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Disconnect( wxID_SRUNTIME, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderOptions ) );
+	this->Disconnect( wxID_ECOMPILE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
+	this->Disconnect( wxID_ESAVEBIN, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
+	this->Disconnect( wxID_ELEGACY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
+	this->Disconnect( wxID_EOPTIMIZE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
 	this->Disconnect( wxID_PROFILE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
 	this->Disconnect( wxID_KILLTEX, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
+	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDM ) );
+	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipCLR ) );
+	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipNM ) );
 	SDChoicePass->Disconnect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoRenderpassSwitch ), NULL, this );
 	SDViewSwitch->Disconnect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxNotebookEventHandler( wxShaderDeveloper::DoViewSwitch ), NULL, this );
 	SDComboShader->Disconnect( wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderSwitch ), NULL, this );
@@ -910,6 +951,7 @@ wxShaderDeveloper::~wxShaderDeveloper()
 	SDShaderAssemblyEditor->Disconnect( wxEVT_KEY_UP, wxKeyEventHandler( wxShaderDeveloper::DoAssemblerHighlight ), NULL, this );
 	SDShaderAssemblyEditor->Disconnect( wxEVT_COMMAND_TEXT_UPDATED, wxCommandEventHandler( wxShaderDeveloper::DoShaderUpdate ), NULL, this );
 	SDShaderEnable->Disconnect( wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderToggle ), NULL, this );
+	SDShaderMark->Disconnect( wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoMarkToggle ), NULL, this );
 	SDShaderConstSetGrid->Disconnect( wxEVT_GRID_CELL_CHANGE, wxGridEventHandler( wxShaderDeveloper::DoShaderConstantChange ), NULL, this );
 	SDShaderConstSetGrid->Disconnect( wxEVT_GRID_CELL_LEFT_CLICK, wxGridEventHandler( wxShaderDeveloper::DoShaderConstantSelect ), NULL, this );
 	SDShaderSamplerGrid->Disconnect( wxEVT_GRID_CELL_CHANGE, wxGridEventHandler( wxShaderDeveloper::DoShaderSamplerChange ), NULL, this );

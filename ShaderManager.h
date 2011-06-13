@@ -8,6 +8,7 @@
 
 #include <vector>
 #include <map>
+#include <set>
 #include <list>
 #include <queue>
 #include <string>
@@ -34,6 +35,7 @@ public:
 	const DWORD *					GetBinary();
 
 	bool						LoadShader(const char *Filename);
+	bool						ReloadShader();
 	bool						RuntimeFlush();
 	bool						RuntimeShader(const char *hlsl, const char *version = NULL);
 	bool						CompareShader(const DWORD *Function) const;
@@ -114,7 +116,7 @@ struct RuntimeConstant {
     struct iv { int vec[4]; } integer;
     struct fv { float vec[4]; } floating;
     struct tv { D3DSAMPLERSTATETYPE Type; DWORD Value; } state;
-//  IDirect3DBaseTexture9 *texture;
+    struct tx { IDirect3DBaseTexture9 *texture; float data[4]; } texture;
   } vals;
 };
 
@@ -137,8 +139,10 @@ public:
 	~RuntimeShaderRecord();
 
 	static inline void Reset() {
-	  bCLoaded = bDLoaded = bZLoaded = 0;
-	  bCFilled = bDFilled = bZFilled = 0;
+	  for (int o = 0; o < OBGEPASS_NUM; o++) {
+	    rsb[o].bCLoaded = rsb[o].bDLoaded = rsb[o].bZLoaded = 0;
+	    rsb[o].bCFilled = rsb[o].bDFilled = rsb[o].bZFilled = 0;
+	  }
 	};
 
 	void Release();
@@ -162,20 +166,26 @@ public:
 
 public:
 	ShaderRecord *			pAssociate;
-	bool				bActive;
+	bool				bActive, bMark;
 	void *				pCustomCT;
 	bool				bIO;
 
 	/* get a copy of the z-buffer right from before and pass it to the shader */
-	static IDirect3DSurface9 *	pGrabRT; static char bCLoaded; bool bCFused;
-	static IDirect3DSurface9 *	pGrabDS; static char bDLoaded; bool bDFused;
-	static IDirect3DSurface9 *	pGrabDZ; static char bZLoaded; bool bZFused;
-	static IDirect3DTexture9 * 	pTextRT; static bool bCFilled; bool bCLazy;
-	static IDirect3DTexture9 * 	pTextDS; static bool bDFilled; bool bDLazy;
-	static IDirect3DTexture9 * 	pTextDZ; static bool bZFilled; bool bZLazy;
-	       IDirect3DTexture9 **	pCopyRT;
-	       IDirect3DTexture9 **	pCopyDS;
-	       IDirect3DTexture9 **	pCopyDZ;
+	static struct Buffers {
+	  IDirect3DSurface9 *		pGrabRT; char bCLoaded;
+	  IDirect3DSurface9 *		pGrabDS; char bDLoaded;
+	  IDirect3DSurface9 *		pGrabDZ; char bZLoaded;
+	  IDirect3DTexture9 * 		pTextRT; bool bCFilled;
+	  IDirect3DTexture9 * 		pTextDS; bool bDFilled;
+	  IDirect3DTexture9 * 		pTextDZ; bool bZFilled;
+
+	  void GrabRT(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice);
+	  void GrabDS(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice);
+	  void GrabDZ(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice, bool bZFused);
+	} rsb[OBGEPASS_NUM];
+	  IDirect3DTexture9 **		pCopyRT; bool bCFused; bool bCLazy;
+	  IDirect3DTexture9 **		pCopyDS; bool bDFused; bool bDLazy;
+	  IDirect3DTexture9 **		pCopyDZ; bool bZFused; bool bZLazy;
 
 	RuntimeVariable *		pBool;
 	RuntimeVariable *		pInt4;
@@ -206,10 +216,13 @@ public:
 	}
 
 	/* stats */
-	int						frame_used[OBGEPASS_NUM];
-	int						frame_pass[OBGEPASS_NUM];
+	int					frame_used[OBGEPASS_NUM];
+	int					frame_pass[OBGEPASS_NUM];
 
 #define	OBGESAMPLER_NUM	16
+
+	/* collect associated pairs of shaders */
+	std::set<RuntimeShaderRecord *>		Paired;
 
 	/* we assume a shader isn't used twice in a specific pass
 	 * thus we don't track over all of [pass][scene]
@@ -282,6 +295,7 @@ struct GlobalConstants
 	ConstsList		pInt4;
 	ConstsList		pFloat4;
 //	ConstsList		pTexture;
+	RuntimeConstant		pTexture[16];
 //	ConstsList		pSampler;
 };
  
@@ -301,6 +315,7 @@ public:
 	void						OnResetDevice(void);
 	void						OnReleaseDevice(void);
 
+	bool						ReloadShaders();
 private:
 	void						Reset();
 public:

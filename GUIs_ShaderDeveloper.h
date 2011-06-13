@@ -36,15 +36,20 @@
 
 ///////////////////////////////////////////////////////////////////////////
 
-#define wxID_COMPILE 1000
-#define wxID_SAVEBIN 1001
-#define wxID_LEGACY 1002
-#define wxID_UPGRADE 1003
-#define wxID_MAXIMUM 1004
-#define wxID_OPTIMIZE 1005
-#define wxID_RUNTIME 1006
-#define wxID_PROFILE 1007
-#define wxID_KILLTEX 1008
+#define wxID_SCOMPILE 1000
+#define wxID_SSAVEBIN 1001
+#define wxID_SLEGACY 1002
+#define wxID_SUPGRADE 1003
+#define wxID_SMAXIMUM 1004
+#define wxID_SOPTIMIZE 1005
+#define wxID_SRUNTIME 1006
+#define wxID_ECOMPILE 1007
+#define wxID_ESAVEBIN 1008
+#define wxID_ELEGACY 1009
+#define wxID_EOPTIMIZE 1010
+#define wxID_PROFILE 1011
+#define wxID_KILLTEX 1012
+#define wxID_AMPLIFY 1013
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Class wxShaderDeveloper
@@ -58,6 +63,8 @@ class wxShaderDeveloper : public wxFrame
 		wxMenu* SDShaderOptions;
 		wxMenu* SDEffectOptions;
 		wxMenu* SDProfileOptions;
+		wxMenu* SDTools;
+		wxMenu* SDToolsSettings;
 		wxChoice* SDChoicePass;
 		wxNotebook* SDViewSwitch;
 		wxPanel* SDPanelShaders;
@@ -81,6 +88,8 @@ class wxShaderDeveloper : public wxFrame
 		wxTextCtrl* SDShaderDisassemblyView;
 		wxStaticText* SDStatusShader;
 		wxCheckBox* SDShaderEnable;
+		wxStaticText* SDShaderPairing;
+		wxCheckBox* SDShaderMark;
 		wxPanel* SDPanelShadersBottom;
 		wxNotebook* SDShaderVariables;
 		wxPanel* SDShaderConstantTable;
@@ -155,6 +164,9 @@ class wxShaderDeveloper : public wxFrame
 		virtual void DoShaderOptions( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoEffectOptions( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoProfileOptions( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoToolPMtoQDM( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoToolRemipCLR( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoToolRemipNM( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoRenderpassSwitch( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoViewSwitch( wxNotebookEvent& event ) { event.Skip(); }
 		virtual void DoShaderSwitch( wxCommandEvent& event ) { event.Skip(); }
@@ -167,6 +179,7 @@ class wxShaderDeveloper : public wxFrame
 		virtual void DoShaderUpdate( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoAssemblerHighlight( wxKeyEvent& event ) { event.Skip(); }
 		virtual void DoShaderToggle( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoMarkToggle( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoShaderConstantChange( wxGridEvent& event ) { event.Skip(); }
 		virtual void DoShaderConstantSelect( wxGridEvent& event ) { event.Skip(); }
 		virtual void DoShaderSamplerChange( wxGridEvent& event ) { event.Skip(); }

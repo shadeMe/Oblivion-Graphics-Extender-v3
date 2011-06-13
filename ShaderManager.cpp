@@ -92,6 +92,7 @@ static D3DXMACRO defs[] = {
   {"DEFAULT"		, stringify(DEFAULT)},
   {"LAZY"		, stringify(LAZY   )},
   {"GREEDY"		, stringify(GREEDY )},
+  {NULL, NULL},
 };
 
 #define SHADER_COLORWRITE	0
@@ -198,6 +199,64 @@ ShaderRecord::~ShaderRecord() {
 
 /* -------------------------------------------------------------------------------------------------
  */
+
+bool ShaderRecord::ReloadShader() {
+  struct stat sb, sh;
+  char strFileFull[MAX_PATH];
+  FILE *f;
+
+  /* getting a compiled binary for replacement if there is any
+   */
+  strcpy(strFileFull, ::ShaderOverrideDirectory.Get());
+  strcat(strFileFull, Name);
+  if (!stat((const char *)Filepath, &sb)) {
+  }
+
+  /* getting a HLSL source for compiling if there is any
+   */
+  strcpy(strFileFull, ::ShaderOverrideDirectory.Get());
+  strcat(strFileFull, Name);
+  strcat(strFileFull, ".hlsl");
+  if (!stat((const char *)strFileFull, &sh)) {
+    /* if the HLSL source is newer than the binary, attempt to recompile
+     */
+    if (pSourceReplaced && (sh.st_mtime > sb.st_mtime)) {
+      /* trigger recompile */
+      RuntimeFlush();
+
+      delete[] pSourceReplaced;
+      pSourceReplaced = NULL;
+    }
+
+    if (!pSourceReplaced) {
+      UINT size = sh.st_size;
+      pSourceReplaced = new CHAR[size + 1];
+      if (pSourceReplaced != NULL) {
+	/* reading in text-mode can yield any number of less characters */
+	memset(pSourceReplaced, 0, size + 1);
+
+	if (!fopen_s(&f, strFileFull, "rb"/*"rt"*/)) {
+	  fread(pSourceReplaced, 1, size, f);
+	  fclose(f);
+
+	  _DMESSAGE("Loaded source of %s from %s", Name, Filepath);
+
+	  sourceLen = strlen(pSourceReplaced);
+	}
+	else {
+	  delete[] pSourceReplaced;
+
+	  pSourceReplaced = NULL;
+	  sourceLen = 0;
+	}
+
+	return true;
+      }
+    }
+  }
+
+  return false;
+}
 
 bool ShaderRecord::LoadShader(const char *Filename) {
   struct stat sb, sv, sa, sh;
@@ -1035,7 +1094,7 @@ RuntimeShaderRecord::RuntimeShaderRecord() {
   pAssociate = NULL;
   pFunction = NULL;
   pShader = NULL;
-  bActive = false;
+  bActive = bMark = false;
 
   pCustomCT = NULL;
   pBool     = NULL;
@@ -1050,6 +1109,8 @@ RuntimeShaderRecord::RuntimeShaderRecord() {
   bIO = false;
 
 #ifdef	OBGE_DEVLING
+  Paired.clear();
+
   memset(frame_used, -1, sizeof(frame_used));
 #endif
 }
@@ -1107,24 +1168,71 @@ inline void RuntimeShaderRecord::OnResetDevice(void) {
 
 /* -------------------------------------------------------------------------------------------------
  */
-IDirect3DSurface9 *RuntimeShaderRecord::pGrabRT = NULL;
-IDirect3DSurface9 *RuntimeShaderRecord::pGrabDS = NULL;
-IDirect3DSurface9 *RuntimeShaderRecord::pGrabDZ = NULL;
-IDirect3DTexture9 *RuntimeShaderRecord::pTextRT = NULL;
-IDirect3DTexture9 *RuntimeShaderRecord::pTextDS = NULL;
-IDirect3DTexture9 *RuntimeShaderRecord::pTextDZ = NULL;
+struct RuntimeShaderRecord::Buffers RuntimeShaderRecord::rsb[OBGEPASS_NUM] = {NULL};
 
-char RuntimeShaderRecord::bCLoaded = 0;
-char RuntimeShaderRecord::bDLoaded = 0;
-char RuntimeShaderRecord::bZLoaded = 0;
-bool RuntimeShaderRecord::bCFilled = false;
-bool RuntimeShaderRecord::bDFilled = false;
-bool RuntimeShaderRecord::bZFilled = false;
+void RuntimeShaderRecord::Buffers::GrabRT(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice) {
+  IDirect3DSurface9 *pCurrRT;
+  if (SceneDevice->GetRenderTarget(0, &pCurrRT) == D3D_OK) {
+    D3DSURFACE_DESC CurrD;              pCurrRT->GetDesc(&CurrD);
+    D3DSURFACE_DESC GrabD; if (pGrabRT) pGrabRT->GetDesc(&GrabD);
 
+    /* different */
+    if (!pTextRT || memcmp(&CurrD, &GrabD, sizeof(D3DSURFACE_DESC))) {
+      if (pGrabRT) pGrabRT->Release();
+      if (pTextRT) pTextRT->Release();
+
+      pGrabRT = NULL; pTextRT = NULL;
+      if (StateDevice->CreateTexture(CurrD.Width, CurrD.Height, 1, CurrD.Usage, CurrD.Format, CurrD.Pool, &pTextRT, NULL) == D3D_OK)
+	pTextRT->GetSurfaceLevel(0, &pGrabRT);
+    }
+
+    if (pGrabRT) {
+      SceneDevice->StretchRect(pCurrRT, NULL, pGrabRT, NULL, D3DTEXF_NONE);
+      bCFilled = true;
+    }
+  }
+}
+
+void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice) {
+  IDirect3DSurface9 *pCurrDS;
+  if (SceneDevice->GetDepthStencilSurface(&pCurrDS) == D3D_OK) {
+    D3DSURFACE_DESC CurrD;              pCurrDS->GetDesc(&CurrD);
+    D3DSURFACE_DESC GrabD; if (pGrabDS) pGrabDS->GetDesc(&GrabD);
+
+    /* different */
+    if (!pTextDS || memcmp(&CurrD, &GrabD, sizeof(D3DSURFACE_DESC))) {
+      if (pGrabDS) pGrabDS->Release();
+      if (pTextDS) pTextDS->Release();
+
+      pGrabDS = NULL; pTextDS = NULL;
+      if (StateDevice->CreateTexture(CurrD.Width, CurrD.Height, 1, CurrD.Usage, CurrD.Format, CurrD.Pool, &pTextDS, NULL) == D3D_OK)
+	pTextDS->GetSurfaceLevel(0, &pGrabDS);
+    }
+
+    if (pGrabDS) {
+      SceneDevice->StretchRect(pCurrDS, NULL, pGrabDS, NULL, D3DTEXF_NONE);
+      bDFilled = true;
+    }
+  }
+}
+
+void RuntimeShaderRecord::Buffers::GrabDZ(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice, bool bZFused) {
+  pTextDZ = NULL; IDirect3DSurface9 *pCurrDZ;
+  if (SceneDevice->GetDepthStencilSurface(&pCurrDZ) == D3D_OK) {
+    if (surfaceTexture[pCurrDZ]) {
+      pTextDZ = surfaceTexture[pCurrDZ]->tex;
+
+      StateDevice->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+      bZLoaded = (bZFused ? -1 : 1);
+    }
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ */
 void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
   Release();
 
-  ShaderManager *SMan = ShaderManager::GetSingleton();
   TextureManager *TexMan = TextureManager::GetSingleton();
   std::vector<int> prevTextures = Textures; Textures.clear();
 
@@ -1244,7 +1352,7 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	    else if (cnst.Name == strstr(cnst.Name, "oblv_"))
 	      break;
 	    else if (cnst.Name == strstr(cnst.Name, "glob_"))
-	      pInt4[cnts[D3DXRS_INT4]].vals.integer = SMan->GetGlobalConst(cnst.Name, cnst.RegisterCount, ivs);
+	      pInt4[cnts[D3DXRS_INT4]].vals.integer = sm->GetGlobalConst(cnst.Name, cnst.RegisterCount, ivs);
 	    else if (cnst.Name == strstr(cnst.Name, "cust_")) {
 	      if (cnst.DefaultValue)
 		memcpy(ivs, cnst.DefaultValue, cnst.RegisterCount * sizeof(int) * 4);
@@ -1289,11 +1397,29 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.PlayerPosition;
 	      else if  (cnst.Name == strstr(cnst.Name, "oblv_GameTime"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.GameTime;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_TexData")) {
+	        /**/ if (cnst.Name[12] == '0')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[0].vals.texture.data;
+		else if (cnst.Name[12] == '1')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[1].vals.texture.data;
+		else if (cnst.Name[12] == '2')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[2].vals.texture.data;
+		else if (cnst.Name[12] == '3')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[3].vals.texture.data;
+		else if (cnst.Name[12] == '4')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[4].vals.texture.data;
+		else if (cnst.Name[12] == '5')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[5].vals.texture.data;
+		else if (cnst.Name[12] == '6')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[6].vals.texture.data;
+		else if (cnst.Name[12] == '7')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[7].vals.texture.data;
+	      }
 	      else
 		break;
 	    }
 	    else if (cnst.Name == strstr(cnst.Name, "glob_"))
-	      pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = SMan->GetGlobalConst(cnst.Name, cnst.RegisterCount, fvs);
+	      pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = sm->GetGlobalConst(cnst.Name, cnst.RegisterCount, fvs);
 	    else if (cnst.Name == strstr(cnst.Name, "cust_")) {
 	      if (cnst.DefaultValue)
 		memcpy(fvs, cnst.DefaultValue, cnst.RegisterCount * sizeof(float) * 4);
@@ -1428,9 +1554,11 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 }
 
 void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice) {
+  struct RuntimeShaderRecord::Buffers *buf = &rsb[currentPass];
+
   /* blow the fuse (vertex shader comes after pixel shader and clears?) */
-  if ((bZLoaded < 0) && !pCopyDZ && (iType == SHADER_PIXEL)) {
-    bZLoaded = 0;
+  if ((buf->bZLoaded < 0) && !pCopyDZ && (iType == SHADER_PIXEL)) {
+    buf->bZLoaded = 0;
 
     /* well, I don't really know if it was on before ... */
     StateDevice->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
@@ -1439,81 +1567,44 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
   if (pCustomCT) {
     if (bIO) {
       /* check what needs to go on here */
-      const bool doRT = pCopyRT && (!pTextRT || !bCFilled || !bCLazy),
-		 doDS = pCopyDS && (!pTextDS || !bDFilled || !bDLazy),
-		 doDZ = pCopyDZ && (!pTextDZ || !bZLoaded);
+      const bool doRT = pCopyRT && (!buf->pTextRT || !buf->bCFilled || !bCLazy),
+		 doDS = pCopyDS && (!buf->pTextDS || !buf->bDFilled || !bDLazy),
+		 doDZ = pCopyDZ && (!buf->pTextDZ || !buf->bZLoaded);
 
       if (doRT || doDS)
 	SceneDevice->EndScene();
-
-      if (doRT) {
-	IDirect3DSurface9 *pCurrRT;
-	if (SceneDevice->GetRenderTarget(0, &pCurrRT) == D3D_OK) {
-	  D3DSURFACE_DESC CurrD;              pCurrRT->GetDesc(&CurrD);
-	  D3DSURFACE_DESC GrabD; if (pGrabRT) pGrabRT->GetDesc(&GrabD);
-
-	  /* different */
-	  if (!pTextRT || memcmp(&CurrD, &GrabD, sizeof(D3DSURFACE_DESC))) {
-	    if (pGrabRT) pGrabRT->Release();
-	    if (pTextRT) pTextRT->Release();
-
-	    pGrabRT = NULL; pTextRT = NULL;
-	    if (StateDevice->CreateTexture(CurrD.Width, CurrD.Height, 1, CurrD.Usage, CurrD.Format, CurrD.Pool, &pTextRT, NULL) == D3D_OK)
-	      pTextRT->GetSurfaceLevel(0, &pGrabRT);
-	  }
-
-	  if (pGrabRT) {
-	    SceneDevice->StretchRect(pCurrRT, NULL, pGrabRT, NULL, D3DTEXF_NONE);
-	    bCFilled = true;
-	  }
-	}
-      }
-
-      if (doDS) {
-	IDirect3DSurface9 *pCurrDS;
-	if (SceneDevice->GetDepthStencilSurface(&pCurrDS) == D3D_OK) {
-	  D3DSURFACE_DESC CurrD;              pCurrDS->GetDesc(&CurrD);
-	  D3DSURFACE_DESC GrabD; if (pGrabDS) pGrabDS->GetDesc(&GrabD);
-
-	  /* different */
-	  if (!pTextDS || memcmp(&CurrD, &GrabD, sizeof(D3DSURFACE_DESC))) {
-	    if (pGrabDS) pGrabDS->Release();
-	    if (pTextDS) pTextDS->Release();
-
-	    pGrabDS = NULL; pTextDS = NULL;
-	    if (StateDevice->CreateTexture(CurrD.Width, CurrD.Height, 1, CurrD.Usage, CurrD.Format, CurrD.Pool, &pTextDS, NULL) == D3D_OK)
-	      pTextDS->GetSurfaceLevel(0, &pGrabDS);
-	  }
-
-	  if (pGrabDS) {
-	    SceneDevice->StretchRect(pCurrDS, NULL, pGrabDS, NULL, D3DTEXF_NONE);
-	    bDFilled = true;
-	  }
-	}
-      }
-
+      if (doRT)
+	buf->GrabRT(StateDevice, SceneDevice);
+      if (doDS)
+	buf->GrabDS(StateDevice, SceneDevice);
       if (doRT || doDS)
 	SceneDevice->BeginScene();
+      if (doDZ)
+	buf->GrabDZ(StateDevice, SceneDevice, bZFused);
 
-      if (doDZ) {
-	pTextDZ = NULL; IDirect3DSurface9 *pCurrDZ;
-	if (SceneDevice->GetDepthStencilSurface(&pCurrDZ) == D3D_OK) {
-	  if (surfaceTexture[pCurrDZ]) {
-	    pTextDZ = surfaceTexture[pCurrDZ]->tex;
-
-	    StateDevice->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
-	    bZLoaded = (bZFused ? -1 : 1);
-	  }
-	}
-      }
-
-      if (pCopyRT) (*pCopyRT) = pTextRT;
-      if (pCopyDS) (*pCopyDS) = pTextDS;
-      if (pCopyDZ) (*pCopyDZ) = pTextDZ;
+      if (pCopyRT) (*pCopyRT) = buf->pTextRT;
+      if (pCopyDS) (*pCopyDS) = buf->pTextDS;
+      if (pCopyDZ) (*pCopyDZ) = buf->pTextDZ;
     }
 
     if (iType == SHADER_VERTEX) {
       RuntimeVariable *rV;
+
+      /* do the textures first, texture-data may be requested */
+      if ((rV = pTexture))
+	do {
+	  StateDevice->SetTexture(rV->offset, rV->vals.texture);
+	} while ((++rV)->length);
+      if ((rV = pSampler))
+	do {
+	  RuntimeVariable::mem::tv *rT;
+	  if ((rT = rV->vals.state))
+	    do {
+	      StateDevice->SetSamplerState(rV->offset, rT->Type, rT->Value);
+	    } while ((++rT)->Type);
+	} while ((++rV)->length);
+
+      /* set the constant arrays */
       if ((rV = pBool))
 	do {
 	  StateDevice->SetVertexShaderConstantB(rV->offset, (const BOOL *)&rV->vals.condition, rV->length);
@@ -1526,6 +1617,11 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
 	do {
 	  StateDevice->SetVertexShaderConstantF(rV->offset, (const float *)rV->vals.floating, rV->length);
 	} while ((++rV)->length);
+    }
+    else if (iType == SHADER_PIXEL) {
+      RuntimeVariable *rV;
+
+      /* do the textures first, texture-data may be requested */
       if ((rV = pTexture))
 	do {
 	  StateDevice->SetTexture(rV->offset, rV->vals.texture);
@@ -1538,9 +1634,8 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
 	      StateDevice->SetSamplerState(rV->offset, rT->Type, rT->Value);
 	    } while ((++rT)->Type);
 	} while ((++rV)->length);
-    }
-    else if (iType == SHADER_PIXEL) {
-      RuntimeVariable *rV;
+
+      /* set the constant arrays */
       if ((rV = pBool))
 	do {
 	  StateDevice->SetPixelShaderConstantB(rV->offset, (const BOOL *)&rV->vals.condition, rV->length);
@@ -1553,23 +1648,11 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
 	do {
 	  StateDevice->SetPixelShaderConstantF(rV->offset, (const float *)rV->vals.floating, rV->length);
 	} while ((++rV)->length);
-      if ((rV = pTexture))
-	do {
-	  StateDevice->SetTexture(rV->offset, rV->vals.texture);
-	} while ((++rV)->length);
-      if ((rV = pSampler))
-	do {
-	  RuntimeVariable::mem::tv *rT;
-	  if ((rT = rV->vals.state))
-	    do {
-	      StateDevice->SetSamplerState(rV->offset, rT->Type, rT->Value);
-	    } while ((++rT)->Type);
-	} while ((++rV)->length);
     }
   }
 }
 
-inline bool RuntimeShaderRecord::SetShaderConstantB(const char *name, bool value) {
+bool RuntimeShaderRecord::SetShaderConstantB(const char *name, bool value) {
   RuntimeVariable *rV;
   if ((rV = pBool))
     do {
@@ -1581,7 +1664,7 @@ inline bool RuntimeShaderRecord::SetShaderConstantB(const char *name, bool value
   return false;
 }
 
-inline bool RuntimeShaderRecord::SetShaderConstantI(const char *name, int *values) {
+bool RuntimeShaderRecord::SetShaderConstantI(const char *name, int *values) {
   RuntimeVariable *rV;
   if ((rV = pInt4))
     do {
@@ -1593,7 +1676,7 @@ inline bool RuntimeShaderRecord::SetShaderConstantI(const char *name, int *value
   return false;
 }
 
-inline bool RuntimeShaderRecord::SetShaderConstantF(const char *name, float *values) {
+bool RuntimeShaderRecord::SetShaderConstantF(const char *name, float *values) {
   RuntimeVariable *rV;
   if ((rV = pFloat4))
     do {
@@ -1703,6 +1786,21 @@ IDirect3DPixelShader9 *RuntimeShaderRecord::GetShader(IDirect3DPixelShader9 *Sha
   if (!::RuntimeSources.Get())
     return Shader;
 
+#ifdef	OBGE_DEVLING
+  if (bMark) {
+    ShaderRecord *id;
+    if ((id = ShaderManager::GetSingleton()->GetBuiltInShader("IDENTIFY.pso"))) {
+      if (!id->pDX9ShaderClss) {
+	id->CompileShader();
+	id->ConstructDX9Shader(SHADER_RUNTIME);
+      }
+
+      if (id->pDX9ShaderClss)
+	return (IDirect3DPixelShader9 *)id->pDX9ShaderClss;
+    }
+  }
+#endif
+ 
   /* we have some replacement resource, and we're going to
    * pass that, do a real quick sanity check first
    */
@@ -1818,6 +1916,24 @@ void ShaderManager::OnResetDevice() {
     (*RShader)->OnResetDevice();
     RShader++;
   }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ */
+
+bool ShaderManager::ReloadShaders() {
+  bool change = false;
+
+  /* prevent locking up because other resources have allready been freed */
+  BuiltInShaderList prevBShaders = BuiltInShaders;
+  BuiltInShaderList::iterator BShader = prevBShaders.begin();
+
+  while (BShader != prevBShaders.end()) {
+    change = change || (*BShader)->ReloadShader();
+    BShader++;
+  }
+
+  return change;
 }
 
 /* -------------------------------------------------------------------------------------------------

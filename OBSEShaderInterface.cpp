@@ -83,8 +83,8 @@ OBSEShaderInterface *OBSEShaderInterface::GetSingleton() {
 }
 
 void OBSEShaderInterface::ShaderCode(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo, IDirect3DSurface9 *RenderFrom, DeviceInfo *Info) {
-  if (Info->AltRenderTarget)
-    _MESSAGE("Alt Render target - width = %i, height = %i", Info->Width, Info->Height);
+//if (Info->AltRenderTarget)
+//  _MESSAGE("Alt Render target - width = %i, height = %i", Info->Width, Info->Height);
 
   if (Info->AltRenderTarget && (SaveFix.data || ((Info->Height) == 256 && (Info->Width == 256)))) {
     D3DDevice->StretchRect(RenderFrom, NULL, RenderTo, NULL, D3DTEXF_NONE);
