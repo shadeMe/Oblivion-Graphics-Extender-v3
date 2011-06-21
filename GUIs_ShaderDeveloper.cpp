@@ -161,6 +161,10 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDToolbarShader->AddControl( SDShaderVersion );
 	SDShaderCompile = new wxButton( SDToolbarShader, wxID_ANY, wxT("Compile"), wxDefaultPosition, wxDefaultSize, 0 );
 	SDToolbarShader->AddControl( SDShaderCompile );
+	SDShaderCompileAll = new wxButton( SDToolbarShader, wxID_ANY, wxT("Compile all failed"), wxDefaultPosition, wxDefaultSize, 0 );
+	SDToolbarShader->AddControl( SDShaderCompileAll );
+	SDShaderFlush = new wxButton( SDToolbarShader, wxID_ANY, wxT("Flush from disk"), wxDefaultPosition, wxDefaultSize, 0 );
+	SDToolbarShader->AddControl( SDShaderFlush );
 	SDToolbarShader->Realize();
 	
 	bSizer111->Add( SDToolbarShader, 0, wxEXPAND|wxLEFT|wxRIGHT, 5 );
@@ -882,6 +886,8 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDButtonShaderSaveAs->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderSaveAs ), NULL, this );
 	SDShaderVersion->Connect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderVersion ), NULL, this );
 	SDShaderCompile->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderCompile ), NULL, this );
+	SDShaderCompileAll->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderCompileAll ), NULL, this );
+	SDShaderFlush->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderFlush ), NULL, this );
 	SDShaderSourceEditor->Connect( wxEVT_KEY_UP, wxKeyEventHandler( wxShaderDeveloper::DoShaderHighlight ), NULL, this );
 	SDShaderSourceEditor->Connect( wxEVT_COMMAND_TEXT_UPDATED, wxCommandEventHandler( wxShaderDeveloper::DoShaderUpdate ), NULL, this );
 	SDShaderAssemblyEditor->Connect( wxEVT_KEY_UP, wxKeyEventHandler( wxShaderDeveloper::DoAssemblerHighlight ), NULL, this );
@@ -946,6 +952,8 @@ wxShaderDeveloper::~wxShaderDeveloper()
 	SDButtonShaderSaveAs->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderSaveAs ), NULL, this );
 	SDShaderVersion->Disconnect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderVersion ), NULL, this );
 	SDShaderCompile->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderCompile ), NULL, this );
+	SDShaderCompileAll->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderCompileAll ), NULL, this );
+	SDShaderFlush->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( wxShaderDeveloper::DoShaderFlush ), NULL, this );
 	SDShaderSourceEditor->Disconnect( wxEVT_KEY_UP, wxKeyEventHandler( wxShaderDeveloper::DoShaderHighlight ), NULL, this );
 	SDShaderSourceEditor->Disconnect( wxEVT_COMMAND_TEXT_UPDATED, wxCommandEventHandler( wxShaderDeveloper::DoShaderUpdate ), NULL, this );
 	SDShaderAssemblyEditor->Disconnect( wxEVT_KEY_UP, wxKeyEventHandler( wxShaderDeveloper::DoAssemblerHighlight ), NULL, this );

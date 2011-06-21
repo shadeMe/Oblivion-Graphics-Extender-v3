@@ -19,6 +19,7 @@
 #include "Nodes/NiBillboardNode.h"
 
 #include "D3D9Identifiers.hpp"
+#include "TextureManager.h"
 
 class ShaderRecord;
 class RuntimeShaderRecord;
@@ -35,6 +36,7 @@ public:
 	const DWORD *					GetBinary();
 
 	bool						LoadShader(const char *Filename);
+	bool						ChangedShader();
 	bool						ReloadShader();
 	bool						RuntimeFlush();
 	bool						RuntimeShader(const char *hlsl, const char *version = NULL);
@@ -72,6 +74,7 @@ public:
 	LPSTR 						pSourceRuntime;
 	UINT						runtimeLen;
 
+	time_t						hlslStamp;
 	LPD3DXBUFFER					pErrorMsgs;
 	LPD3DXBUFFER					pDisasmbly;
 
@@ -169,9 +172,25 @@ public:
 	bool				bActive, bMark;
 	void *				pCustomCT;
 	bool				bIO;
+	unsigned int			bMask;
 
 	/* get a copy of the z-buffer right from before and pass it to the shader */
 	static struct Buffers {
+	  void Release();
+
+struct CameraQuad { float x,y,z, rhw; float u,v; };
+//ruct CameraQuad { float x,y,z;      float u,v; };
+
+#define CAMERAQUADFORMAT D3DFVF_XYZRHW | D3DFVF_TEX1
+//efine CAMERAQUADFORMAT D3DFVF_XYZ    | D3DFVF_TEX1
+
+	  IDirect3DVertexBuffer9 *	pGrabVX;
+	  IDirect3DTexture9 * 		pTextUB;
+
+	  void GrabRT(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice);
+	  void GrabDS(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice);
+	  void GrabDZ(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice, bool bZFused);
+
 	  IDirect3DSurface9 *		pGrabRT; char bCLoaded;
 	  IDirect3DSurface9 *		pGrabDS; char bDLoaded;
 	  IDirect3DSurface9 *		pGrabDZ; char bZLoaded;
@@ -179,10 +198,8 @@ public:
 	  IDirect3DTexture9 * 		pTextDS; bool bDFilled;
 	  IDirect3DTexture9 * 		pTextDZ; bool bZFilled;
 
-	  void GrabRT(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice);
-	  void GrabDS(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice);
-	  void GrabDZ(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice, bool bZFused);
 	} rsb[OBGEPASS_NUM];
+
 	  IDirect3DTexture9 **		pCopyRT; bool bCFused; bool bCLazy;
 	  IDirect3DTexture9 **		pCopyDS; bool bDFused; bool bDLazy;
 	  IDirect3DTexture9 **		pCopyDZ; bool bZFused; bool bZLazy;
@@ -207,12 +224,10 @@ public:
 
 #ifdef	OBGE_DEVLING
 	void Clear(int pass = -1) {
-	  if (pass == -1) {
+	  if (pass == -1)
 	    memset(traced, -1, sizeof(traced));
-	  }
-	  else {
+	  else
 	    memset(&traced[pass], -1, sizeof(traced[pass]));
-	  }
 	}
 
 	/* stats */
@@ -298,7 +313,7 @@ struct GlobalConstants
 	RuntimeConstant		pTexture[16];
 //	ConstsList		pSampler;
 };
- 
+
 class ShaderManager
 {
 	friend class ShaderRecord;
@@ -311,10 +326,12 @@ public:
 	static ShaderManager*		GetSingleton(void);
 	static ShaderManager*		Singleton;
 
+	void						OnCreateDevice(void);
 	void						OnLostDevice(void);
 	void						OnResetDevice(void);
 	void						OnReleaseDevice(void);
 
+	bool						ChangedShaders();
 	bool						ReloadShaders();
 private:
 	void						Reset();
@@ -346,6 +363,11 @@ private:
 	ShaderList					Shaders;
 
 public:
+	ShaderRecord *					idp;  // IDENTIFY.pso
+	ShaderRecord *					cqp;  // COPYQUAD.pso
+	ShaderRecord *					cqv;  // COPYQUAD.vso
+	TextureRecord *					unbound;
+
 	ShaderConstants					ShaderConst;
 	GlobalConstants					GlobalConst;
 

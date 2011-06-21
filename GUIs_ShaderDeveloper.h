@@ -77,6 +77,8 @@ class wxShaderDeveloper : public wxFrame
 		wxBitmapButton* SDButtonShaderSaveAs;
 		wxChoice* SDShaderVersion;
 		wxButton* SDShaderCompile;
+		wxButton* SDShaderCompileAll;
+		wxButton* SDShaderFlush;
 		wxNotebook* SDShaderCodeSwitch;
 		wxPanel* SDShaderSource;
 		wxTextCtrl* SDShaderSourceEditor;
@@ -175,6 +177,8 @@ class wxShaderDeveloper : public wxFrame
 		virtual void DoShaderSaveAs( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoShaderVersion( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoShaderCompile( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoShaderCompileAll( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoShaderFlush( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoShaderHighlight( wxKeyEvent& event ) { event.Skip(); }
 		virtual void DoShaderUpdate( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoAssemblerHighlight( wxKeyEvent& event ) { event.Skip(); }

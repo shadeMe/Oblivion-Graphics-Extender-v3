@@ -388,7 +388,7 @@ inline void EffectQueue::End(ID3DXEffect *pEffect) {
       (rotate[EQPREV] = prev)->Copy(device, rotate[EQLAST]);
   }
 }
-
+ 
 inline void EffectQueue::End(EffectBuffer *target) {
   /* this occurs when "target" never entered the queue,
    * or when the have an odd number of accumulated passes
@@ -399,6 +399,9 @@ inline void EffectQueue::End(EffectBuffer *target) {
   /* not allocated if not needed! */
   if (past)
     past->Copy(device, orig);
+
+  /* restore original rendertarget (Oblivion expects this!) */
+  target->SetRenderTarget(device);
 }
 
 #undef EQLAST
@@ -1678,11 +1681,11 @@ void EffectManager::InitialiseFrameTextures() {
     if (RenderBuf & EFFECTBUF_ZBUF) if (RenderTransferZ)
       CurrDS.Initialise(
 	RenderPrjZ
-	  ? (bitz == 32 || 1 ? D3DFMT_A32B32G32R32F : D3DFMT_A16B16G16R16)  // linear
+	  ? (bitz != 16 ? D3DFMT_A32B32G32R32F : D3DFMT_A16B16G16R16)  // linear
 	  :
 	RenderLinZ
-	  ? (bitz == 32 || 1 ? D3DFMT_R32F : D3DFMT_R16F)  // linear
-	  : (bitz == 32 || 1 ? D3DFMT_R32F : D3DFMT_R16F)  // non-linear
+	  ? (bitz != 16 ? D3DFMT_R32F : D3DFMT_R16F)  // linear
+	  : (bitz != 16 ? D3DFMT_R32F : D3DFMT_R16F)  // non-linear
       );
  }
 #endif
@@ -1769,7 +1772,7 @@ void EffectManager::InitialiseBuffers() {
     minu = 0;
   }
 
-  D3D_sShaderVertex ShaderVertices[] = {
+  EffectQuad ShaderVertices[] = {
     {minx , +1 , 1, minu + uadj , 0 + vadj},
     {minx , -1 , 1, minu + uadj , 1 + vadj},
     {1    , +1 , 1, 1    + uadj , 0 + vadj},
@@ -1778,7 +1781,7 @@ void EffectManager::InitialiseBuffers() {
 
   _MESSAGE("Creating effect vertex buffers.");
 
-  GetD3DDevice()->CreateVertexBuffer(4 * sizeof(D3D_sShaderVertex), D3DUSAGE_WRITEONLY, MYVERTEXFORMAT, D3DPOOL_DEFAULT, &EffectVertex, 0);
+  GetD3DDevice()->CreateVertexBuffer(4 * sizeof(EffectQuad), D3DUSAGE_WRITEONLY, EFFECTQUADFORMAT, D3DPOOL_DEFAULT, &EffectVertex, 0);
   EffectVertex->Lock(0, 0, &VertexPointer, 0);
   CopyMemory(VertexPointer, ShaderVertices, sizeof(ShaderVertices));
   EffectVertex->Unlock();
@@ -1936,8 +1939,8 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
 
   UpdateFrameConstants(Renderer);
 
-  D3DDevice->SetStreamSource(0, EffectVertex, 0, sizeof(D3D_sShaderVertex));
-  Renderer->RenderStateManager->SetFVF(MYVERTEXFORMAT, false);
+  D3DDevice->SetStreamSource(0, EffectVertex, 0, sizeof(EffectQuad));
+  Renderer->RenderStateManager->SetFVF(EFFECTQUADFORMAT, false);
 
   // Sets up the viewport.
   float test[4] = { 0.0, 1.0, 1.0, 0.0 };
@@ -2481,7 +2484,7 @@ void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
       EffectNum = AddManagedEffect(LoadFilepath, LoadRefID);
     else
       EffectNum = FindEffect(LoadFilepath);
- 
+
     if (EffectNum != -1) {
       ManagedEffectRecord *NewEffect = GetEffect(EffectNum);
       ID3DXEffect *pEffect = NewEffect->GetEffect();

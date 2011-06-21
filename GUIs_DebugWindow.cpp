@@ -337,7 +337,7 @@ public:
     // add our dataset to plot
     plot->AddDataset(vset);
 
-    for (int p = OBGEPASS_NUM - 1; p >= 0; p--) {
+    for (int p = OBGEPASS_MAX; p >= OBGEPASS_MIN; p--) {
       // create dataset
       hist[p].dset = new XYDynamicDataset();
       hist[p].dset->AddRef();
@@ -445,10 +445,42 @@ public:
     /* search shader render-targets */
     RuntimeShaderList::iterator RS = sm->RuntimeShaders.begin();
     while (RS != sm->RuntimeShaders.end()) {
-      for (int p = 0; p < OBGEPASS_NUM; p++)
-	if ((*RS)->rsb[p].pTextRT && (*RS)->rsb[p].pGrabRT)
-	  if (--offs < 0)
-	    return (*RS)->rsb[p].pGrabRT;
+      if (pass == OBGEPASS_ANY) {
+	for (int p = OBGEPASS_MIN; p < OBGEPASS_NUM; p++)
+	  if ((*RS)->rsb[p].pTextRT && (*RS)->rsb[p].pGrabRT)
+	    if (--offs < 0)
+	      return (*RS)->rsb[p].pGrabRT;
+      }
+      else {
+	if ((*RS)->rsb[pass].pTextRT && (*RS)->rsb[pass].pGrabRT)
+	  return (*RS)->rsb[pass].pGrabRT;
+      }
+
+      RS++;
+    }
+
+    return NULL;
+  }
+
+  IDirect3DSurface9 *FindGrabbedDS(int offs = 0) {
+    if (pass == OBGEPASS_EFFECTS) {
+      if (em && em->CurrDS.Srf[0])
+	return em->CurrDS.Srf[0];
+    }
+
+    /* search shader render-targets */
+    RuntimeShaderList::iterator RS = sm->RuntimeShaders.begin();
+    while (RS != sm->RuntimeShaders.end()) {
+      if (pass == OBGEPASS_ANY) {
+	for (int p = OBGEPASS_MIN; p < OBGEPASS_NUM; p++)
+	  if ((*RS)->rsb[p].pTextDS && (*RS)->rsb[p].pGrabDS)
+	    if (--offs < 0)
+	      return (*RS)->rsb[p].pGrabDS;
+      }
+      else {
+	if ((*RS)->rsb[pass].pTextDS && (*RS)->rsb[pass].pGrabDS)
+	  return (*RS)->rsb[pass].pGrabDS;
+      }
 
       RS++;
     }
@@ -465,7 +497,7 @@ public:
     if (tex) {
       /* search render targets */
       if (sm) {
-	for (int p = 0; p < OBGEPASS_NUM; p++)
+	for (int p = OBGEPASS_MIN; p < OBGEPASS_NUM; p++)
 	  for (int s = 0; s < sm->trackd[p].frame_cntr; s++) {
 	    IDirect3DSurface9 *pRenderTarget;
 	    textureSurface *pTextureSurface;
@@ -504,7 +536,7 @@ public:
       /* search shader render-targets */
       RuntimeShaderList::iterator RS = sm->RuntimeShaders.begin();
       while (RS != sm->RuntimeShaders.end()) {
-	for (int p = 0; p < OBGEPASS_NUM; p++) {
+	for (int p = OBGEPASS_MIN; p < OBGEPASS_NUM; p++) {
 	  if ((*RS)->rsb[p].pTextRT == tex) {
 	    if ((*RS)->pAssociate)
 	      sprintf(buf, "%s pass %d rendertarget copy", (*RS)->pAssociate->Name, p);
@@ -1696,30 +1728,30 @@ public:
 
       if (o->iType == SHADER_PIXEL) {
 	if (!mi || !mi->IsChecked()) {
-	  SDShaderVersion->Append(wxString("ps_1_1")); if (!strcmp(o->pProfile, "ps_1_1")) sel = idx; idx++;
-	  SDShaderVersion->Append(wxString("ps_1_2")); if (!strcmp(o->pProfile, "ps_1_2")) sel = idx; idx++;
-	  SDShaderVersion->Append(wxString("ps_1_3")); if (!strcmp(o->pProfile, "ps_1_3")) sel = idx; idx++;
-	  SDShaderVersion->Append(wxString("ps_1_4")); if (!strcmp(o->pProfile, "ps_1_4")) sel = idx; idx++;
+	  SDShaderVersion->Append(wxString("ps_1_1")); if (o->pProfile && !strcmp(o->pProfile, "ps_1_1")) sel = idx; idx++;
+	  SDShaderVersion->Append(wxString("ps_1_2")); if (o->pProfile && !strcmp(o->pProfile, "ps_1_2")) sel = idx; idx++;
+	  SDShaderVersion->Append(wxString("ps_1_3")); if (o->pProfile && !strcmp(o->pProfile, "ps_1_3")) sel = idx; idx++;
+	  SDShaderVersion->Append(wxString("ps_1_4")); if (o->pProfile && !strcmp(o->pProfile, "ps_1_4")) sel = idx; idx++;
 	}
 
-	SDShaderVersion->Append(wxString("ps_2_0")); if (!strcmp(o->pProfile, "ps_2_0")) sel = idx; idx++;
-	SDShaderVersion->Append(wxString("ps_2_a")); if (!strcmp(o->pProfile, "ps_2_a")) sel = idx; idx++;
-	SDShaderVersion->Append(wxString("ps_2_b")); if (!strcmp(o->pProfile, "ps_2_b")) sel = idx; idx++;
-	SDShaderVersion->Append(wxString("ps_2_sw")); if (!strcmp(o->pProfile, "ps_2_sw")) sel = idx; idx++;
-	SDShaderVersion->Append(wxString("ps_3_0")); if (!strcmp(o->pProfile, "ps_3_0")) sel = idx; idx++;
-	SDShaderVersion->Append(wxString("ps_3_sw")); if (!strcmp(o->pProfile, "ps_3_sw")) sel = idx; idx++;
+	SDShaderVersion->Append(wxString("ps_2_0"));  if (o->pProfile && !strcmp(o->pProfile, "ps_2_0" )) sel = idx; idx++;
+	SDShaderVersion->Append(wxString("ps_2_a"));  if (o->pProfile && !strcmp(o->pProfile, "ps_2_a" )) sel = idx; idx++;
+	SDShaderVersion->Append(wxString("ps_2_b"));  if (o->pProfile && !strcmp(o->pProfile, "ps_2_b" )) sel = idx; idx++;
+	SDShaderVersion->Append(wxString("ps_2_sw")); if (o->pProfile && !strcmp(o->pProfile, "ps_2_sw")) sel = idx; idx++;
+	SDShaderVersion->Append(wxString("ps_3_0"));  if (o->pProfile && !strcmp(o->pProfile, "ps_3_0" )) sel = idx; idx++;
+	SDShaderVersion->Append(wxString("ps_3_sw")); if (o->pProfile && !strcmp(o->pProfile, "ps_3_sw")) sel = idx; idx++;
       }
 
       else if (o->iType == SHADER_VERTEX) {
 	if (!mi || !mi->IsChecked()) {
-	  SDShaderVersion->Append(wxString("vs_1_1")); if (!strcmp(o->pProfile, "vs_1_1")) sel = idx; idx++;
+	  SDShaderVersion->Append(wxString("vs_1_1")); if (o->pProfile && !strcmp(o->pProfile, "vs_1_1")) sel = idx; idx++;
 	}
 
-	SDShaderVersion->Append(wxString("vs_2_0")); if (!strcmp(o->pProfile, "vs_2_0")) sel = idx; idx++;
-	SDShaderVersion->Append(wxString("vs_2_a")); if (!strcmp(o->pProfile, "vs_2_a")) sel = idx; idx++;
-	SDShaderVersion->Append(wxString("vs_2_sw")); if (!strcmp(o->pProfile, "vs_2_sw")) sel = idx; idx++;
-	SDShaderVersion->Append(wxString("vs_3_0")); if (!strcmp(o->pProfile, "vs_3_0")) sel = idx; idx++;
-	SDShaderVersion->Append(wxString("vs_3_sw")); if (!strcmp(o->pProfile, "vs_3_sw")) sel = idx; idx++;
+	SDShaderVersion->Append(wxString("vs_2_0"));  if (o->pProfile && !strcmp(o->pProfile, "vs_2_0" )) sel = idx; idx++;
+	SDShaderVersion->Append(wxString("vs_2_a"));  if (o->pProfile && !strcmp(o->pProfile, "vs_2_a" )) sel = idx; idx++;
+	SDShaderVersion->Append(wxString("vs_2_sw")); if (o->pProfile && !strcmp(o->pProfile, "vs_2_sw")) sel = idx; idx++;
+	SDShaderVersion->Append(wxString("vs_3_0"));  if (o->pProfile && !strcmp(o->pProfile, "vs_3_0" )) sel = idx; idx++;
+	SDShaderVersion->Append(wxString("vs_3_sw")); if (o->pProfile && !strcmp(o->pProfile, "vs_3_sw")) sel = idx; idx++;
       }
 
       if (sel != wxNOT_FOUND)
@@ -1878,6 +1910,16 @@ public:
     wxString oo = SDShaderSourceEditor->GetValue();
     const wxChar *ooo = oo.GetData();
     int size = strlen(ooo);
+
+    /* not a runtime-shader (like IDENTIFY, COPYQUAD etc. */
+    if (!o->pAssociate) {
+      SDShaderEnable->Disable();
+      SDShaderMark->Disable();
+    }
+    else {
+      SDShaderEnable->Enable();
+      SDShaderMark->Enable();
+    }
 
     /* prevent flickering */
     if (o) {
@@ -2388,7 +2430,7 @@ public:
     if (sm) {
       _rt = sm->trackd[p].rt[o];
       _gt = FindGrabbedRT(0);
-      _ds = sm->trackd[p].ds[o];
+      _ds = FindGrabbedDS(0);//sm->trackd[p].ds[o];
       if ((int)_rt == -1) _rt = NULL;
       if ((int)_gt == -1) _gt = NULL;
       if ((int)_ds == -1) _ds = NULL;
@@ -2455,7 +2497,7 @@ public:
 	hist[pass].dset->BeginUpdate();
 
 	/* loop over passes */
-	for (int p = OBGEPASS_NUM; p > 0; p--) {
+	for (int p = OBGEPASS_NUM; p > OBGEPASS_MIN; p--) {
 	  if (!(serie = hist[pass].series[p])) {
 	    serie = new XYDynamicSerie();
 
@@ -2501,7 +2543,7 @@ public:
 	}
 
 	/* loop over passes */
-	for (int p = OBGEPASS_NUM; p > 0; p--) {
+	for (int p = OBGEPASS_NUM; p > OBGEPASS_MIN; p--) {
 	  serie = hist[pass].series[p];
 
 	  /* cap the number of resulting data to OBGEFRAME_NUM */
@@ -2532,7 +2574,7 @@ public:
 
 	  LARGE_INTEGER tsum; tsum.QuadPart = 0;
 	  /* loop over passes */
-	  for (int p = 1; p <= OBGEPASS_MAX; p++) {
+	  for (int p = OBGEPASS_MIN; p < OBGEPASS_NUM; p++) {
 
 	    LARGE_INTEGER psum; psum.QuadPart = 0;
 	    /* loop over scenes */
@@ -2742,7 +2784,7 @@ public:
 	/* info with pass-id */
 	if (r && (pass == OBGEPASS_ANY)) {
 	  char num[256] = ""; bool has = false;
-	  for (int p = 0; p < OBGEPASS_NUM; p++) {
+	  for (int p = OBGEPASS_MIN; p < OBGEPASS_NUM; p++) {
 	    if (r->frame_used[p] >= 0) {
 	      if (!has)
 		sprintf(num, "%d", p);
@@ -2807,7 +2849,7 @@ public:
     if (sm) {
       /* info with pass-id */
       if ((pass == OBGEPASS_ANY) && sm) {
-	for (int p = 1; p < OBGEPASS_NUM; p++) {
+	for (int p = OBGEPASS_MIN; p < OBGEPASS_NUM; p++) {
 	  for (int scene = 0; scene < OBGESCENE_NUM; scene++) {
 	    struct ShaderManager::track *t = &sm->trackd[p];
 
@@ -2877,12 +2919,13 @@ public:
   /* --------------------------------------------------------------
    */
 
-  void SetPanels(int sel, wxString *resel = NULL) {
+  void SetPanels(int sel, wxString *resel = NULL, bool force = false) {
     /* ------------------------------------------------ */
     if (sel == SDVIEW_SHADER) {
       /* not changeable */
       int j = SDComboShader->GetSelection();
-      if (j == wxNOT_FOUND) {
+      int c = SDComboShader->GetCount();
+      if ((j == wxNOT_FOUND) || (c != sm->BuiltInShaders.size()) || force) {
 	wxString jj = SDComboShader->GetStringSelection();
 	SDComboShader->Clear();
 
@@ -2935,6 +2978,8 @@ public:
 	}
 	else
 	  SDPanelShaders->Hide();
+
+	SDShaderCompileAll->Enable(!CheckShaderRecords());
       }
     }
 
@@ -2942,7 +2987,8 @@ public:
     else if (sel == SDVIEW_EFFECT) {
       /* always changeable */
       int j = SDComboEffect->GetSelection();
-      if (j == wxNOT_FOUND || 1) {
+      int c = SDComboEffect->GetCount();
+      if ((j == wxNOT_FOUND) || (c != em->ManagedEffects.size()) || force) {
 	wxString jj = SDComboEffect->GetStringSelection();
 	SDComboEffect->Clear();
 
@@ -2990,7 +3036,8 @@ public:
     /* ------------------------------------------------ */
     else if (sel == SDVIEW_SCENES) {
       int k = SDChoiceScene->GetSelection();
-      if (k == wxNOT_FOUND) {
+      int c = SDChoiceScene->GetCount();
+      if ((k == wxNOT_FOUND) || force) {
 	if (!SDChoiceScene->IsEmpty()) {
 	  SDPanelScenes->Show();
 	  SDChoiceScene->SetSelection(0);
@@ -3005,21 +3052,36 @@ public:
     /* ------------------------------------------------ */
     else if (sel == SDVIEW_STATS) {
       int k = SDChoiceStats->GetSelection();
-      if (k == wxNOT_FOUND || 1) {
-	//if (!SDChoiceStats->IsEmpty()) {
+      int c = SDChoiceStats->GetCount();
+      if ((k == wxNOT_FOUND) || 1 || force) {
+      //if (!SDChoiceStats->IsEmpty()) {
 	  SDPanelStats->Show();
-	  //SDChoiceStats->SetSelection(0);
+	//SDChoiceStats->SetSelection(0);
 
 	  DoStatsSwitch(true);
-	//}
-	//else
-	  //SDPanelStats->Hide();
+      //}
+      //else
+	//SDPanelStats->Hide();
       }
     }
   }
 
   /* --------------------------------------------------------------
    */
+
+  bool CheckShaderRecords() {
+    if (sm) {
+      BuiltInShaderList::iterator BShader = sm->BuiltInShaders.begin();
+      while (BShader != sm->BuiltInShaders.end()) {
+	if (!(*BShader)->pDisasmbly)
+	  return false;
+
+	BShader++;
+      }
+    }
+
+    return true;
+  }
 
   ShaderRecord *FindShaderRecord(ShaderRecord *o, wxString oo) {
     const char *ooo = oo.GetData();
@@ -3084,7 +3146,7 @@ public:
   void FindScene(int &p, int &o) {
     if ((p == OBGEPASS_ANY) && sm) {
       int s = 0;
-      for (int _p = 1; _p < OBGEPASS_NUM; _p++) {
+      for (int _p = OBGEPASS_MIN; _p < OBGEPASS_NUM; _p++) {
 	for (int _o = 0; _o < OBGESCENE_NUM; _o++) {
 	  if (sm->trackd[_p].frame_used[_o] > 0) {
 	    if (o == s) {
@@ -3141,13 +3203,7 @@ public:
     }
 #endif
 
-    /* read changes from disk
-    if (sm->ReloadShaders()) {
-      ShaderRecord *o = FindShaderRecord(NULL, SDComboShader->GetStringSelection());
-      
-      SetShaderRecord(o);
-    }
-    */
+    SDShaderFlush->Enable(sm->ChangedShaders());
 
     /* renderpasses might have changed since last activation */
     int j = SDChoicePass->GetSelection(), h = 0;
@@ -3158,7 +3214,7 @@ public:
     /* ------------------------------------------------ */
     SDChoicePass->Clear();
 
-    for (int p = 0; p < OBGEPASS_NUM; p++) {
+    for (int p = OBGEPASS_ANY; p < OBGEPASS_NUM; p++) {
       if (!p || (passFrames[p] >= 0)) {
       	if (sm && (sm->trackd[p].frame_cntr > 1))
 	  sprintf(buf, "%s [%d scenes]", passNames[p], sm->trackd[p].frame_cntr);
@@ -3530,6 +3586,31 @@ public:
   void DoShaderLoad() {
   }
 
+  virtual void DoShaderFlush(wxCommandEvent& event) {
+    DoShaderFlush();
+//  event.Skip();
+  }
+
+  void DoShaderFlush() {
+    /* read changes from disk
+    if (sm->ChangedShaders()) {
+      wxMessageDialog dlg(
+	this,
+	_T("Changes in the shaders on-disk have been detected. Do you want to reload the related shaders?"),
+	_T("Confirmation"),
+	wxYES_NO
+	);
+
+      if (dlg.ShowModal() == wxID_YES) { */
+	if (sm->ReloadShaders()) {
+	  ShaderRecord *o = FindShaderRecord(NULL, SDComboShader->GetStringSelection());
+	  if (o)
+	    SetShaderRecord(o);
+	}/*
+      }
+    }*/
+  }
+
   virtual void DoShaderSave(wxCommandEvent& event) {
     DoShaderSave();
 //  event.Skip();
@@ -3553,10 +3634,17 @@ public:
 	fwrite(ooo, 1, size, f);
 	fclose(f);
 
+	o->hlslStamp = time(NULL);
 	if (o->RuntimeShader(ooo))
 	  SetShaderRecord(o);
         else
 	  UpdateShaderRecord(o);
+
+	SDShaderCompileAll->Enable(!CheckShaderRecords());
+
+	/* not a runtime-shader (like IDENTIFY, COPYQUAD etc. */
+	if (!o->pAssociate) {
+	  o->ConstructDX9Shader(SHADER_RUNTIME); return; }
 
 	/* trigger re-creation of the DX9-class */
 	if (SDShaderEnable->Get3StateValue() == wxCHK_CHECKED)
@@ -3601,6 +3689,12 @@ public:
 	else
 	  UpdateShaderRecord(o);
 
+	SDShaderCompileAll->Enable(!CheckShaderRecords());
+
+	/* not a runtime-shader (like IDENTIFY, COPYQUAD etc. */
+	if (!o->pAssociate) {
+	  o->ConstructDX9Shader(SHADER_RUNTIME); return; }
+
 	/* trigger re-creation of the DX9-class */
 	if (SDShaderEnable->Get3StateValue() == wxCHK_CHECKED)
 	  o->pAssociate->ActivateShader(SHADER_RUNTIME);
@@ -3631,6 +3725,12 @@ public:
       else
 	UpdateShaderRecord(o);
 
+      SDShaderCompileAll->Enable(!CheckShaderRecords());
+
+      /* not a runtime-shader (like IDENTIFY, COPYQUAD etc. */
+      if (!o->pAssociate) {
+	o->ConstructDX9Shader(SHADER_RUNTIME); return; }
+
       /* trigger re-creation of the DX9-class */
       if (SDShaderEnable->Get3StateValue() == wxCHK_CHECKED)
 	o->pAssociate->ActivateShader(SHADER_RUNTIME);
@@ -3639,6 +3739,33 @@ public:
       else //if (SDShaderEnable->Get3StateValue() == wxCHK_UNCHECKED)
 	o->pAssociate->ActivateShader(SHADER_ORIGINAL);
     }
+  }
+
+  virtual void DoShaderCompileAll(wxCommandEvent& event) {
+    DoShaderCompileAll();
+//  event.Skip();
+  }
+
+  void DoShaderCompileAll() {
+    ShaderRecord *o = FindShaderRecord(NULL, SDComboShader->GetStringSelection());
+
+    /* ------------------------------------------------ */
+    if (sm) {
+      BuiltInShaderList::iterator BShader = sm->BuiltInShaders.begin();
+      while (BShader != sm->BuiltInShaders.end()) {
+	if ((*BShader != o) && !(*BShader)->pDisasmbly)
+	  SetShaderRecord(*BShader);
+
+	BShader++;
+      }
+    }
+
+    /* ------------------------------------------------ */
+    if (!o->pDisasmbly)
+      DoShaderCompile();
+
+    SDShaderCompileAll->Enable(!CheckShaderRecords());
+    SetPanels(SDVIEW_SHADER, NULL, true);
   }
 
   virtual void DoShaderToggle(wxCommandEvent& event) {

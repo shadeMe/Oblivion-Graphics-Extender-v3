@@ -10,6 +10,7 @@ OBGEDirect3DDevice9 *lastOBGEDirect3DDevice9 = NULL;
 enum OBGEPass currentPass  = OBGEPASS_UNKNOWN,
               previousPass = OBGEPASS_UNKNOWN;
 IDirect3DTexture9 *passTexture[OBGEPASS_NUM];
+IDirect3DTexture9 *passDepthT [OBGEPASS_NUM];
 IDirect3DSurface9 *passSurface[OBGEPASS_NUM];
 IDirect3DSurface9 *passDepth  [OBGEPASS_NUM];
 int                passFrames [OBGEPASS_NUM] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
@@ -86,6 +87,7 @@ OBGEDirect3DDevice9::OBGEDirect3DDevice9(IDirect3D9 *d3d, IDirect3DDevice9 *devi
 
 #define HasShaderManager	1	// m_shaders
   m_shaders = ShaderManager::GetSingleton();
+  m_shaders->OnCreateDevice();
   m_shadercv = NULL;
   m_shadercp = NULL;
 
@@ -210,6 +212,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::Reset(D3DPRE
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::Present(CONST RECT *pSourceRect, CONST RECT *pDestRect, HWND hDestWindowOverride, CONST RGNDATA *pDirtyRegion) {
   memset(passTexture, 0, sizeof(passTexture));
   memset(passSurface, 0, sizeof(passSurface));
+  memset(passDepthT , 0, sizeof(passDepthT ));
   memset(passDepth  , 0, sizeof(passDepth  ));
   memset(passPasses , 0, sizeof(passPasses ));
 
@@ -557,14 +560,14 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetRenderTar
   /* they are a textures anyway, no need to check dedicated targets */
   if (currentPass != OBGEPASS_UNKNOWN) {
     /* dedicated rendertarget, possibly with multi-sampling */
-    if (surfaceRender[pRenderTarget])
-      passSurface[currentPass] = pRenderTarget,
-        passTexture[currentPass] = NULL;
+    passTexture[OBGEPASS_ANY] = passTexture[currentPass] = NULL;
+    if ((passSurface[OBGEPASS_ANY] = passSurface[currentPass] = pRenderTarget)) {
+      struct textureSurface *texs;
 
-    /* texture-based rendertarget surface, no multisampling */
-    if (surfaceTexture[pRenderTarget])
-      if ((passSurface[currentPass] = pRenderTarget))
-        passTexture[currentPass] = surfaceTexture[pRenderTarget]->tex;
+      /* texture-based rendertarget surface, no multisampling */
+      if ((texs = surfaceTexture[pRenderTarget]))
+        passTexture[OBGEPASS_ANY] = passTexture[currentPass] = texs->tex;
+    }
 
 //  _MESSAGE("OD3D9: Grabbed pass %d texture", currentPass);
   }
@@ -653,12 +656,14 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetDepthSten
   /* they are a dedicated anyway, no need to check textures */
   if (currentPass != OBGEPASS_UNKNOWN) {
     /* dedicated depthstencil, possibly with multi-sampling */
-    if (surfaceDepth[pNewZStencil])
-      passDepth[currentPass] = pNewZStencil;
+    passDepthT[OBGEPASS_ANY] = passDepthT[currentPass] = NULL;
+    if ((passDepth[OBGEPASS_ANY] = passDepth[currentPass] = pNewZStencil)) {
+      struct textureSurface *texs;
 
-    /* texture-based depthstencil surface, no multisampling */
-    if (surfaceTexture[pNewZStencil])
-      passDepth[currentPass] = pNewZStencil;
+      /* texture-based depthstencil surface, no multisampling */
+      if ((texs = surfaceTexture[pNewZStencil]))
+        passDepthT[OBGEPASS_ANY] = passDepthT[currentPass] = texs->tex;
+    }
 
 //  _MESSAGE("OD3D9: Grabbed pass %d depth", currentPass);
   }
@@ -1462,8 +1467,8 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetVertexSha
     /* apply dynamic runtime parameters */
     m_shadercv->SetRuntimeParams(m_device, m_device);
 #else
-    m_shadercv->frame_used[OBGEPASS_UNKNOWN] = frame_num;
-    m_shadercv->frame_pass[OBGEPASS_UNKNOWN] = frame_bge;
+    m_shadercv->frame_used[OBGEPASS_ANY] = frame_num;
+    m_shadercv->frame_pass[OBGEPASS_ANY] = frame_bge;
 
     m_shadercv->frame_used[currentPass] = frame_num;
     m_shadercv->frame_pass[currentPass] = frame_bge;
@@ -1648,8 +1653,8 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetPixelShad
     /* apply dynamic runtime parameters */
     m_shadercp->SetRuntimeParams(m_device, m_device);
 #else
-    m_shadercp->frame_used[OBGEPASS_UNKNOWN] = frame_num;
-    m_shadercp->frame_pass[OBGEPASS_UNKNOWN] = frame_bge;
+    m_shadercp->frame_used[OBGEPASS_ANY] = frame_num;
+    m_shadercp->frame_pass[OBGEPASS_ANY] = frame_bge;
 
     m_shadercp->frame_used[currentPass] = frame_num;
     m_shadercp->frame_pass[currentPass] = frame_bge;

@@ -336,7 +336,7 @@ void Anonymous::TrackHDRPass(int unk1, int unk2, int unk3, int unk4) {
 
 void Anonymous::TrackBlurPass(int unk1, int unk2, int unk3, int unk4) {
 	previousPass = currentPass;
-	currentPass = OBGEPASS_EFFECTS;
+	currentPass = OBGEPASS_POST;
 
 	if (frame_log)
 		frame_log->Message("OD3D9: BlurPass started");
@@ -355,7 +355,7 @@ void Anonymous::TrackBlurPass(int unk1, int unk2, int unk3, int unk4) {
 
 void Anonymous::TrackHitPass(int unk1, int unk2, int unk3, int unk4) {
 	previousPass = currentPass;
-	currentPass = OBGEPASS_EFFECTS;
+	currentPass = OBGEPASS_POST;
 
 	if (frame_log)
 		frame_log->Message("OD3D9: HitPass started");
@@ -374,7 +374,7 @@ void Anonymous::TrackHitPass(int unk1, int unk2, int unk3, int unk4) {
 
 void Anonymous::TrackMenuPass(int unk1, int unk2, int unk3, int unk4) {
 	previousPass = currentPass;
-	currentPass = OBGEPASS_EFFECTS;
+	currentPass = OBGEPASS_POST;
 
 	if (frame_log)
 		frame_log->Message("OD3D9: MenuPass started");
@@ -393,7 +393,7 @@ void Anonymous::TrackMenuPass(int unk1, int unk2, int unk3, int unk4) {
 
 void Anonymous::TrackRefractionPass(int unk1, int unk2, int unk3, int unk4) {
 	previousPass = currentPass;
-	currentPass = OBGEPASS_EFFECTS;
+	currentPass = OBGEPASS_POST;
 
 	if (frame_log)
 		frame_log->Message("OD3D9: RefractionPass started");
@@ -412,7 +412,7 @@ void Anonymous::TrackRefractionPass(int unk1, int unk2, int unk3, int unk4) {
 
 void Anonymous::TrackNighteyePass(int unk1, int unk2, int unk3, int unk4) {
 	previousPass = currentPass;
-	currentPass = OBGEPASS_EFFECTS;
+	currentPass = OBGEPASS_POST;
 
 	if (frame_log)
 		frame_log->Message("OD3D9: NighteyePass started");
@@ -516,7 +516,7 @@ void __cdecl TrackIdlePass(int unk1, int unk2) {
 	 */
 	previousPass = currentPass;
 //	currentPass = OBGEPASS_UNKNOWN;
-	currentPass = OBGEPASS_ANY;
+	currentPass = OBGEPASS_UNKNOWN;
 
 	if (frame_log)
 		frame_log->Message("OD3D9: IdlePass started");

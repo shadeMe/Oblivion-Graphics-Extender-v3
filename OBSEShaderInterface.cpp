@@ -22,6 +22,7 @@ static global<bool> UseSave(true, NULL, "Serialization", "bSaveData");
 static global<bool> UseLoad(true, NULL, "Serialization", "bLoadData");
 static global<bool> EnableInterOp(false, NULL, "PluginInterOp", "bEnableInterOp");
 static global<bool> SaveFix(false, NULL, "Effects", "bNoShadersInMenus");
+static global<bool> TailEffects(false, NULL, "Effects", "bTailEffects");
 static global<bool> Enabled(true, NULL, "General", "bEnabled");
 static global<bool> ExtHDR(false, "Oblivion.ini", "BlurShaderHDR", "bDoHighDynamicRange");
 static global<bool> IntHDR(false, "Oblivion.ini", "BlurShaderHDRInterior", "bDoHighDynamicRange");
@@ -68,7 +69,7 @@ OBSEShaderInterface *OBSEShaderInterface::GetSingleton() {
     // as I haven't written a destructor it will fail.
     Singleton->RefCount++;
 
-    if (IsPlain())
+    if (TailEffects.Get())
       obImageSpaceShaderList->p->AddTail(Singleton);	// put after alllll other effects
     else
       obImageSpaceShaderList->p->AddHead(Singleton);	// put before allll other effects

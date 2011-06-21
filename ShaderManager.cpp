@@ -21,6 +21,7 @@ static global<bool> Optimize(false,NULL,"Shaders","bOptimize");
 static global<bool> MaximumSM(false,NULL,"Shaders","bMaximumSM");
 static global<bool> UpgradeSM(false,NULL,"Shaders","bUpgradeSM1X");
 static global<char*> ShaderOverrideDirectory("data\\shaders\\override\\",NULL,"Shaders","sShaderOverrideDirectory");
+static global<int> BufferZDepthNumBits(0, NULL, "ScreenBuffers", "iBufferZDepthNumBits");
 
 /* #################################################################################################
  */
@@ -85,6 +86,11 @@ static HLSLIncludeManager incl;
 #define	OFF		2
 #define	LAZY		3
 #define	GREEDY		4
+#define	REFLECTIONPASS	(1 << 1) /*(1 << OBGEPASS_REFLECTION)*/
+#define	WATERPASS	(1 << 2) /*(1 << OBGEPASS_WATER)*/
+#define	SHADOWPASS	(1 << 5) /*(1 << OBGEPASS_SHADOW)*/
+#define	MAINPASS	(1 << 6) /*(1 << OBGEPASS_MAIN)*/
+#define	EFFECTPASS	(1 << 7) /*(1 << OBGEPASS_EFFECTS)*/
 
 static D3DXMACRO defs[] = {
   {"FUSED"		, stringify(FUSED  )},
@@ -92,6 +98,13 @@ static D3DXMACRO defs[] = {
   {"DEFAULT"		, stringify(DEFAULT)},
   {"LAZY"		, stringify(LAZY   )},
   {"GREEDY"		, stringify(GREEDY )},
+
+  {"REFLECTIONPASS"	, stringify(REFLECTIONPASS)},
+  {"WATERPASS"		, stringify(WATERPASS     )},
+  {"SHADOWPASS"		, stringify(SHADOWPASS    )},
+  {"MAINPASS"		, stringify(MAINPASS      )},
+  {"EFFECTPASS"		, stringify(EFFECTPASS    )},
+
   {NULL, NULL},
 };
 
@@ -99,6 +112,7 @@ static D3DXMACRO defs[] = {
 #define SHADER_COLORBUFFER	1
 #define SHADER_ZWRITE		2
 #define SHADER_ZBUFFER		3
+#define SHADER_PASSMASK		4
 
 /* #################################################################################################
  */
@@ -152,7 +166,7 @@ ShaderRecord::ShaderRecord() {
 
   /* shader source, binaries and constant tables */
   pProfile = NULL;
-  pSourceReplaced = NULL; sourceLen = 0;
+  pSourceReplaced = NULL; sourceLen = 0; hlslStamp = 0;
   pAsmblyReplaced = NULL; asmblyLen = 0;
   pShaderReplaced = NULL;
   pConstsReplaced = NULL;
@@ -200,17 +214,9 @@ ShaderRecord::~ShaderRecord() {
 /* -------------------------------------------------------------------------------------------------
  */
 
-bool ShaderRecord::ReloadShader() {
-  struct stat sb, sh;
+bool ShaderRecord::ChangedShader() {
+  struct stat sh;
   char strFileFull[MAX_PATH];
-  FILE *f;
-
-  /* getting a compiled binary for replacement if there is any
-   */
-  strcpy(strFileFull, ::ShaderOverrideDirectory.Get());
-  strcat(strFileFull, Name);
-  if (!stat((const char *)Filepath, &sb)) {
-  }
 
   /* getting a HLSL source for compiling if there is any
    */
@@ -220,34 +226,57 @@ bool ShaderRecord::ReloadShader() {
   if (!stat((const char *)strFileFull, &sh)) {
     /* if the HLSL source is newer than the binary, attempt to recompile
      */
-    if (pSourceReplaced && (sh.st_mtime > sb.st_mtime)) {
+    if (sh.st_mtime > hlslStamp) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool ShaderRecord::ReloadShader() {
+  struct stat sh;
+  char strFileFull[MAX_PATH];
+  FILE *f;
+
+  /* getting a HLSL source for compiling if there is any
+   */
+  strcpy(strFileFull, ::ShaderOverrideDirectory.Get());
+  strcat(strFileFull, Name);
+  strcat(strFileFull, ".hlsl");
+  if (!stat((const char *)strFileFull, &sh)) {
+    /* if the HLSL source is newer than the binary, attempt to recompile
+     */
+    if (pSourceRuntime && (sh.st_mtime > hlslStamp)) {
       /* trigger recompile */
       RuntimeFlush();
 
-      delete[] pSourceReplaced;
-      pSourceReplaced = NULL;
+      delete[] pSourceRuntime;
+      pSourceRuntime = NULL;
     }
 
-    if (!pSourceReplaced) {
+    if (!pSourceRuntime) {
       UINT size = sh.st_size;
-      pSourceReplaced = new CHAR[size + 1];
-      if (pSourceReplaced != NULL) {
+      pSourceRuntime = new CHAR[size + 1];
+      if (pSourceRuntime != NULL) {
 	/* reading in text-mode can yield any number of less characters */
-	memset(pSourceReplaced, 0, size + 1);
+	memset(pSourceRuntime, 0, size + 1);
 
 	if (!fopen_s(&f, strFileFull, "rb"/*"rt"*/)) {
-	  fread(pSourceReplaced, 1, size, f);
+	  fread(pSourceRuntime, 1, size, f);
 	  fclose(f);
 
 	  _DMESSAGE("Loaded source of %s from %s", Name, Filepath);
 
-	  sourceLen = strlen(pSourceReplaced);
+	  runtimeLen = strlen(pSourceRuntime);
+	  hlslStamp = sh.st_mtime;
 	}
 	else {
-	  delete[] pSourceReplaced;
+	  delete[] pSourceRuntime;
 
-	  pSourceReplaced = NULL;
-	  sourceLen = 0;
+	  pSourceRuntime = NULL;
+	  runtimeLen = 0;
+	  hlslStamp = 0;
 	}
 
 	return true;
@@ -384,12 +413,14 @@ bool ShaderRecord::LoadShader(const char *Filename) {
         _DMESSAGE("Loaded source of %s from %s", Name, Filepath);
 
 	sourceLen = strlen(pSourceReplaced);
+	hlslStamp = sh.st_mtime;
       }
       else {
       	delete[] pSourceReplaced;
 
       	pSourceReplaced = NULL;
-        sourceLen = 0;
+	sourceLen = 0;
+	hlslStamp = 0;
       }
     }
 
@@ -416,12 +447,10 @@ bool ShaderRecord::LoadShader(const char *Filename) {
     if (pSourceReplaced && ::MaximumSM.Get())
       _DMESSAGE("Upgraded version of %s to max.", Name);
 
-    if (iType == SHADER_VERTEX) {
+    if (iType == SHADER_VERTEX)
       pProfile = strdup(D3DXGetVertexShaderProfile(lastOBGEDirect3DDevice9));
-    }
-    else if (iType == SHADER_PIXEL) {
+    else if (iType == SHADER_PIXEL)
       pProfile = strdup(D3DXGetPixelShaderProfile(lastOBGEDirect3DDevice9));
-    }
   }
 
   return true;
@@ -707,7 +736,7 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	    char *end = (char *)strchr(bc, ';'); if (end) *end = '\0';
 
 	    /* currently fixed */
-	    float col = 0.0;
+	    float col = 0.0; /*sscanf("Bordercolor = %f", &col);*/
 	    *States++ = D3DSAMP_BORDERCOLOR;
 	    *States++ = *((DWORD *)&col);
 	  }
@@ -755,6 +784,7 @@ DWORD *ShaderRecord::GetDX9RenderStates(DWORD *States) {
 	const char *cb = strstr(buf, "ColorBuffer");
 	const char *zw = strstr(buf, "ZWrite");
 	const char *zb = strstr(buf, "ZBuffer");
+	const char *pm = strstr(buf, "PassMask");
 
 	if (cb) {
 	  char *end = (char *)strchr(cb, ';'); if (end) *end = '\0';
@@ -779,6 +809,16 @@ DWORD *ShaderRecord::GetDX9RenderStates(DWORD *States) {
 	  /**/ if (strstr(zw, "FUSED"        )) { *States++ = SHADER_ZWRITE; *States++ = FUSED; }
 	  else if (strstr(zw, "OFF"          )) { *States++ = SHADER_ZWRITE; *States++ = OFF; }
 	  else if (strstr(zw, "DEFAULT"      )) { *States++ = SHADER_ZWRITE; *States++ = DEFAULT; }
+	}
+	if (pm) {
+	  char *end = (char *)strchr(pm, ';'); if (end) *end = '\0';
+	  unsigned long mask = 0;
+	  /**/ if (strstr(pm, "REFLECTIONPASS")) { mask |= REFLECTIONPASS; }
+	  else if (strstr(pm, "WATERPASS"     )) { mask |= WATERPASS; }
+	  else if (strstr(pm, "SHADOWPASS"    )) { mask |= SHADOWPASS; }
+	  else if (strstr(pm, "MAINPASS"      )) { mask |= MAINPASS; }
+	  else if (strstr(pm, "EFFECTPASS"    )) { mask |= EFFECTPASS; }
+	  *States++ = SHADER_PASSMASK; *States++ = mask;
 	}
       }
     }
@@ -937,7 +977,7 @@ bool ShaderRecord::CompileShader(bool forced) {
 	defs,
 	&incl,
 	"main",
-	pProfile,
+	(pProfile ? pProfile : (iType == SHADER_VERTEX ? "vs_3_0" : "ps_3_0")),
 	D3DXSHADER_DEBUG | (
 	  ::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
 	  ::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
@@ -957,7 +997,7 @@ bool ShaderRecord::CompileShader(bool forced) {
 	  defs,
 	  &incl,
 	  "main",
-	  pProfile,
+	  (pProfile ? pProfile : (iType == SHADER_VERTEX ? "vs_3_0" : "ps_3_0")),
 	  D3DXSHADER_DEBUG | (
 	    ::UpgradeSM.Get() ? D3DXSHADER_ENABLE_BACKWARDS_COMPATIBILITY : D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
 	  &p,
@@ -1107,21 +1147,19 @@ RuntimeShaderRecord::RuntimeShaderRecord() {
   pCopyDZ = NULL; bZFused = true; bZLazy = true;
 
   bIO = false;
+  bMask = 0;
 
 #ifdef	OBGE_DEVLING
   Paired.clear();
 
+  Clear();
   memset(frame_used, -1, sizeof(frame_used));
 #endif
 }
 
 RuntimeShaderRecord::~RuntimeShaderRecord() {
-  /* first release (text points into pCustomCT)
-  if (pGrabRT) pGrabRT->Release(); pGrabRT = NULL;
-  if (pTextRT) pTextRT->Release(); pTextRT = NULL;
-  if (pGrabDS) pGrabDS->Release(); pGrabDS = NULL;
-  if (pTextDS) pTextDS->Release(); pTextDS = NULL;
-   */
+  /* first release (text points into pCustomCT) */
+//rsb.Release();
 
   if (pCustomCT)
     free(pCustomCT);
@@ -1152,6 +1190,7 @@ void RuntimeShaderRecord::Release() {
   pCopyDZ = NULL; bZFused = true; bZLazy = true;
 
   bIO = false;
+  bMask = false;
 }
 
 inline void RuntimeShaderRecord::OnLostDevice(void) {
@@ -1170,9 +1209,25 @@ inline void RuntimeShaderRecord::OnResetDevice(void) {
  */
 struct RuntimeShaderRecord::Buffers RuntimeShaderRecord::rsb[OBGEPASS_NUM] = {NULL};
 
+void RuntimeShaderRecord::Buffers::Release() {
+  /* first release (text points into pCustomCT)
+  if (pGrabRT) pGrabRT->Release(); pGrabRT = NULL;
+  if (pTextRT) pTextRT->Release(); pTextRT = NULL;
+  if (pGrabDS) pGrabDS->Release(); pGrabDS = NULL;
+  if (pTextDS) pTextDS->Release(); pTextDS = NULL;
+
+  if (pGrabVX) {
+    _MESSAGE("Releasing shader vertex buffer.");
+
+    while (pGrabVX->Release()) {}
+    pGrabVX = NULL;
+  }
+   */
+}
+
 void RuntimeShaderRecord::Buffers::GrabRT(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice) {
   IDirect3DSurface9 *pCurrRT;
-  if (SceneDevice->GetRenderTarget(0, &pCurrRT) == D3D_OK) {
+  if ((pCurrRT = passSurface[OBGEPASS_ANY])) {
     D3DSURFACE_DESC CurrD;              pCurrRT->GetDesc(&CurrD);
     D3DSURFACE_DESC GrabD; if (pGrabRT) pGrabRT->GetDesc(&GrabD);
 
@@ -1194,8 +1249,9 @@ void RuntimeShaderRecord::Buffers::GrabRT(IDirect3DDevice9 *StateDevice, IDirect
 }
 
 void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice) {
+#if 0
   IDirect3DSurface9 *pCurrDS;
-  if (SceneDevice->GetDepthStencilSurface(&pCurrDS) == D3D_OK) {
+  if ((pCurrDS = passDepth[OBGEPASS_ANY])) {
     D3DSURFACE_DESC CurrD;              pCurrDS->GetDesc(&CurrD);
     D3DSURFACE_DESC GrabD; if (pGrabDS) pGrabDS->GetDesc(&GrabD);
 
@@ -1214,17 +1270,142 @@ void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect
       bDFilled = true;
     }
   }
+#endif
+
+  IDirect3DTexture9 *pCurrDT;
+  if ((pCurrDT = passDepthT[OBGEPASS_ANY])) {
+    D3DSURFACE_DESC CurrD;              pCurrDT->GetLevelDesc(0, &CurrD);
+    D3DSURFACE_DESC GrabD; if (pTextDS) pTextDS->GetLevelDesc(0, &GrabD);
+
+    /* different */
+    if (!pTextDS || ((CurrD.Width != GrabD.Width) || (CurrD.Height != GrabD.Height))) {
+      if (pGrabDS) pGrabDS->Release();
+      if (pTextDS) pTextDS->Release();
+      if (pGrabVX) pGrabVX->Release();
+
+      pGrabDS = NULL; pTextDS = NULL; pGrabVX = NULL;
+      if (StateDevice->CreateTexture(
+		CurrD.Width, CurrD.Height,
+		1, D3DUSAGE_RENDERTARGET /*CurrD.Usage*/,
+		(BufferZDepthNumBits.Get() != 16 ? D3DFMT_R32F : D3DFMT_R16F) /*CurrD.Format*/,
+		CurrD.Pool, &pTextDS, NULL) == D3D_OK) {
+        if (pTextDS->GetSurfaceLevel(0, &pGrabDS) == D3D_OK) {
+          void *VertexPointer;
+
+	  /* pixel exact screen-quad */
+          const float width  = CurrD.Width  - 0.5f;
+          const float height = CurrD.Height - 0.5f;
+
+          CameraQuad ShaderVertices[] = {
+            {-0.5f,  -0.5f,  0.5f,  1.0f,	0.0f, 0.0f},
+            {width,  -0.5f,  0.5f,  1.0f,	1.0f, 0.0f},
+            {-0.5f, height,  0.5f,  1.0f,	0.0f, 1.0f},
+            {width, height,  0.5f,  1.0f,	1.0f, 1.0f}
+          };
+
+          _MESSAGE("Creating shader vertex buffers.");
+ 
+          SceneDevice->CreateVertexBuffer(4 * sizeof(CameraQuad), D3DUSAGE_WRITEONLY, CAMERAQUADFORMAT, D3DPOOL_DEFAULT, &pGrabVX, 0);
+          pGrabVX->Lock(0, 0, &VertexPointer, 0);
+          CopyMemory(VertexPointer, ShaderVertices, sizeof(ShaderVertices));
+          pGrabVX->Unlock();
+        }
+      }
+    }
+
+    if (pGrabDS) {
+      ShaderManager *sm = ShaderManager::GetSingleton();
+
+//    IDirect3DSurface9 *pCurrRT;
+      IDirect3DBaseTexture9 *pCurrTX;
+      IDirect3DVertexShader9 *pCurrVS;
+      IDirect3DPixelShader9 *pCurrPS;
+//    DWORD dCurrZW;
+      DWORD dCurrCL;
+      DWORD dCurrAB;
+//    DWORD dCurrAT;
+//    DWORD dCurrST;
+//    DWORD dCurrVF;
+      IDirect3DVertexBuffer9 *pCurrVX;
+      UINT32 dCurrVO;
+      UINT32 dCurrVS;
+
+#if 0
+      IDirect3DVertexShader9 *pCopyVS;
+      IDirect3DPixelShader9  *pCopyPS;
+
+      pCopyVS = (IDirect3DVertexShader9 *)sm->cqv->pDX9ShaderClss;
+      pCopyPS = (IDirect3DPixelShader9  *)sm->cqp->pDX9ShaderClss;
+#endif
+
+#if 0
+      IDirect3DSurface9 *pCurrRT;
+      IDirect3DSurface9 *pCurrDS;
+      SceneDevice->GetRenderTarget(0, &pCurrRT);
+      SceneDevice->GetDepthStencilSurface(&pCurrDS);
+      assert(pCurrRT == passSurface[currentPass]);
+      assert(pCurrDS == passDepth[currentPass]);
+
+      struct textureSurface *t = surfaceTexture[passDepth[currentPass]];
+#endif
+
+//    SceneDevice->GetRenderTarget(0, &pCurrRT);
+      SceneDevice->GetTexture(0, &pCurrTX);
+      SceneDevice->GetVertexShader(&pCurrVS);
+      SceneDevice->GetPixelShader(&pCurrPS);
+//    SceneDevice->GetRenderState(D3DRS_ZENABLE, &dCurrZW);
+      SceneDevice->GetRenderState(D3DRS_CULLMODE, &dCurrCL);
+      SceneDevice->GetRenderState(D3DRS_ALPHABLENDENABLE, &dCurrAB);
+//    SceneDevice->GetRenderState(D3DRS_ALPHATESTENABLE, &dCurrAT);
+//    SceneDevice->GetRenderState(D3DRS_STENCILENABLE, &dCurrST);
+//    SceneDevice->GetFVF(&dCurrVF);
+      SceneDevice->GetStreamSource(0, &pCurrVX, &dCurrVO, &dCurrVS);
+
+//    SceneDevice->BeginScene();
+      SceneDevice->SetRenderTarget(0, pGrabDS);
+      SceneDevice->SetDepthStencilSurface(NULL);
+//    SceneDevice->Clear(0, NULL, D3DCLEAR_TARGET, 0, 0.0, 0);
+      SceneDevice->SetTexture(0, pCurrDT);
+      SceneDevice->SetVertexShader((IDirect3DVertexShader9 *)sm->cqv->pDX9ShaderClss);
+      SceneDevice->SetPixelShader ((IDirect3DPixelShader9  *)sm->cqp->pDX9ShaderClss);
+      SceneDevice->SetPixelShaderConstantF(0, (const float *)&sm->ShaderConst.ZRange, 1);
+      SceneDevice->SetPixelShaderConstantF(1, (const float *)&sm->ShaderConst.proj, 4);
+//    SceneDevice->SetRenderState(D3DRS_ZENABLE, FALSE);
+      SceneDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+      SceneDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+//    SceneDevice->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
+//    SceneDevice->SetRenderState(D3DRS_STENCILENABLE, FALSE);
+
+      SceneDevice->SetFVF(CAMERAQUADFORMAT);
+      SceneDevice->SetStreamSource(0, pGrabVX, 0, sizeof(CameraQuad));
+      SceneDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
+//    SceneDevice->EndScene();
+
+//    SceneDevice->SetRenderTarget(0, pCurrRT);
+//    SceneDevice->SetDepthStencilSurface(pCurrDS);
+      SceneDevice->SetRenderTarget(0, passSurface[OBGEPASS_ANY]);
+      SceneDevice->SetDepthStencilSurface(passDepth[OBGEPASS_ANY]);
+      SceneDevice->SetTexture(0, pCurrTX);
+      SceneDevice->SetVertexShader(pCurrVS);
+      SceneDevice->SetPixelShader(pCurrPS);
+//    SceneDevice->SetRenderState(D3DRS_ZENABLE, dCurrZW);
+      SceneDevice->SetRenderState(D3DRS_CULLMODE, dCurrCL);
+      SceneDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, dCurrAB);
+//    SceneDevice->SetRenderState(D3DRS_ALPHATESTENABLE, dCurrAT);
+//    SceneDevice->SetRenderState(D3DRS_STENCILENABLE, dCurrST);
+//    SceneDevice->SetFVF(dCurrVF);
+      SceneDevice->SetStreamSource(0, pCurrVX, dCurrVO, dCurrVS);
+
+      bDFilled = true;
+    }
+  }
 }
 
 void RuntimeShaderRecord::Buffers::GrabDZ(IDirect3DDevice9 *StateDevice, IDirect3DDevice9 *SceneDevice, bool bZFused) {
-  pTextDZ = NULL; IDirect3DSurface9 *pCurrDZ;
-  if (SceneDevice->GetDepthStencilSurface(&pCurrDZ) == D3D_OK) {
-    if (surfaceTexture[pCurrDZ]) {
-      pTextDZ = surfaceTexture[pCurrDZ]->tex;
-
-      StateDevice->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
-      bZLoaded = (bZFused ? -1 : 1);
-    }
+  pTextDZ = NULL;
+  if ((pTextDZ = passDepthT[currentPass])) {
+    StateDevice->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+    bZLoaded = (bZFused ? -1 : 1);
   }
 }
 
@@ -1246,6 +1427,7 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
     if (CoTa->GetDesc(&desc) == D3D_OK) {
       /* for assigning global references */
       ShaderManager *sm = ShaderManager::GetSingleton();
+      IDirect3DBaseTexture9 *unbound = (sm->unbound ? sm->unbound->GetTexture() : NULL);
 
       /* counts of what's in the tables */
       int lcls[4] = {0};
@@ -1325,10 +1507,6 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 
 	switch (cnst.RegisterSet) {
 	  case D3DXRS_BOOL:
-	    pBool[cnts[D3DXRS_BOOL]].offset = cnst.RegisterIndex;
-	    pBool[cnts[D3DXRS_BOOL]].length = cnst.RegisterCount;
-	    pBool[cnts[D3DXRS_BOOL]].name = cnst.Name;
-
 	    /**/ if (cnst.Name == strstr(cnst.Name, "obge_"))
 	      break;
 	    else if (cnst.Name == strstr(cnst.Name, "oblv_"))
@@ -1340,13 +1518,12 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 		pBool[cnts[D3DXRS_BOOL]].vals.condition = *((bool *)cnst.DefaultValue);
 	    }
 
-	    cnts[D3DXRS_BOOL]++;
+	    pBool[cnts[D3DXRS_BOOL]].offset = cnst.RegisterIndex;
+	    pBool[cnts[D3DXRS_BOOL]].length = cnst.RegisterCount;
+	    pBool[cnts[D3DXRS_BOOL]].name = cnst.Name;
+	          cnts[D3DXRS_BOOL]++;
 	    break;
 	  case D3DXRS_INT4:
-	    pInt4[cnts[D3DXRS_INT4]].offset = cnst.RegisterIndex;
-	    pInt4[cnts[D3DXRS_INT4]].length = cnst.RegisterCount;
-	    pInt4[cnts[D3DXRS_INT4]].name = cnst.Name;
-
 	    /**/ if (cnst.Name == strstr(cnst.Name, "obge_"))
 	      break;
 	    else if (cnst.Name == strstr(cnst.Name, "oblv_"))
@@ -1359,13 +1536,12 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	      pInt4[cnts[D3DXRS_INT4]].vals.integer = ivs; ivs += cnst.RegisterCount;
 	    }
 
-	    cnts[D3DXRS_INT4]++;
+	    pInt4[cnts[D3DXRS_INT4]].offset = cnst.RegisterIndex;
+	    pInt4[cnts[D3DXRS_INT4]].length = cnst.RegisterCount;
+	    pInt4[cnts[D3DXRS_INT4]].name = cnst.Name;
+	          cnts[D3DXRS_INT4]++;
 	    break;
 	  case D3DXRS_FLOAT4:
-	    pFloat4[cnts[D3DXRS_FLOAT4]].offset = cnst.RegisterIndex;
-	    pFloat4[cnts[D3DXRS_FLOAT4]].length = cnst.RegisterCount;
-	    pFloat4[cnts[D3DXRS_FLOAT4]].name = cnst.Name;
-
 	    /**/ if (cnst.Name == strstr(cnst.Name, "obge_")) {
 	      /**/ if (cnst.Name == strstr(cnst.Name, "obge_Tick"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.TikTiming;
@@ -1426,48 +1602,48 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	      pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = fvs; fvs += cnst.RegisterCount;
 	    }
 
-	    cnts[D3DXRS_FLOAT4]++;
+	    pFloat4[cnts[D3DXRS_FLOAT4]].offset = cnst.RegisterIndex;
+	    pFloat4[cnts[D3DXRS_FLOAT4]].length = cnst.RegisterCount;
+	    pFloat4[cnts[D3DXRS_FLOAT4]].name = cnst.Name;
+	            cnts[D3DXRS_FLOAT4]++;
  	    break;
 	  case D3DXRS_SAMPLER:
-	    pTexture[cnts[D3DXRS_SAMPLER]].offset = cnst.RegisterIndex;
-	    pTexture[cnts[D3DXRS_SAMPLER]].length = cnst.RegisterCount;
-	    pTexture[cnts[D3DXRS_SAMPLER]].name = cnst.Name;
-
 	    /**/ if (cnst.Name == strstr(cnst.Name, "obge_"))
 	      break;
 	    else if (cnst.Name == strstr(cnst.Name, "oblv_")) {
-	      /**/ if (cnst.Name == strstr(cnst.Name, "oblv_CurrRendertarget0_CURRENTPASS"))
-		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL, pCopyRT = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture;
-	      else if (cnst.Name == strstr(cnst.Name, "oblv_CurrDepthStenzilZ_CURRENTPASS"))
-		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL, pCopyDS = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture;
-	      else if (cnst.Name == strstr(cnst.Name, "oblv_CurrDepthStenzilR_CURRENTPASS"))
-		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL, pCopyDZ = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture;
-	      else {
-	        /* read and interprete the source and extract optional information */
-	        int sts = (RuntimeVariable::mem::tv *)
-		  pAssociate->GetDX9ShaderTexture(cnst.Name,
-		  NULL,
-		  (DWORD *)tvs) - tvs;
+	      /* the default texture for any kind of dynamic texture is "white" */
+	      pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = unbound;
 
-	        /* specific sampler-states have been defined */
-	        if (tvs->Type) {
-		  assert(sts < 16);
+	      /* read and interprete the source and extract optional information */
+	      int sts = (RuntimeVariable::mem::tv *)
+		pAssociate->GetDX9ShaderTexture(cnst.Name,
+		NULL,
+		(DWORD *)tvs) - tvs;
 
-		  pSampler[cnts[D3DXRS_SAMPLER + 1]].offset = cnst.RegisterIndex;
-		  pSampler[cnts[D3DXRS_SAMPLER + 1]].length = cnst.RegisterCount;
-		  pSampler[cnts[D3DXRS_SAMPLER + 1]].name = cnst.Name;
+	      /* specific sampler-states have been defined */
+	      if (tvs->Type) {
+		assert(sts < 16);
 
-		  pSampler[cnts[D3DXRS_SAMPLER + 1]].vals.state = tvs; tvs += sts + 1;
-
-		  cnts[D3DXRS_SAMPLER + 1]++;
-	        }
-
-		break;
+		pSampler[cnts[D3DXRS_SAMPLER + 1]].vals.state = tvs; tvs += sts + 1;
+		pSampler[cnts[D3DXRS_SAMPLER + 1]].offset = cnst.RegisterIndex;
+		pSampler[cnts[D3DXRS_SAMPLER + 1]].length = cnst.RegisterCount;
+		pSampler[cnts[D3DXRS_SAMPLER + 1]].name = cnst.Name;
+		cnts[D3DXRS_SAMPLER + 1]++;
 	      }
+
+	      /**/ if (cnst.Name == strstr(cnst.Name, "oblv_CurrRendertarget0_CURRENTPASS"))
+		pCopyRT = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_CurrDepthStenzilZ_CURRENTPASS"))
+		pCopyDS = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_CurrDepthStenzilR_CURRENTPASS"))
+		pCopyDZ = (IDirect3DTexture9 **)&pTexture[cnts[D3DXRS_SAMPLER]].vals.texture;
+	      else
+		break;
 	    }
 	    else if ((cnst.Name == strstr(cnst.Name, "glob_")) ||
 		     (cnst.Name == strstr(cnst.Name, "cust_"))) {
-	      pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = NULL;
+	      /* the default texture for any kind of dynamic texture is "white" */
+	      pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = unbound;
 
 	      /* read and interprete the source and extract optional information */
 	      int tnm = -1;
@@ -1480,13 +1656,11 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	      if (tvs->Type) {
 		assert(sts < 16);
 
+		pSampler[cnts[D3DXRS_SAMPLER + 1]].vals.state = tvs; tvs += sts + 1;
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].offset = cnst.RegisterIndex;
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].length = cnst.RegisterCount;
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].name = cnst.Name;
-
-		pSampler[cnts[D3DXRS_SAMPLER + 1]].vals.state = tvs; tvs += sts + 1;
-
-		cnts[D3DXRS_SAMPLER + 1]++;
+			 cnts[D3DXRS_SAMPLER + 1]++;
 	      }
 
 	      /* a specific texture has been given */
@@ -1499,7 +1673,10 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	      }
 	    }
 
-	    cnts[D3DXRS_SAMPLER]++;
+	    pTexture[cnts[D3DXRS_SAMPLER]].offset = cnst.RegisterIndex;
+	    pTexture[cnts[D3DXRS_SAMPLER]].length = cnst.RegisterCount;
+	    pTexture[cnts[D3DXRS_SAMPLER]].name = cnst.Name;
+		     cnts[D3DXRS_SAMPLER]++;
 	    break;
 	}
       }
@@ -1520,24 +1697,26 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
   }
 
   /* prepare statechanges */
-  if ((bIO = (pCopyRT || pCopyDS || pCopyDZ))) {
+  if ((bIO = (pCopyRT || pCopyDS || pCopyDZ))) { bMask = -1;
     DWORD States[16], *SBegin, *SEnd;
 
     SEnd = pAssociate->GetDX9RenderStates(SBegin = States);
     while (SBegin < SEnd) {
       switch (SBegin[0]) {
 	case SHADER_COLORBUFFER:
-	  /**/ if (SBegin[1] == LAZY) bCLazy = true;
+	  /**/ if (SBegin[1] == LAZY  ) bCLazy = true;
 	  else if (SBegin[1] == GREEDY) bCLazy = false; break;
 	case SHADER_COLORWRITE:
-	  /**/ if (SBegin[1] == FUSED) bCFused = true;
-	  else if (SBegin[1] == OFF) bCFused = false; break;
+	  /**/ if (SBegin[1] == FUSED ) bCFused = true;
+	  else if (SBegin[1] == OFF   ) bCFused = false; break;
 	case SHADER_ZBUFFER:
-	  /**/ if (SBegin[1] == LAZY) bDLazy = true;
+	  /**/ if (SBegin[1] == LAZY  ) bDLazy = true;
 	  else if (SBegin[1] == GREEDY) bDLazy = false; break;
 	case SHADER_ZWRITE:
-	  /**/ if (SBegin[1] == FUSED) bZFused = true;
-	  else if (SBegin[1] == OFF) bZFused = false; break;
+	  /**/ if (SBegin[1] == FUSED ) bZFused = true;
+	  else if (SBegin[1] == OFF   ) bZFused = false; break;
+	case SHADER_PASSMASK:
+	  /**/ bMask = SBegin[1]; break;
       }
 
       SBegin += 2;
@@ -1565,26 +1744,26 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
   }
 
   if (pCustomCT) {
-    if (bIO) {
+    if (bMask & (1 << currentPass)) {
       /* check what needs to go on here */
       const bool doRT = pCopyRT && (!buf->pTextRT || !buf->bCFilled || !bCLazy),
 		 doDS = pCopyDS && (!buf->pTextDS || !buf->bDFilled || !bDLazy),
 		 doDZ = pCopyDZ && (!buf->pTextDZ || !buf->bZLoaded);
 
-      if (doRT || doDS)
+      if (doRT /*|| doDS*/)
 	SceneDevice->EndScene();
       if (doRT)
 	buf->GrabRT(StateDevice, SceneDevice);
+      if (doRT /*|| doDS*/)
+	SceneDevice->BeginScene();
       if (doDS)
 	buf->GrabDS(StateDevice, SceneDevice);
-      if (doRT || doDS)
-	SceneDevice->BeginScene();
       if (doDZ)
 	buf->GrabDZ(StateDevice, SceneDevice, bZFused);
 
-      if (pCopyRT) (*pCopyRT) = buf->pTextRT;
-      if (pCopyDS) (*pCopyDS) = buf->pTextDS;
-      if (pCopyDZ) (*pCopyDZ) = buf->pTextDZ;
+      if (pCopyRT && buf->bCFilled) (*pCopyRT) = buf->pTextRT;
+      if (pCopyDS && buf->bDFilled) (*pCopyDS) = buf->pTextDS;
+      if (pCopyDZ && buf->bZLoaded) (*pCopyDZ) = buf->pTextDZ;
     }
 
     if (iType == SHADER_VERTEX) {
@@ -1789,18 +1968,11 @@ IDirect3DPixelShader9 *RuntimeShaderRecord::GetShader(IDirect3DPixelShader9 *Sha
 #ifdef	OBGE_DEVLING
   if (bMark) {
     ShaderRecord *id;
-    if ((id = ShaderManager::GetSingleton()->GetBuiltInShader("IDENTIFY.pso"))) {
-      if (!id->pDX9ShaderClss) {
-	id->CompileShader();
-	id->ConstructDX9Shader(SHADER_RUNTIME);
-      }
-
-      if (id->pDX9ShaderClss)
-	return (IDirect3DPixelShader9 *)id->pDX9ShaderClss;
-    }
+    if ((id = ShaderManager::GetSingleton()->idp))
+      return (IDirect3DPixelShader9 *)id->pDX9ShaderClss;
   }
 #endif
- 
+
   /* we have some replacement resource, and we're going to
    * pass that, do a real quick sanity check first
    */
@@ -1877,6 +2049,30 @@ void ShaderManager::Reset() {
   Clear();
 #endif
 }
+ 
+void ShaderManager::OnCreateDevice() {
+  if ((idp = GetBuiltInShader("IDENTIFY.pso"))) {
+    idp->CompileShader();
+    idp->ConstructDX9Shader(SHADER_RUNTIME);
+  }
+
+  if ((cqp = GetBuiltInShader("COPYQUAD.pso"))) {
+    cqp->CompileShader();
+    cqp->ConstructDX9Shader(SHADER_RUNTIME);
+  }
+
+  if ((cqv = GetBuiltInShader("COPYQUAD.vso"))) {
+    cqv->CompileShader();
+    cqv->ConstructDX9Shader(SHADER_RUNTIME);
+  }
+
+  int utx; unbound = NULL; TextureManager *TexMan = TextureManager::GetSingleton();
+  if (TexMan && (utx = TexMan->LoadDependtTexture("shaders/unbound.dds", TR_PLANAR)) != -1) {
+    unbound = TexMan->GetTexture(utx);
+    for (int p = 0; p < OBGEPASS_NUM; p++)
+      RuntimeShaderRecord::rsb[p].pTextUB = (IDirect3DTexture9 *)unbound;
+  }
+}
 
 void ShaderManager::OnReleaseDevice() {
   /* prevent locking up because other resources have allready been freed */
@@ -1920,6 +2116,22 @@ void ShaderManager::OnResetDevice() {
 
 /* -------------------------------------------------------------------------------------------------
  */
+
+bool ShaderManager::ChangedShaders() {
+  /* prevent locking up because other resources have allready been freed */
+  BuiltInShaderList prevBShaders = BuiltInShaders;
+  BuiltInShaderList::iterator BShader = prevBShaders.begin();
+
+  while (BShader != prevBShaders.end()) {
+    /* just one positive needed */
+    if ((*BShader)->ChangedShader())
+      return true;
+
+    BShader++;
+  }
+
+  return false;
+}
 
 bool ShaderManager::ReloadShaders() {
   bool change = false;

@@ -21,6 +21,7 @@
 // Hook-Tracker
 extern enum OBGEPass currentPass, previousPass;
 extern IDirect3DTexture9 *passTexture[OBGEPASS_NUM];
+extern IDirect3DTexture9 *passDepthT [OBGEPASS_NUM];
 extern IDirect3DSurface9 *passSurface[OBGEPASS_NUM];
 extern IDirect3DSurface9 *passDepth  [OBGEPASS_NUM];
 extern int                passFrames [OBGEPASS_NUM];
