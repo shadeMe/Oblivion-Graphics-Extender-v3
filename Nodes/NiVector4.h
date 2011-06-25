@@ -21,6 +21,9 @@ namespace v1_2_416
 		NiVector4(float _x, float _y, float _z, float _w);
 		~NiVector4();
 
+		inline float& operator [] (int i)       { return ((float *)&x)[i]; }
+		inline float  operator [] (int i) const { return ((float *)&x)[i]; }
+
 		void	Zero();
 		float	GetLength();
 		void	Normalize();

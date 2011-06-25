@@ -1,3 +1,4 @@
+#ifndef	OBGE_NOSHADER
 #ifndef	DEBUG_WINDOW_HPP
 #define	DEBUG_WINDOW_HPP
 
@@ -40,5 +41,6 @@ private:
 #endif
 };
 
+#endif
 #endif
 #endif

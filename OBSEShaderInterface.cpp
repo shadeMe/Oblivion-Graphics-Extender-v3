@@ -28,8 +28,6 @@ static global<bool> ExtHDR(false, "Oblivion.ini", "BlurShaderHDR", "bDoHighDynam
 static global<bool> IntHDR(false, "Oblivion.ini", "BlurShaderHDRInterior", "bDoHighDynamicRange");
 static global<bool> Bloom(false, "Oblivion.ini", "BlurShader", "bUseBlurShader");
 
-static enum OBGEPass previousPass;
-
 // Uses code from OBGE by Timeslip.
 
 OBSEShaderInterface *OBSEShaderInterface::Singleton = NULL;
@@ -92,13 +90,17 @@ void OBSEShaderInterface::ShaderCode(IDirect3DDevice9 *D3DDevice, IDirect3DSurfa
     return;
   }
 
-  previousPass = currentPass;
+#ifndef	OBGE_NOSHADER
+  enum OBGEPass previousPass = currentPass;
   currentPass = OBGEPASS_EFFECTS;
+#endif
 
   EffectManager::GetSingleton()->Render(D3DDevice, RenderTo, RenderFrom);
   HUDManager::GetSingleton()->Render();
 
+#ifndef	OBGE_NOSHADER
   currentPass = previousPass;
+#endif
 
   /*
   	if(EnableInterOp.data)

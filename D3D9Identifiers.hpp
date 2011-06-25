@@ -10,11 +10,15 @@
 #define	_DMESSAGE(...)	0
 #endif
 
+/* ------------------------------------------------------------------------------- */
+#ifndef	OBGE_NOSHADER
+
 /* these are build-switches from now on */
 //efine	OBGE_LOGGING
 #undef	OBGE_HOOKING
 //efine	OBGE_DEVLING
 //efine	OBGE_PROFILE
+#define	OBGE_ANISOTROPY		0	// 0 = just hint
 #define	OBGE_AUTOMIPMAP		0	// 0 = just hint, 1 = call GenerateMipSubLevels
 #define	OBGE_TRACKER		0	// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
 #undef	OBGE_TRACKER_SURFACES		// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
@@ -43,6 +47,7 @@ enum OBGEPass {
 
 extern const char *passNames[OBGEPASS_NUM];
 extern const char *passScens[OBGEPASS_NUM][16];
+#endif
 
 /* ------------------------------------------------------------------------------- */
 

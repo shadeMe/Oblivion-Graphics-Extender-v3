@@ -1,8 +1,11 @@
+#ifndef	OBGE_NOSHADER
+
 #include "D3D9.hpp"
 #include "D3D9Device.hpp"
 
 // Tracker
 OBGEDirect3D9 *lastOBGEDirect3D9 = NULL;
+static std::vector<OBGEDirect3D9 *> OBGEDrivers;
 
 /* ----------------------------------------------------------------------------- */
 
@@ -10,13 +13,19 @@ OBGEDirect3D9 *lastOBGEDirect3D9 = NULL;
 
 
 OBGEDirect3D9::OBGEDirect3D9(IDirect3D9 *d3d) : m_d3d(d3d) {
-  lastOBGEDirect3D9 = this;
+  _MESSAGE("OD3D9: Driver 0x%08x constructed from 0x%08x (%d drivers available)", this, _ReturnAddress(), OBGEDrivers.size() + 1);
 
-  _MESSAGE("OD3D9: D3D constructed from 0x%08x", _ReturnAddress());
+  /* add to vector and replace by the new version */
+  lastOBGEDirect3D9 = this;
+  OBGEDrivers.push_back(this);
 }
 
 OBGEDirect3D9::~OBGEDirect3D9() {
-  lastOBGEDirect3D9 = NULL;
+  /* remove from vector and replace by the other version */
+  OBGEDrivers.erase(std::find(OBGEDrivers.begin(), OBGEDrivers.end(), this));
+  lastOBGEDirect3D9 = (OBGEDrivers.size() ? OBGEDrivers.back() : NULL);
+
+  _MESSAGE("OD3D9: Driver 0x%08x destructed from 0x%08x (%d drivers left)", this, _ReturnAddress(), OBGEDrivers.size());
 }
 
 /*** IUnknown methods ***/
@@ -103,3 +112,5 @@ HRESULT STDMETHODCALLTYPE OBGEDirect3D9::CreateDevice( UINT Adapter, D3DDEVTYPE 
 
   return hr;
 }
+
+#endif

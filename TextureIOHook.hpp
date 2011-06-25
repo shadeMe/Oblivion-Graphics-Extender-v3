@@ -1,3 +1,4 @@
+#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING)
 #pragma once
 
 #include <map>
@@ -11,3 +12,5 @@ extern std::map <std::string, IDirect3DBaseTexture9 *> textureFiles;
 const char *findTexture(IDirect3DBaseTexture9 *tex);
 
 void CreateTextureIOHook(void);
+
+#endif

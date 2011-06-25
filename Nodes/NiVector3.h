@@ -18,6 +18,9 @@ namespace v1_2_416
 	{
 	public:
 
+		NiVector3() {};
+		NiVector3(float x, float y, float z) {Set(x,y,z);}
+
 		void	Set(float x, float y, float z);
 		void	Zero();
 		void	Normalize();

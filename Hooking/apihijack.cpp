@@ -159,11 +159,9 @@ bool RedirectIAT( SDLLHook* DLLHook, PIMAGE_IMPORT_DESCRIPTOR pImportDesc, PVOID
             SFunctionHook* FHook = DLLHook->Functions;
             while ( FHook->Name )
             {
-                if ( lstrcmpi( FHook->Name, (char*)pImportName->Name ) == 0 )
+                if ( lstrcmpi( FHook->Name, (char *)pImportName->Name ) == 0 )
                 {
-                //  _MESSAGE( "Hooked function: " );
-                //  _MESSAGE( (char*)pImportName->Name );
-                //  _MESSAGE( "\n" );
+		    _DMESSAGE("Hooked function: %s", (char *)pImportName->Name);
 
                     // Save the old function in the SFunctionHook structure and get the new one.
                     FHook->OrigFn = reinterpret_cast<void*>(pIteratingIAT->u1.Function);
@@ -242,9 +240,7 @@ void* RedirectPA( SDLLHook* DLLHook, LPCSTR lpProcName, FARPROC fnc )
     {
         if ( lstrcmpi( FHook->Name, lpProcName ) == 0 )
         {
-        //  _MESSAGE( "Hooked function: " );
-        //  _MESSAGE( lpProcName );
-        //  _MESSAGE( "\n" );
+	    _DMESSAGE("Hooked function: %s", lpProcName);
 
             // Save the old function in the SFunctionHook structure and get the new one.
             FHook->OrigFn = fnc;
@@ -309,10 +305,12 @@ bool HookAPICalls( SDLLHook* Hook ) {
 
   HINSTANCE exe = GetModuleHandle(NULL);
 
+  _DMESSAGE("Hooking Oblivion ... ");
   HookAPICalls( Hook, exe );
 
   HINSTANCE dll = GetModuleHandle("OBGEv2.dll");
 
+  _DMESSAGE("Hooking OBGE ... ");
   HookAPICalls( Hook, dll );
 
   return true;

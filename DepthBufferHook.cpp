@@ -78,6 +78,7 @@ bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3
         if (hr == D3D_OK) {
           _MESSAGE("Depth buffer attached OK. %i", DepthCount);
 
+#ifndef	OBGE_NOSHADER
 	  /* register in the device-tracker because apparently
 	   * here the surface-pointer is NOT constant
 	   */
@@ -90,6 +91,7 @@ bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3
 
 	    surfaceTexture[pDepthSurface] = track;
 	  }
+#endif
 
           if (UseRAWZfix.Get() && (DepthCount == RAWZINDEX)) {
             _MESSAGE("Setting IsRAWZflag.");
@@ -189,6 +191,7 @@ void static _cdecl DepthBufferHook(IDirect3DDevice9 *Device, UInt32 u2) {
         if (hr == D3D_OK) {
           _MESSAGE("Depth buffer attached OK. %i", DepthCount);
 
+#ifndef	OBGE_NOSHADER
 	  /* register in the device-tracker because apparently
 	   * here the surface-pointer is NOT constant
 	   */
@@ -201,6 +204,7 @@ void static _cdecl DepthBufferHook(IDirect3DDevice9 *Device, UInt32 u2) {
 
 	    surfaceTexture[pDepthSurface] = track;
 	  }
+#endif
 
           if (UseRAWZfix.data && (DepthCount == RAWZINDEX)) {
             _MESSAGE("Setting IsRAWZflag.");

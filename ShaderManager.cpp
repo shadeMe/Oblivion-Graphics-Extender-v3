@@ -1,3 +1,5 @@
+#ifndef	OBGE_NOSHADER
+
 #include <sys/stat.h>
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -7,7 +9,6 @@
 #include "ShaderManager.h"
 #include "TextureManager.h"
 #include "GlobalSettings.h"
-#include "obse/GameObjects.h"
 
 #include "D3D9.hpp"
 #include "D3D9Device.hpp"
@@ -680,6 +681,7 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	  const char *mn = strstr(buf, "MINFILTER");
 	  const char *mg = strstr(buf, "MAGFILTER");
 	  const char *bc = strstr(buf, "Bordercolor");
+	  const char *af = strstr(buf, "MaxAnisotropy");
 
 	  if (au) {
 	    char *end = (char *)strchr(au, ';'); if (end) *end = '\0';
@@ -736,8 +738,16 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	    char *end = (char *)strchr(bc, ';'); if (end) *end = '\0';
 
 	    /* currently fixed */
-	    float col = 0.0; /*sscanf("Bordercolor = %f", &col);*/
+	    float col = 0.0; sscanf(bc, "Bordercolor = %f", &col);
 	    *States++ = D3DSAMP_BORDERCOLOR;
+	    *States++ = *((DWORD *)&col);
+	  }
+	  if (af) {
+	    char *end = (char *)strchr(af, ';'); if (end) *end = '\0';
+
+	    /* currently fixed */
+	    float col = 0.0; sscanf(af, "MaxAnisotropy = %f", &col);
+	    *States++ = D3DSAMP_MAXANISOTROPY;
 	    *States++ = *((DWORD *)&col);
 	  }
 	}
@@ -1304,7 +1314,7 @@ void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect
           };
 
           _MESSAGE("Creating shader vertex buffers.");
- 
+
           SceneDevice->CreateVertexBuffer(4 * sizeof(CameraQuad), D3DUSAGE_WRITEONLY, CAMERAQUADFORMAT, D3DPOOL_DEFAULT, &pGrabVX, 0);
           pGrabVX->Lock(0, 0, &VertexPointer, 0);
           CopyMemory(VertexPointer, ShaderVertices, sizeof(ShaderVertices));
@@ -1368,8 +1378,8 @@ void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect
       SceneDevice->SetTexture(0, pCurrDT);
       SceneDevice->SetVertexShader((IDirect3DVertexShader9 *)sm->cqv->pDX9ShaderClss);
       SceneDevice->SetPixelShader ((IDirect3DPixelShader9  *)sm->cqp->pDX9ShaderClss);
-      SceneDevice->SetPixelShaderConstantF(0, (const float *)&sm->ShaderConst.ZRange, 1);
-      SceneDevice->SetPixelShaderConstantF(1, (const float *)&sm->ShaderConst.proj, 4);
+      SceneDevice->SetPixelShaderConstantF(0, (const float *)&Constants.ZRange, 1);
+      SceneDevice->SetPixelShaderConstantF(1, (const float *)&Constants.proj, 4);
 //    SceneDevice->SetRenderState(D3DRS_ZENABLE, FALSE);
       SceneDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
       SceneDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
@@ -1544,35 +1554,35 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	  case D3DXRS_FLOAT4:
 	    /**/ if (cnst.Name == strstr(cnst.Name, "obge_")) {
 	      /**/ if (cnst.Name == strstr(cnst.Name, "obge_Tick"))
-		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.TikTiming;
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.fTikTiming;
 	      else
 		break;
 	    }
 	    else if (cnst.Name == strstr(cnst.Name, "oblv_")) {
 	      /**/ if (cnst.Name == strstr(cnst.Name, "oblv_WorldTransform_CURRENTPASS"))
-	        pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.wrld;
+	        pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.wrld;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_ViewTransform_CURRENTPASS"))
-	        pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.view;
+	        pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.view;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_ProjectionTransform_CURRENTPASS"))
-		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.proj;
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.proj;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_ProjectionDepthRange_CURRENTPASS"))
-		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.ZRange;
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.ZRange;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_ProjectionFoV_CURRENTPASS"))
-		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.FoV;
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.FoV;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_ReciprocalResolution_CURRENTPASS"))
-		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.rcpres;
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.rcpres;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_ReciprocalResolution_WATERHEIGHTMAPPASS"))
-		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.rcpresh;
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.rcpresh;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_ReciprocalResolution_WATERDISPLACEMENTPASS"))
-		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.rcpresd;
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.rcpresd;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_SunDirection"))
-		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.SunDir;
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.SunDir;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_SunTiming"))
-		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.SunTiming;
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.SunTiming;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_PlayerPosition"))
-		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.PlayerPosition;
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.PlayerPosition;
 	      else if  (cnst.Name == strstr(cnst.Name, "oblv_GameTime"))
-		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->ShaderConst.GameTime;
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.fGameTime;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_TexData")) {
 	        /**/ if (cnst.Name[12] == '0')
 		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[0].vals.texture.data;
@@ -2008,7 +2018,7 @@ ShaderManager::ShaderManager() {
 
   QueryPerformanceFrequency(&freq);
 
-  ShaderConst.TikTiming.w = (freq.QuadPart);
+  Constants.fTikTiming.w = (freq.QuadPart);
 
 #ifdef	OBGE_DEVLING
   Clear();
@@ -2049,7 +2059,7 @@ void ShaderManager::Reset() {
   Clear();
 #endif
 }
- 
+
 void ShaderManager::OnCreateDevice() {
   if ((idp = GetBuiltInShader("IDENTIFY.pso"))) {
     idp->CompileShader();
@@ -2152,62 +2162,6 @@ bool ShaderManager::ReloadShaders() {
  */
 
 void ShaderManager::UpdateFrameConstants() {
-  OBGEfork::Sky *pSky = OBGEfork::Sky::GetSingleton();
-  OBGEfork::Sun *pSun = pSky->sun;
-  TESClimate *climate = pSky->firstClimate;
-  TESWeather *weather = pSky->firstWeather;
-  v1_2_416::NiDX9Renderer *Renderer = v1_2_416::GetRenderer();
-  float (_cdecl * GetTimer)(bool, bool) = (float( *)(bool, bool))0x0043F490; // (TimePassed,GameTime)
-  int gtime = GetTimer(0, 1);
-  LARGE_INTEGER tick;
-
-  QueryPerformanceCounter(&tick);
-
-  ShaderConst.TikTiming.z = (float)(tick.QuadPart) * 1000 * 1000 / ShaderConst.TikTiming.w;
-  ShaderConst.TikTiming.y = (float)(tick.QuadPart) * 1000 * 1    / ShaderConst.TikTiming.w;
-  ShaderConst.TikTiming.x = (float)(tick.QuadPart) * 1    * 1    / ShaderConst.TikTiming.w;
-
-  ShaderConst.SunTiming.x = climate->sunriseBegin * 10 * 60;
-  ShaderConst.SunTiming.y = climate->sunriseEnd   * 10 * 60;
-  ShaderConst.SunTiming.z = climate->sunsetBegin  * 10 * 60;
-  ShaderConst.SunTiming.w = climate->sunsetEnd    * 10 * 60;
-
-  ShaderConst.GameTime.x = gtime;
-  ShaderConst.GameTime.w = ((int)gtime     ) % 60;
-  ShaderConst.GameTime.z = ((int)gtime / 60) % 60;
-  ShaderConst.GameTime.y = ((int)gtime / 60) / 60; // [-PI,0,+PI]
-  // Noon is at (20:00 + 06:00) / 2 == 13:00
-  ShaderConst.GameTime.x = M_PI * (gtime - (13 * 60 * 60)) / (14 * 60 * 60);
-
-  v1_2_416::NiNode *SunContainer = pSun->SunBillboard.Get()->ParentNode;
-  float deltaz = ShaderConst.SunDir.z;
-  ShaderConst.SunDir.x = SunContainer->m_localTranslate.x;
-  ShaderConst.SunDir.y = SunContainer->m_localTranslate.y;
-  ShaderConst.SunDir.z = SunContainer->m_localTranslate.z;
-  ShaderConst.SunDir.Normalize3();
-  // Sunrise is at 06:00, Sunset at 20:00
-  if ((gtime > ShaderConst.SunTiming.w + (10 * 60)) ||
-      (gtime < ShaderConst.SunTiming.x - (10 * 60)))
-    ShaderConst.SunDir.z = -ShaderConst.SunDir.z;
-  else if ((gtime > ShaderConst.SunTiming.z - (10 * 60))) {
-    /* needs to go down aways */
-    if ((fabs(deltaz) - ShaderConst.SunDir.z) <= 0.0)
-      ShaderConst.SunDir.z = -ShaderConst.SunDir.z;
-  }
-  else if ((gtime < ShaderConst.SunTiming.y + (10 * 60))) {
-    /* needs to go up aways */
-    if ((fabs(deltaz) - ShaderConst.SunDir.z) >= 0.0)
-      ShaderConst.SunDir.z = -ShaderConst.SunDir.z;
-  }
-//if ((ShaderConst.GameTime.y < 6) || (ShaderConst.GameTime.y >= 21))
-//  ShaderConst.SunDir.z = -fabs(ShaderConst.SunDir.z);
-
-#define Units2Centimeters	0.1428767293691635
-#define Units2Meters		0.001428767293691635
-  PlayerCharacter *PlayerContainer = (*g_thePlayer);
-  ShaderConst.PlayerPosition.x = PlayerContainer->posX * Units2Meters;
-  ShaderConst.PlayerPosition.y = PlayerContainer->posY * Units2Meters;
-  ShaderConst.PlayerPosition.z = PlayerContainer->posZ * Units2Meters * 4;
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -2471,3 +2425,25 @@ bool ShaderManager::UpgradeSM() {
 bool ShaderManager::MaximumSM() {
   return ::MaximumSM.Get();
 }
+
+#else
+#include "ShaderManager.h"
+
+ShaderManager *ShaderManager::Singleton = NULL;
+
+ShaderManager::ShaderManager() {
+}
+
+ShaderManager::~ShaderManager() {
+  Singleton = NULL;
+}
+
+ShaderManager *ShaderManager::GetSingleton() {
+  if (ShaderManager::Singleton)
+    return ShaderManager::Singleton;
+  if (!ShaderManager::Singleton)
+    ShaderManager::Singleton = new ShaderManager();
+
+  return ShaderManager::Singleton;
+}
+#endif

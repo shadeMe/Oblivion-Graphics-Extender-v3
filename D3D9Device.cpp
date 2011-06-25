@@ -1,8 +1,12 @@
+#ifndef	OBGE_NOSHADER
+
 #include "D3D9.hpp"
 #include "D3D9Device.hpp"
+#include "Constants.h"
 
 // Tracker
 OBGEDirect3DDevice9 *lastOBGEDirect3DDevice9 = NULL;
+static std::vector<OBGEDirect3DDevice9 *> OBGEDevices;
 
 /* ----------------------------------------------------------------------------- */
 
@@ -21,6 +25,8 @@ const char        *passScene;
 
 /* hacking CreateTexure passed via the RenderSurfaceParameters-hook */
 D3DTEXTUREFILTERTYPE AMFilter = D3DTEXF_NONE;
+int Anisotropy = 1;
+float LODBias = 0.0;
 
 /* ----------------------------------------------------------------------------- */
 
@@ -60,9 +66,11 @@ std::map <void *, struct textureMap     *> textureMaps;
  * IDirect3D9 implementor in functions like GetDirect3D9
  */
 OBGEDirect3DDevice9::OBGEDirect3DDevice9(IDirect3D9 *d3d, IDirect3DDevice9 *device) : m_d3d(d3d), m_device(device) {
-  lastOBGEDirect3DDevice9 = this;
+  _MESSAGE("OD3D9: Device 0x%08x constructed from 0x%08x (%d devices available)", this, _ReturnAddress(), OBGEDevices.size() + 1);
 
-  _MESSAGE("OD3D9: Device constructed from 0x%08x", _ReturnAddress());
+  /* add to vector and replace by the new version */
+  lastOBGEDirect3DDevice9 = this;
+  OBGEDevices.push_back(this);
 
   /* must be on in any case, otherwise we can not get
    * access to any of the rendertargets/depthstencils
@@ -122,10 +130,16 @@ OBGEDirect3DDevice9::~OBGEDirect3DDevice9() {
 
   textureMaps.clear();
 
-#ifdef	OBGE_DEVLING
+#if	defined(OBGE_DEVLING)
   /* just for now */
   DebugWindow::Destroy();
 #endif
+
+  /* remove from vector and replace by the other version */
+  OBGEDevices.erase(std::find(OBGEDevices.begin(), OBGEDevices.end(), this));
+  lastOBGEDirect3DDevice9 = (OBGEDevices.size() ? OBGEDevices.back() : NULL);
+
+  _MESSAGE("OD3D9: Device 0x%08x destructed from 0x%08x (%d devices left)", this, _ReturnAddress(), OBGEDevices.size());
 }
 
 /*** IUnknown methods ***/
@@ -912,11 +926,11 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::Clear(DWORD 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTransform(D3DTRANSFORMSTATETYPE State, CONST D3DMATRIX *pMatrix) {
   if (HasShaderManager) {
     /**/ if (State == D3DTS_VIEW)
-      m_shaders->ShaderConst.UpdateView(pMatrix);
+      Constants.UpdateView((D3DXMATRIX)*pMatrix);
     else if (State == D3DTS_PROJECTION)
-      m_shaders->ShaderConst.UpdateProjection(pMatrix);
+      Constants.UpdateProjection((D3DXMATRIX)*pMatrix);
     else if (State == D3DTS_WORLD)
-      m_shaders->ShaderConst.UpdateWorld(pMatrix);
+      Constants.UpdateWorld((D3DXMATRIX)*pMatrix);
 
 #ifdef	OBGE_DEVLING
     /* record exact position of occurance */
@@ -986,10 +1000,10 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetViewport(
     const float H = (float)pViewport->Height;
 
     /* record constants */
-    m_shaders->ShaderConst.rcpres[0] = 1.0f / W;
-    m_shaders->ShaderConst.rcpres[1] = 1.0f / H;
-    m_shaders->ShaderConst.rcpres[2] = W / H;
-    m_shaders->ShaderConst.rcpres[3] = W * H;
+    Constants.rcpres.x = 1.0f / W;
+    Constants.rcpres.y = 1.0f / H;
+    Constants.rcpres.z = W / H;
+    Constants.rcpres.w = W * H;
   }
 
   if (frame_log) {
@@ -1164,8 +1178,10 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTexture(D
     frame_log->Indent();
     frame_log->FormattedMessage("Address: 0x%08x", pTexture);
 
+#if	defined(OBGE_LOGGING)
     if (pTexture)
       frame_log->FormattedMessage("Path: %s", findTexture(pTexture));
+#endif
 
     bool ok = false;
 
@@ -1222,10 +1238,17 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::GetSamplerSt
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetSamplerState(DWORD Sampler, D3DSAMPLERSTATETYPE Type, DWORD Value) {
 #ifdef	OBGE_DEVLING
-
   if (HasShaderManager)
     m_shaders->traced[currentPass].states_s[Sampler][Type] = Value;
+#endif
 
+#if	defined(OBGE_ANISOTROPY)
+//if ((Type == D3DSAMP_MIPFILTER) && (Anisotropy > 1)) {
+  if ((Anisotropy - (Type == D3DSAMP_MIPFILTER)) > 0) {
+    m_device->SetSamplerState(Sampler, D3DSAMP_MIPFILTER, D3DTEXF_ANISOTROPIC);
+    m_device->SetSamplerState(Sampler, D3DSAMP_MIPMAPLODBIAS, *((DWORD *)&LODBias));
+    m_device->SetSamplerState(Sampler, D3DSAMP_MAXANISOTROPY, *((DWORD *)&Anisotropy));
+  }
 #endif
 
   return m_device->SetSamplerState(Sampler, Type, Value);
@@ -1804,3 +1827,5 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DumpFrameScr
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DumpFrameSurfaces(void) {
   return D3D_OK;
 }
+
+#endif

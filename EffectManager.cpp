@@ -100,6 +100,7 @@ static FXIncludeManager incl;
 #define	EFFECTCOND_ISDAY	(1 << 16)
 #define	EFFECTCOND_ISNIGHT	(1 << 17)
 #define	EFFECTCOND_HASREFL	(1 << 24)
+#define	EFFECTCOND_HASACHN	(1 << 26)	// special one
 #define	EFFECTCOND_HASMIPS	(1 << 27)	// special one
 #define	EFFECTCOND_HASNBUF	(1 << 28)	// special one
 #define	EFFECTCOND_HASPBUF	(1 << 29)	// special one
@@ -109,6 +110,7 @@ static FXIncludeManager incl;
 #define	EFFECTBUF_COPY		(1 << 25)	// need frame "copy" because the effect surfaces have other format
 #define	EFFECTBUF_PREV		(1 << 26)	// need previous effect "copy"
 #define	EFFECTBUF_PAST		(1 << 27)	// need previous frame "copy"
+#define	EFFECTBUF_ACHN		EFFECTCOND_HASACHN
 #define	EFFECTBUF_NBUF		EFFECTCOND_HASNBUF
 #define	EFFECTBUF_PBUF		EFFECTCOND_HASPBUF
 #define	EFFECTBUF_LBUF		EFFECTCOND_HASLBUF
@@ -147,6 +149,7 @@ static D3DXMACRO defs[] = {
   {"EFFECTCOND_PBUFFER"		, stringify(EFFECTCOND_HASPBUF		)}, // hm, error
   {"EFFECTCOND_NBUFFER"		, stringify(EFFECTCOND_HASNBUF		)}, // hm, error
   {"EFFECTCOND_MIPMAPS"		, stringify(EFFECTCOND_HASMIPS		)}, // hm, error
+  {"EFFECTCOND_ACHANNEL"	, stringify(EFFECTCOND_HASACHN		)}, // hm, error
 
   {"D3DFMT_DEFAULT"	        , "0"},		// same format as main-pass surface
 
@@ -184,27 +187,32 @@ EffectBuffer::~EffectBuffer() {
 }
 
 inline HRESULT EffectBuffer::Initialise(IDirect3DTexture9 *text) {
-  Tex[0] = text;
-  Srf[0] = NULL;
-//Tex[0]->GetSurfaceLevel(0, &Srf[0]);
+  for (int rt = 0; rt < EBUFRT_NUM; rt++) {
+    Tex[rt] = NULL;
+    Srf[rt] = NULL;
+  }
 
-  Tex[1] = Tex[2] = Tex[3] = NULL;
-  Srf[1] = Srf[2] = Srf[3] = NULL;
+  Tex[0] = text;
+//Tex[0]->GetSurfaceLevel(0, &Srf[0]);
 
   return (Srf[0] ? D3D_OK : S_FALSE);
 }
 
-inline HRESULT EffectBuffer::Initialise(enum OBGEPass pass, IDirect3DSurface9 *surf) {
-  Tex[0] = surfaceTexture[surf] ? surfaceTexture[surf]->tex : NULL;
-  Srf[0] =                surf                                    ;
+inline HRESULT EffectBuffer::Initialise(IDirect3DSurface9 *surf) {
+  for (int rt = 0; rt < EBUFRT_NUM; rt++) {
+    Tex[rt] = NULL;
+    Srf[rt] = NULL;
+  }
 
-  Tex[1] = Tex[2] = Tex[3] = NULL;
-  Srf[1] = Srf[2] = Srf[3] = NULL;
+#ifndef	OBGE_NOSHADER
+  Tex[0] = surfaceTexture[surf] ? surfaceTexture[surf]->tex : NULL;
+#endif
+  Srf[0] =                surf                                    ;
 
   return (Tex[0] ? D3D_OK : S_FALSE);
 }
 
-inline HRESULT EffectBuffer::Initialise(D3DFORMAT rt0, D3DFORMAT rt1, D3DFORMAT rt2, D3DFORMAT rt3) {
+inline HRESULT EffectBuffer::Initialise(const D3DFORMAT fmt[EBUFRT_NUM]) {
   UInt32 Width = v1_2_416::GetRenderer()->SizeWidth;
   UInt32 Height = v1_2_416::GetRenderer()->SizeHeight;
   HRESULT hr;
@@ -215,47 +223,22 @@ inline HRESULT EffectBuffer::Initialise(D3DFORMAT rt0, D3DFORMAT rt1, D3DFORMAT 
 #define EFFECT_USAGE  D3DUSAGE_RENDERTARGET
 #endif
 
-  if (!Tex[0] && (rt0 != D3DFMT_UNKNOWN)) {
-    if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, EFFECT_USAGE, rt0, D3DPOOL_DEFAULT, &Tex[0], 0)) == D3D_OK)
-      Tex[0]->GetSurfaceLevel(0, &Srf[0]);
+  for (int rt = 0; rt < EBUFRT_NUM; rt++) {
+    if (!Tex[rt] && (fmt[rt] != D3DFMT_UNKNOWN)) {
+      if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, EFFECT_USAGE, fmt[rt], D3DPOOL_DEFAULT, &Tex[0], 0)) == D3D_OK)
+	Tex[rt]->GetSurfaceLevel(0, &Srf[rt]);
 #if	defined(OBGE_AUTOMIPMAP)
-    if (Tex[0] && (AMFilter != D3DTEXF_NONE))
-      Tex[0]->SetAutoGenFilterType(AMFilter);
+      if (Tex[rt] && (AMFilter != D3DTEXF_NONE))
+	Tex[rt]->SetAutoGenFilterType(AMFilter);
 #endif
-  }
-
-  if (!Tex[1] && (rt1 != D3DFMT_UNKNOWN)) {
-    if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, EFFECT_USAGE, rt1, D3DPOOL_DEFAULT, &Tex[1], 0)) == D3D_OK)
-      Tex[1]->GetSurfaceLevel(0, &Srf[1]);
-#if	defined(OBGE_AUTOMIPMAP)
-    if (Tex[1] && (AMFilter != D3DTEXF_NONE))
-      Tex[1]->SetAutoGenFilterType(AMFilter);
-#endif
-  }
-
-  if (!Tex[2] && (rt2 != D3DFMT_UNKNOWN)) {
-    if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, EFFECT_USAGE, rt2, D3DPOOL_DEFAULT, &Tex[2], 0)) == D3D_OK)
-      Tex[2]->GetSurfaceLevel(0, &Srf[2]);
-#if	defined(OBGE_AUTOMIPMAP)
-    if (Tex[2] && (AMFilter != D3DTEXF_NONE))
-      Tex[2]->SetAutoGenFilterType(AMFilter);
-#endif
-  }
-
-  if (!Tex[3] && (rt3 != D3DFMT_UNKNOWN)) {
-    if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, EFFECT_USAGE, rt3, D3DPOOL_DEFAULT, &Tex[3], 0)) == D3D_OK)
-      Tex[3]->GetSurfaceLevel(0, &Srf[3]);
-#if	defined(OBGE_AUTOMIPMAP)
-    if (Tex[3] && (AMFilter != D3DTEXF_NONE))
-      Tex[3]->SetAutoGenFilterType(AMFilter);
-#endif
+    }
   }
 
   return D3D_OK;
 }
 
 inline void EffectBuffer::Release() {
-  for (int rt = 0; rt < 4; rt++) {
+  for (int rt = 0; rt < EBUFRT_NUM; rt++) {
     if (Tex[rt]) Tex[rt]->Release();
     if (Srf[rt]) Srf[rt]->Release();
 
@@ -265,15 +248,14 @@ inline void EffectBuffer::Release() {
 }
 
 inline bool EffectBuffer::IsValid() {
-  for (int rt = 0; rt < 4; rt++) {
+  for (int rt = 0; rt < EBUFRT_NUM; rt++)
     if (Tex[rt]) return true;
-  }
 
   return false;
 }
 
 bool EffectBuffer::IsTexture(IDirect3DBaseTexture9 *text) {
-  for (int rt = 0; rt < 4; rt++) {
+  for (int rt = 0; rt < EBUFRT_NUM; rt++) {
     if (Tex[rt] == text) return true;
   }
 
@@ -282,27 +264,32 @@ bool EffectBuffer::IsTexture(IDirect3DBaseTexture9 *text) {
 
 inline void EffectBuffer::SetTexture(const char *fmt, ID3DXEffect *pEffect) {
   char buf[256];
-  for (int rt = 0; rt < 4; rt++) {
+  for (int rt = 0; rt < EBUFRT_NUM; rt++) {
     if (Tex[rt]) {
       sprintf(buf, fmt, rt);
-
       pEffect->SetTexture(buf, Tex[rt]);
     }
   }
 }
 
 inline void EffectBuffer::SetRenderTarget(IDirect3DDevice9 *Device) {
-  for (int rt = 0; rt < 4; rt++) {
-    if (Srf[rt]) {
+  for (int rt = 0; rt < EBUFRT_NUM; rt++) {
+    if (Srf[rt])
       Device->SetRenderTarget(rt, Srf[rt]);
-    }
   }
 }
 
 inline void EffectBuffer::Copy(IDirect3DDevice9 *Device, EffectBuffer *from) {
-  for (int rt = 0; rt < 4; rt++) {
-    if (Srf[rt] && from->Srf[rt])
+  for (int rt = 0; rt < EBUFRT_NUM; rt++) {
+    if (from->Srf[rt] && Srf[rt])
       Device->StretchRect(from->Srf[rt], 0, Srf[rt], 0, D3DTEXF_NONE);
+  }
+}
+
+inline void EffectBuffer::Copy(IDirect3DDevice9 *Device, IDirect3DSurface9 *from) {
+  for (int rt = 0; rt < EBUFRT_NUM; rt++) {
+    if (from && Srf[rt])
+      Device->StretchRect(from, 0, Srf[rt], 0, D3DTEXF_NONE);
   }
 }
 
@@ -388,7 +375,7 @@ inline void EffectQueue::End(ID3DXEffect *pEffect) {
       (rotate[EQPREV] = prev)->Copy(device, rotate[EQLAST]);
   }
 }
- 
+
 inline void EffectQueue::End(EffectBuffer *target) {
   /* this occurs when "target" never entered the queue,
    * or when the have an odd number of accumulated passes
@@ -894,7 +881,7 @@ void EffectRecord::ApplyCompileDirectives() {
   EffectManager::GetSingleton()->Recalculate();
 }
 
-inline void EffectRecord::ApplyPermanents(EffectConstants *ConstList, EffectManager *FXMan) {
+inline void EffectRecord::ApplyPermanents(EffectManager *FXMan) {
 #ifdef	OLD_QUEUE
   pEffect->SetTexture("obge_PrevRendertarget0_EFFECTPASS", FXMan->thisframeTex);
   pEffect->SetTexture("obge_LastRendertarget0_EFFECTPASS", FXMan->lastpassTex);
@@ -920,40 +907,42 @@ inline void EffectRecord::ApplyPermanents(EffectConstants *ConstList, EffectMana
     FXMan->OrigDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect);
 #endif
 
-  pEffect->SetVector("oblv_ReciprocalResolution_MAINPASS", &ConstList->rcpres);
+  pEffect->SetVector("oblv_ReciprocalResolution_MAINPASS", &Constants.rcpres);
 
   /* deprecated */
 #ifndef	NO_DEPRECATED
-  pEffect->SetBool("bHasDepth", ConstList->bHasDepth);
-  pEffect->SetFloatArray("rcpres", (float *)&ConstList->rcpres, 2);
+  pEffect->SetBool("bHasDepth", Constants.bHasDepth);
+  pEffect->SetFloatArray("rcpres", (float *)&Constants.rcpres, 2);
 #endif
 }
 
-inline void EffectRecord::ApplyConstants(EffectConstants *ConstList) {
-  pEffect->SetMatrix("oblv_WorldTransform_MAINPASS", &ConstList->world);
-  pEffect->SetMatrix("oblv_ViewTransform_MAINPASS", &ConstList->view);
-  pEffect->SetMatrix("oblv_ProjectionTransform_MAINPASS", &ConstList->proj);
-  pEffect->SetVector("oblv_ProjectionDepthRange_MAINPASS", &ConstList->ZRange);
-  pEffect->SetVector("oblv_ProjectionFoV_MAINPASS", &ConstList->FoV);
-  pEffect->SetFloatArray("oblv_CameraForward_MAINPASS", &ConstList->EyeForward.x, 3);
+inline void EffectRecord::ApplyConstants() {
+  pEffect->SetMatrix("oblv_WorldTransform_MAINPASS", &Constants.wrld);
+  pEffect->SetMatrix("oblv_ViewTransform_MAINPASS", &Constants.view);
+  pEffect->SetMatrix("oblv_ProjectionTransform_MAINPASS", &Constants.proj);
+  pEffect->SetVector("oblv_ProjectionDepthRange_MAINPASS", &Constants.ZRange);
+  pEffect->SetVector("oblv_ProjectionFoV_MAINPASS", &Constants.FoV);
+  pEffect->SetFloatArray("oblv_CameraForward_MAINPASS", &Constants.EyeForward.x, 3);
 
-  pEffect->SetIntArray("oblv_GameTime", &ConstList->GameTime.x, 4);
-  pEffect->SetIntArray("obge_Tick", &ConstList->TikTiming.x, 4);
-  pEffect->SetVector("oblv_SunDirection", &ConstList->SunDir);
-  pEffect->SetVector("oblv_SunTiming", &ConstList->SunTiming);
+  pEffect->SetIntArray("oblv_GameTime", &Constants.iGameTime.x, 4);
+  pEffect->SetIntArray("obge_Tick", &Constants.iTikTiming.x, 4);
+  pEffect->SetVector("oblv_SunDirection", &Constants.SunDir);
+  pEffect->SetVector("oblv_SunTiming", &Constants.SunTiming);
 
   /* deprecated */
 #ifndef	NO_DEPRECATED
-  pEffect->SetVector("f4Time", &ConstList->time);
+  pEffect->SetVector("f4Time", &Constants.time);
 #endif
 }
 
 inline void EffectRecord::ApplyDynamics() {
+#ifndef	OBGE_NOSHADER
   pEffect->SetTexture("oblv_Rendertarget0_REFLECTIONPASS", passTexture[OBGEPASS_REFLECTION]);
 
   /* deprecated */
 #ifndef	NO_DEPRECATED
   pEffect->SetBool("bHasReflection", !!passTexture[OBGEPASS_REFLECTION]);
+#endif
 #endif
 }
 
@@ -996,7 +985,7 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 
   D3DDevice->EndScene();
 }
 
-inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectConstants *ConstList, EffectQueue *Queue) {
+inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue) {
   if (!IsEnabled())
     return false;
 
@@ -1006,7 +995,7 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectConstants *C
   // uses the last vertex effect that was active and much strangeness occurs.
   D3DDevice->SetVertexShader(NULL);
 
-  ApplyConstants(ConstList);
+  ApplyConstants();
   ApplyDynamics();
 
   UINT pass = 0; Queue->Begin(pEffect);
@@ -1036,7 +1025,7 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectConstants *C
   return true;
 }
 
-inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectConstants *ConstList) {
+inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice) {
   if (!IsEnabled())
     return;
 
@@ -1046,7 +1035,7 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectConstants *C
   // uses the last vertex effect that was active and much strangeness occurs.
   D3DDevice->SetVertexShader(NULL);
 
-  ApplyConstants(ConstList);
+  ApplyConstants();
   ApplyDynamics();
 
   UINT pass = 0;
@@ -1342,7 +1331,7 @@ EffectManager::EffectManager() {
 
   QueryPerformanceFrequency(&freq);
 
-  EffectConst.TikTiming.w = (int)(freq.QuadPart);
+  Constants.iTikTiming.w = (int)(freq.QuadPart);
 
   EffectIndex = 0;
   MaxEffectIndex = 0;
@@ -1607,6 +1596,9 @@ void EffectManager::InitialiseFrameTextures() {
   else
     depth = GetDepthBufferTexture();
 #else
+  IDirect3D9 *lastOBGEDirect3D9;
+  lastOBGEDirect3DDevice9->GetDirect3D(&lastOBGEDirect3D9);
+
   int bitz = BufferRawZDepthNumBits.Get();
   int bits = BufferTexturesNumBits.Get();
 
@@ -1616,15 +1608,15 @@ void EffectManager::InitialiseFrameTextures() {
     lastOBGEDirect3D9->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm);
 
     while (bits != 0) {
-      /**/ if (bits >=  32) frmt = D3DFMT_A32B32G32R32F;
-      else if (bits >=  16) frmt = D3DFMT_A16B16G16R16F;
-      else if (bits >=   8) frmt = D3DFMT_A8R8G8B8;
-      else if (bits <= -16) frmt = D3DFMT_A16B16G16R16;
-      else if (bits <= -10) frmt = D3DFMT_A2B10G10R10;
-      else if (bits <=  -8) frmt = D3DFMT_A8R8G8B8;
-      else if (bits <=  -5) frmt = D3DFMT_A1R5G5B5;
-      else if (bits <=  -4) frmt = D3DFMT_A4R4G4B4;
-      else if (bits <=  -3) frmt = D3DFMT_R3G3B2;
+      /**/ if (bits >=  32) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A32B32G32R32F : D3DFMT_A32B32G32R32F);
+      else if (bits >=  16) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A16B16G16R16F : D3DFMT_A16B16G16R16F);
+      else if (bits >=   8) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A8R8G8B8      : D3DFMT_R8G8B8);
+      else if (bits <= -16) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A16B16G16R16  : D3DFMT_A16B16G16R16);
+      else if (bits <= -10) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A2B10G10R10   : D3DFMT_A2B10G10R10);
+      else if (bits <=  -8) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A8R8G8B8      : D3DFMT_R8G8B8);
+      else if (bits <=  -5) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A1R5G5B5      : D3DFMT_R5G6B5);
+      else if (bits <=  -4) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A4R4G4B4      : D3DFMT_X4R4G4B4);
+      else if (bits <=  -3) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_R3G3B2	      : D3DFMT_R3G3B2);
       else                  frmt = D3DFMT_UNKNOWN;
 
       if (frmt != D3DFMT_UNKNOWN) {
@@ -1691,7 +1683,9 @@ void EffectManager::InitialiseFrameTextures() {
 #endif
 
   RenderCnd = (RenderCnd & ~EFFECTCOND_HASZBUF) | (OrigDS.IsValid() || CurrDS.IsValid() ? EFFECTCOND_HASZBUF : 0);
+#ifndef	OBGE_NOSHADER
   RenderCnd = (RenderCnd & ~EFFECTCOND_HASMIPS) | (AMFilter != D3DTEXF_NONE		? EFFECTCOND_HASMIPS : 0);
+#endif
 }
 
 void EffectManager::ReleaseFrameTextures() {
@@ -1755,13 +1749,13 @@ void EffectManager::InitialiseBuffers() {
   const float W = (float)v1_2_416::GetRenderer()->SizeWidth;
   const float H = (float)v1_2_416::GetRenderer()->SizeHeight;
 
-  EffectConst.rcpres[0] = 1.0f / W;
-  EffectConst.rcpres[1] = 1.0f / H;
-  EffectConst.rcpres[2] = W / H;
-  EffectConst.rcpres[3] = W * H;
+  Constants.rcpres[0] = 1.0f / W;
+  Constants.rcpres[1] = 1.0f / H;
+  Constants.rcpres[2] = W / H;
+  Constants.rcpres[3] = W * H;
 
-  uadj = EffectConst.rcpres[0] * 0.5;
-  vadj = EffectConst.rcpres[1] * 0.5;
+  uadj = Constants.rcpres[0] * 0.5;
+  vadj = Constants.rcpres[1] * 0.5;
 
   if (SplitScreen.data) {
     minx = 0;
@@ -1786,7 +1780,7 @@ void EffectManager::InitialiseBuffers() {
   CopyMemory(VertexPointer, ShaderVertices, sizeof(ShaderVertices));
   EffectVertex->Unlock();
 
-  EffectConst.bHasDepth = ::HasDepth();
+  Constants.bHasDepth = ::HasDepth();
 }
 
 void EffectManager::ReleaseBuffers() {
@@ -1845,7 +1839,7 @@ void EffectManager::OnResetDevice() {
 
   while (SEffect != ManagedEffects.end()) {
     (*SEffect)->OnResetDevice();
-    (*SEffect)->ApplyPermanents(&EffectConst, this);
+    (*SEffect)->ApplyPermanents(this);
 
     SEffect++;
   }
@@ -1855,89 +1849,37 @@ void EffectManager::OnResetDevice() {
 }
 
 void EffectManager::UpdateFrameConstants(v1_2_416::NiDX9Renderer *Renderer) {
-  OBGEfork::Sky *pSky = OBGEfork::Sky::GetSingleton();
-  OBGEfork::Sun *pSun = pSky->sun;
-  TESClimate *climate = pSky->firstClimate;
-  TESWeather *weather = pSky->firstWeather;
-  float (_cdecl * GetTimer)(bool, bool) = (float( *)(bool, bool))0x0043F490; // (TimePassed,GameTime)
+  Constants.UpdateView((D3DXMATRIX)Renderer->m44View);
+  Constants.UpdateProjection((D3DXMATRIX)Renderer->m44Projection);
+
   v1_2_416::NiCamera **pMainCamera = (v1_2_416::NiCamera **)0x00B43124;
-  char *CamName; int gtime = GetTimer(0, 1);
-  LARGE_INTEGER tick;
 
   Renderer->SetCameraViewProj(*pMainCamera);
-  D3DXMatrixTranslation(&EffectConst.world,
+  D3DXMatrixTranslation(&Constants.wrld,
 			-(*pMainCamera)->m_worldTranslate.x,
 			-(*pMainCamera)->m_worldTranslate.y,
 			-(*pMainCamera)->m_worldTranslate.z);
 
-  EffectConst.UpdateView((D3DXMATRIX)Renderer->m44View);
-  EffectConst.UpdateProjection((D3DXMATRIX)Renderer->m44Projection);
+  char *CamName = (*pMainCamera)->m_pcName;
+  (*pMainCamera)->m_worldRotate.GetForwardVector(&Constants.EyeForward);
 
-  CamName = (*pMainCamera)->m_pcName;
-  (*pMainCamera)->m_worldRotate.GetForwardVector(&EffectConst.EyeForward);
-
-  QueryPerformanceCounter(&tick);
-
-  EffectConst.TikTiming.z = (__int64)((tick.QuadPart * 1000 * 1000) / EffectConst.TikTiming.w);
-  EffectConst.TikTiming.y = (__int64)((tick.QuadPart * 1000 * 1   ) / EffectConst.TikTiming.w);
-  EffectConst.TikTiming.x = (__int64)((tick.QuadPart * 1    * 1   ) / EffectConst.TikTiming.w);
-
-  EffectConst.SunTiming.x = climate->sunriseBegin * 10 * 60;
-  EffectConst.SunTiming.y = climate->sunriseEnd   * 10 * 60;
-  EffectConst.SunTiming.z = climate->sunsetBegin  * 10 * 60;
-  EffectConst.SunTiming.w = climate->sunsetEnd    * 10 * 60;
-
-  EffectConst.GameTime.x = gtime;
-  EffectConst.GameTime.w = (gtime     ) % 60;
-  EffectConst.GameTime.z = (gtime / 60) % 60;
-  EffectConst.GameTime.y = (gtime / 60) / 60;
   // Sunrise is at 06:00, Sunset at 20:00
   bool DayTime =
-    (gtime >= EffectConst.SunTiming.x) &&
-    (gtime <= EffectConst.SunTiming.w);
-
-  /* deprecated */
-#ifndef	NO_DEPRECATED
-  EffectConst.time.x = gtime;
-  EffectConst.time.w = (int)(gtime     ) % 60;
-  EffectConst.time.z = (int)(gtime / 60) % 60;
-  EffectConst.time.y = (int)(gtime / 60) / 60;
-#endif
-
-  v1_2_416::NiNode *SunContainer = pSun->SunBillboard.Get()->ParentNode;
-  float deltaz = EffectConst.SunDir.z;
-  bool SunHasBenCulled = SunContainer->m_flags.individual.AppCulled;
-  EffectConst.SunDir.x = SunContainer->m_localTranslate.x;
-  EffectConst.SunDir.y = SunContainer->m_localTranslate.y;
-  EffectConst.SunDir.z = SunContainer->m_localTranslate.z;
-  EffectConst.SunDir.Normalize3();
-  // Sunrise is at 06:00, Sunset at 20:00
-  if ((gtime > EffectConst.SunTiming.w + (10 * 60)) ||
-      (gtime < EffectConst.SunTiming.x - (10 * 60)))
-    EffectConst.SunDir.z = -EffectConst.SunDir.z;
-  else if ((gtime > EffectConst.SunTiming.z - (10 * 60))) {
-    /* needs to go down aways */
-    if ((fabs(deltaz) - EffectConst.SunDir.z) <= 0.0)
-      EffectConst.SunDir.z = -EffectConst.SunDir.z;
-  }
-  else if ((gtime < EffectConst.SunTiming.y + (10 * 60))) {
-    /* needs to go up aways */
-    if ((fabs(deltaz) - EffectConst.SunDir.z) >= 0.0)
-      EffectConst.SunDir.z = -EffectConst.SunDir.z;
-  }
-  //if ((ShaderConst.GameTime.y < 6) || (ShaderConst.GameTime.y >= 21))
-  //  ShaderConst.SunDir.z = -fabs(ShaderConst.SunDir.z);
+    (Constants.iGameTime.x >= Constants.SunTiming.x) &&
+    (Constants.iGameTime.x <= Constants.SunTiming.w);
+  bool SunHasBenCulled =
+    (Constants.SunDir.w == 0.0);
 
   RenderCnd = (RenderCnd & ~EFFECTCOND_ISDAY  ) | ( DayTime			    ? EFFECTCOND_ISDAY   : 0);
   RenderCnd = (RenderCnd & ~EFFECTCOND_ISNIGHT) | (!DayTime			    ? EFFECTCOND_ISNIGHT : 0);
   RenderCnd = (RenderCnd & ~EFFECTCOND_HASSUN ) | (!SunHasBenCulled                 ? EFFECTCOND_HASSUN  : 0);
+#ifndef	OBGE_NOSHADER
   RenderCnd = (RenderCnd & ~EFFECTCOND_HASREFL) | (passTexture[OBGEPASS_REFLECTION] ? EFFECTCOND_HASREFL : 0);
+#endif
 }
 
 void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo, IDirect3DSurface9 *RenderFrom) {
   v1_2_416::NiDX9Renderer *Renderer = v1_2_416::GetRenderer();
-
-  UpdateFrameConstants(Renderer);
 
   D3DDevice->SetStreamSource(0, EffectVertex, 0, sizeof(EffectQuad));
   Renderer->RenderStateManager->SetFVF(EFFECTQUADFORMAT, false);
@@ -1959,6 +1901,8 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
   D3DDevice->SetTransform(D3DTS_PROJECTION, &mIdent);
   D3DDevice->SetTransform(D3DTS_VIEW, &mIdent);
   D3DDevice->SetTransform(D3DTS_WORLD, &mIdent);
+
+  UpdateFrameConstants(Renderer);
 
   /* current state:
    *
@@ -1999,19 +1943,21 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
 
   D3DDevice->StretchRect(RenderTo, 0, lastframeSurf, 0, D3DTEXF_NONE);
 #else
+  D3DDevice->EndScene();
+
   /* over frames */
-  OrigRT.Initialise(OBGEPASS_MAIN, RenderFrom);
-  TrgtRT.Initialise(OBGEPASS_MAIN, RenderTo);
+  if (OrigRT.Initialise(RenderFrom) != D3D_OK) {
+    OrigRT.Initialise(RenderFmt);
+    OrigRT.Copy(D3DDevice, RenderFrom);
+  }
 
   /* rendertarget without texture, non-HDR & non-Bloom special case
    * this basically is the raw backbuffer I think
    */
-  if (!TrgtRT.IsValid()) {
-    RenderBuf |= EFFECTBUF_COPY;
+  if (TrgtRT.Initialise(RenderTo) != D3D_OK) {
     CopyRT.Initialise(RenderFmt);
+    RenderBuf |= EFFECTBUF_COPY;
   }
-
-  D3DDevice->EndScene();
 
 //if (RenderBuf & EFFECTBUF_ZBUF) {
   if (EffectDepth) {
@@ -2029,7 +1975,7 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
 
       if (RenderRawZ) {
 	EffectDepth->GetEffect()->SetTechnique(tec);
-	EffectDepth->Render(D3DDevice, &EffectConst);
+	EffectDepth->Render(D3DDevice);
 
         CurrDS.SetTexture("zbufferTexture", EffectDepth->GetEffect());
         OrigDS.SetRenderTarget(D3DDevice);
@@ -2044,7 +1990,7 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
     }
 
     EffectDepth->GetEffect()->SetTechnique(tec);
-    EffectDepth->Render(D3DDevice, &EffectConst);
+    EffectDepth->Render(D3DDevice);
   }
 
   RenderQueue.device = D3DDevice;
@@ -2068,7 +2014,7 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
     /* check if the conditions meet */
     unsigned long EffectCnd = (*e)->GetConditions();
     if ((RenderCnd & EffectCnd) == EffectCnd)
-      run += (*e)->Render(D3DDevice, &EffectConst, &RenderQueue);
+      run += (*e)->Render(D3DDevice, &RenderQueue);
   }
 
   /* nothing happend */
@@ -2263,7 +2209,7 @@ void EffectManager::Recalculate() {
   for (ManagedEffectList::iterator e = ManagedEffects.begin(); e != ManagedEffects.end(); e++) {
     if ((*e)->IsEnabled()) {
       /* update */
-      (*e)->ApplyPermanents(&EffectConst, this);
+      (*e)->ApplyPermanents(this);
     }
   }
 }

@@ -1,3 +1,5 @@
+#ifndef	OBGE_NOSHADER
+
 #include "Commands_Shaders.h"
 #include "Commands_Misc.h"
 #include "Commands_Params.h"
@@ -162,3 +164,5 @@ CommandInfo kCommandInfo_SetShaderSamplerTexture = {
   0,
   0
 };
+
+#endif

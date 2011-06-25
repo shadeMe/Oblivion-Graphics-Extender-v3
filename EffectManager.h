@@ -43,50 +43,7 @@ struct FloatType
 	float data[16];
 };
 
-struct EffectConstants
-{
-	// ****** Global static effect constants ******
-	v1_2_416::NiVector4		rcpres;
-	bool				bHasDepth;
-
-	// ****** Global effect constants (Updated each frame) ******
-	D3DXMATRIX			world;
-	D3DXMATRIX			view;
-	D3DXMATRIX			proj;
-
-	v1_2_416::NiVector4		ZRange;
-	v1_2_416::NiVector4		FoV;
-	v1_2_416::NiVector4		SunDir;
-	v1_2_416::NiVector4		SunTiming;
-	v1_2_416::NiVector3		EyeForward;
-
-	struct { int x, y, z, w; }	GameTime;
-	struct { int x, y, z, w; }	TikTiming;
-
-	/* deprecated */
-#ifndef	NO_DEPRECATED
-	v1_2_416::NiVector4		time;
-#endif
-
-	inline void UpdateView(const D3DXMATRIX &mx) {
-	  view = mx;
-	}
-
-	inline void UpdateProjection(const D3DXMATRIX &mx) {
-	  proj = mx;
-
-	  ZRange.y = (proj._43 / proj._33);
-	  ZRange.x = (proj._33 * ZRange.y) / (proj._33 - 1.0f);
-	  ZRange.z = ZRange.x - ZRange.y;
-	  ZRange.w = ZRange.x + ZRange.y;
-
-#define acot(x)	(M_PI_2 - atan(x))
-	  FoV.x = acot(proj._11) * 1;
-	  FoV.y = acot(proj._22) * 1;
-	  FoV.z = (FoV.x * 360.0) / M_PI;
-	  FoV.w = (FoV.y * 360.0) / M_PI;
-	}
-};
+#include "Constants.h"
 
 class EffectBuffer
 {
@@ -96,16 +53,24 @@ public:
 	EffectBuffer();
 	~EffectBuffer();
 
+#define EBUFRT_NUM  1
+#if	EBUFRT_NUM == 4
+	HRESULT				Initialise(const D3DFORMAT rt0,
+						   const D3DFORMAT rt1 = D3DFMT_UNKNOWN,
+						   const D3DFORMAT rt2 = D3DFMT_UNKNOWN,
+						   const D3DFORMAT rt3 = D3DFMT_UNKNOWN) {
+						   const D3DFORMAT fmt[EBUFRT_NUM] = {rt0,rt1,rt2,rt3}; return Initialise(fmt); }
+#elif	EBUFRT_NUM == 1
+	HRESULT				Initialise(const D3DFORMAT rt0) {
+						   const D3DFORMAT fmt[EBUFRT_NUM] = {rt0}; return Initialise(fmt); }
+#endif
+
 	/* initialize the buffer from internal resources */
 	HRESULT				Initialise(IDirect3DTexture9 *text);
 	/* initialize the buffer from internal resources */
-	HRESULT				Initialise(enum OBGEPass pass,
-						   IDirect3DSurface9 *surf);
+	HRESULT				Initialise(IDirect3DSurface9 *surf);
 	/* initialize the buffer from newly allocated resources */
-	HRESULT				Initialise(D3DFORMAT rt0,
-						   D3DFORMAT rt1 = D3DFMT_UNKNOWN,
-						   D3DFORMAT rt2 = D3DFMT_UNKNOWN,
-						   D3DFORMAT rt3 = D3DFMT_UNKNOWN);
+	HRESULT				Initialise(const D3DFORMAT fmt[EBUFRT_NUM]);
 	void				Release();
 	bool				IsValid();
 
@@ -113,10 +78,11 @@ public:
 	void				SetTexture(const char *fmt, ID3DXEffect *Effect);
 	void				SetRenderTarget(IDirect3DDevice9 *Device);
 	void				Copy(IDirect3DDevice9 *Device, EffectBuffer *from);
+	void				Copy(IDirect3DDevice9 *Device, IDirect3DSurface9 *from);
 
 private:
-	IDirect3DTexture9 *		Tex[4];
-	IDirect3DSurface9 *		Srf[4];
+	IDirect3DTexture9 *		Tex[EBUFRT_NUM];
+	IDirect3DSurface9 *		Srf[EBUFRT_NUM];
 };
 
 class EffectQueue
@@ -162,16 +128,16 @@ public:
 	bool SaveEffect();
 
 	void ApplyCompileDirectives();
-	void ApplyPermanents(EffectConstants *ConstList, EffectManager *FXMan);
-	void ApplyConstants(EffectConstants *ConstList);
+	void ApplyPermanents(EffectManager *FXMan);
+	void ApplyConstants();
 	void ApplyDynamics();
 
 	void OnLostDevice(void);
 	void OnResetDevice(void);
 
 	void Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo, IDirect3DSurface9 *RenderCopy);
-	bool Render(IDirect3DDevice9 *D3DDevice, EffectConstants *ConstList, EffectQueue *Queue);
-	void Render(IDirect3DDevice9 *D3DDevice, EffectConstants *ConstList);
+	bool Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue);
+	void Render(IDirect3DDevice9 *D3DDevice);
 
 	bool SetEffectConstantB(const char *name, bool value);
 	bool SetEffectConstantI(const char *name, int value);
@@ -343,7 +309,7 @@ struct EffectQuad { float x,y,z;      float u,v; };
 
 	IDirect3DVertexBuffer9 *			EffectVertex;
 	EffectRecord *					EffectDepth;
-	EffectConstants					EffectConst;
+//	EffectConstants					EffectConst;
 
 	EffectBuffer					OrigRT, CopyRT, TrgtRT;
 	EffectBuffer					LastRT, PrevRT, PastRT;

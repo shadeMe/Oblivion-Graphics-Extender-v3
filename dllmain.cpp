@@ -24,8 +24,10 @@ void GlobalCleanup() {
 	if (TextureManager::Singleton) delete TextureManager::Singleton;
 	if (ShaderManager::Singleton) delete ShaderManager::Singleton;
 
+#ifndef	OBGE_NOSHADER
 	if (lastOBGEDirect3DDevice9) delete lastOBGEDirect3DDevice9;
 	if (lastOBGEDirect3D9) delete lastOBGEDirect3D9;
+#endif
 }
 
 static HMODULE s_hDll;

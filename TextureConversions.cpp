@@ -1,3 +1,4 @@
+#ifndef	OBGE_NOSHADER
 
 #include <d3d9.h>
 #include <d3dx9.h>
@@ -792,3 +793,5 @@ bool TextureCompressQDM(LPDIRECT3DTEXTURE9 *base, LPDIRECT3DTEXTURE9 *norm) {
 
   return true;
 }
+
+#endif

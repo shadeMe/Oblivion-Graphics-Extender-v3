@@ -1,3 +1,4 @@
+#ifndef	OBGE_NOSHADER
 #ifndef	D3D9_HPP
 #define	D3D9_HPP
 
@@ -40,4 +41,5 @@ private:
 	IDirect3D9* m_d3d;
 };
 
+#endif
 #endif

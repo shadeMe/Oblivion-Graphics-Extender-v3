@@ -1,3 +1,4 @@
+#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING)
 #include <assert.h>
 
 #include "TextureManager.h"
@@ -90,3 +91,5 @@ void CreateTextureIOHook(void) {
 
 	return;
 }
+
+#endif

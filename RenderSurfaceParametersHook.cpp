@@ -28,6 +28,7 @@ static global<bool> UseWaterHiRes(0, "Oblivion.ini", "Water", "bUseWaterHiRes");
 
 class Anonymous {
 
+#ifndef	OBGE_NOSHADER
 public:
   void TrackCombinerPass(int unk1);
 
@@ -55,11 +56,13 @@ public:
 
   bool TrackVideoPass(int unk1, int unk2);
   void TrackMiscPass(int unk1);
+#endif
 
 public:
   void *TrackRenderedSurface(v1_2_416::NiDX9Renderer *renderer, int Width, int Height, int Flags, D3DFORMAT Format, enum SurfaceIDs SurfaceTypeID);
 };
 
+#ifndef	OBGE_NOSHADER
 void (__thiscall Anonymous::* CombinerPass)(int)/* =
 	(void (__thiscall TES::*)(int, int))0040C830*/;
 void (__thiscall Anonymous::* ReflectionCull)(int)/* =
@@ -142,9 +145,9 @@ bool (__thiscall Anonymous::* TrackVideoPass)(int, int)/* =
 	(void (__thiscall TES::*)(int, int))0x004106C0*/;
 void (__thiscall Anonymous::* TrackMiscPass)(int)/* =
 	(void (__thiscall TES::*)(int, int))0x0057F170*/;
+#endif
 
-static enum OBGEPass previousPass;
-
+#ifndef	OBGE_NOSHADER
 void Anonymous::TrackReflectionCull(int unk1) {
 	*((char *)0x00B07068) = UseWaterReflectionsActors.Get();	// boolUseWaterReflectionsActors
 	*((char *)0x00B07070) = UseWaterReflectionsTrees.Get();		// boolUseWaterReflectionsTrees
@@ -155,7 +158,7 @@ void Anonymous::TrackReflectionCull(int unk1) {
 }
 
 void Anonymous::TrackCombinerPass(int unk1) {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_MAIN;
 
 	if (frame_log)
@@ -165,8 +168,7 @@ void Anonymous::TrackCombinerPass(int unk1) {
 
 	{
 		/* right location? */
-		ShaderManager *sm = ShaderManager::GetSingleton();
-		sm->UpdateFrameConstants();
+		Constants.Update();
 	}
 
 	(this->*CombinerPass)(unk1);
@@ -180,7 +182,7 @@ void Anonymous::TrackCombinerPass(int unk1) {
 }
 
 void Anonymous::TrackReflectionPass(int unk1, int unk2) {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_REFLECTION;
 
 	if (frame_log)
@@ -199,7 +201,7 @@ void Anonymous::TrackReflectionPass(int unk1, int unk2) {
 }
 
 void Anonymous::TrackWaterSurfaceLoop() {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_WATER;
 
 	if (frame_log)
@@ -218,7 +220,7 @@ void Anonymous::TrackWaterSurfaceLoop() {
 }
 
 void Anonymous::TrackWaterSurfacePass() {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_WATER;
 
 	if (frame_log)
@@ -237,7 +239,7 @@ void Anonymous::TrackWaterSurfacePass() {
 }
 
 void Anonymous::TrackWaterGeometryPass(int unk1, int unk2) {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_WATER;
 
 	if (frame_log)
@@ -256,7 +258,7 @@ void Anonymous::TrackWaterGeometryPass(int unk1, int unk2) {
 }
 
 bool Anonymous::TrackShadowPass() {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_SHADOW;
 
 	if (frame_log)
@@ -276,7 +278,7 @@ bool Anonymous::TrackShadowPass() {
 }
 
 bool Anonymous::TrackShadowCanopyPass() {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_SHADOW;
 
 	if (frame_log)
@@ -296,7 +298,7 @@ bool Anonymous::TrackShadowCanopyPass() {
 }
 
 bool Anonymous::TrackHDRAlphaPass(int unk1, int unk2) {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_HDR;
 
 	if (frame_log)
@@ -316,7 +318,7 @@ bool Anonymous::TrackHDRAlphaPass(int unk1, int unk2) {
 }
 
 void Anonymous::TrackHDRPass(int unk1, int unk2, int unk3, int unk4) {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_HDR;
 
 	if (frame_log)
@@ -335,7 +337,7 @@ void Anonymous::TrackHDRPass(int unk1, int unk2, int unk3, int unk4) {
 }
 
 void Anonymous::TrackBlurPass(int unk1, int unk2, int unk3, int unk4) {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_POST;
 
 	if (frame_log)
@@ -354,7 +356,7 @@ void Anonymous::TrackBlurPass(int unk1, int unk2, int unk3, int unk4) {
 }
 
 void Anonymous::TrackHitPass(int unk1, int unk2, int unk3, int unk4) {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_POST;
 
 	if (frame_log)
@@ -373,7 +375,7 @@ void Anonymous::TrackHitPass(int unk1, int unk2, int unk3, int unk4) {
 }
 
 void Anonymous::TrackMenuPass(int unk1, int unk2, int unk3, int unk4) {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_POST;
 
 	if (frame_log)
@@ -392,7 +394,7 @@ void Anonymous::TrackMenuPass(int unk1, int unk2, int unk3, int unk4) {
 }
 
 void Anonymous::TrackRefractionPass(int unk1, int unk2, int unk3, int unk4) {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_POST;
 
 	if (frame_log)
@@ -411,7 +413,7 @@ void Anonymous::TrackRefractionPass(int unk1, int unk2, int unk3, int unk4) {
 }
 
 void Anonymous::TrackNighteyePass(int unk1, int unk2, int unk3, int unk4) {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_POST;
 
 	if (frame_log)
@@ -430,7 +432,7 @@ void Anonymous::TrackNighteyePass(int unk1, int unk2, int unk3, int unk4) {
 }
 
 void Anonymous::TrackWaterDisplacementPass(int unk1, int unk2, int unk3, int unk4) {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_WATERDISPLACEMENT;
 
 	if (frame_log)
@@ -449,7 +451,7 @@ void Anonymous::TrackWaterDisplacementPass(int unk1, int unk2, int unk3, int unk
 }
 
 void Anonymous::TrackWaterHeightmapPass(int unk1, int unk2, int unk3, int unk4) {
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_WATERHEIGHTMAP;
 
 	if (frame_log)
@@ -470,7 +472,7 @@ void Anonymous::TrackWaterHeightmapPass(int unk1, int unk2, int unk3, int unk4) 
 bool Anonymous::TrackVideoPass(int unk1, int unk2) {
 	/* bink splash-video and possibly all bink playbacks
 	 */
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_VIDEO;
 
 	if (frame_log)
@@ -492,7 +494,7 @@ bool Anonymous::TrackVideoPass(int unk1, int unk2) {
 void Anonymous::TrackMiscPass(int unk1) {
 	/* occurs as early as the splash-video
 	 */
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 //	currentPass = OBGEPASS_UNKNOWN;
 	currentPass = OBGEPASS_MAIN;
 
@@ -514,7 +516,7 @@ void Anonymous::TrackMiscPass(int unk1) {
 void __cdecl TrackIdlePass(int unk1, int unk2) {
 	/* occurs as early as the menu
 	 */
-	previousPass = currentPass;
+	enum OBGEPass previousPass = currentPass;
 //	currentPass = OBGEPASS_UNKNOWN;
 	currentPass = OBGEPASS_UNKNOWN;
 
@@ -546,6 +548,7 @@ bool __cdecl TrackIsScriptRunning(int unk1, int unk2) {
 
 	return res;
 }
+#endif
 
 /* ------------------------------------------------------------------------------------------------- */
 
@@ -678,8 +681,10 @@ void __stdcall TrackRenderedSurfaceParameters(v1_2_416::NiDX9Renderer *renderer,
 	_DMESSAGE("OD3D9: Intercepted {W,H} before: {%d,%d}", *pWidth, *pHeight);
 #endif
 #if 1
+#ifndef	OBGE_NOSHADER
 	/* enable default automipmapping */
 	AMFilter = (D3DTEXTUREFILTERTYPE)AutoGenerateMipMaps.Get();
+#endif
 
 	switch (SurfaceTypeID) {
 		case SURFACE_ID_WATER6:
@@ -701,17 +706,19 @@ void __stdcall TrackRenderedSurfaceParameters(v1_2_416::NiDX9Renderer *renderer,
 		    }
 		  }
 
+#ifndef	OBGE_NOSHADER
 		  {
 		    ShaderManager *sm = ShaderManager::GetSingleton();
 		    const float W = (float)*pWidth;
 		    const float H = (float)*pHeight;
 
 		    /* record constants */
-		    sm->ShaderConst.rcpresh[0] = 1.0f / W;
-		    sm->ShaderConst.rcpresh[1] = 1.0f / H;
-		    sm->ShaderConst.rcpresh[2] = W / H;
-		    sm->ShaderConst.rcpresh[3] = W * H;
+		    Constants.rcpresh[0] = 1.0f / W;
+		    Constants.rcpresh[1] = 1.0f / H;
+		    Constants.rcpresh[2] = W / H;
+		    Constants.rcpresh[3] = W * H;
 		  }
+#endif
 		  break;
 		case SURFACE_ID_WATER7:
 		  /* Water displacement */
@@ -732,17 +739,19 @@ void __stdcall TrackRenderedSurfaceParameters(v1_2_416::NiDX9Renderer *renderer,
 		    }
 		  }
 
+#ifndef	OBGE_NOSHADER
 		  {
 		    ShaderManager *sm = ShaderManager::GetSingleton();
 		    const float W = (float)*pWidth;
 		    const float H = (float)*pHeight;
 
 		    /* record constants */
-		    sm->ShaderConst.rcpresd[0] = 1.0f / W;
-		    sm->ShaderConst.rcpresd[1] = 1.0f / H;
-		    sm->ShaderConst.rcpresd[2] = W / H;
-		    sm->ShaderConst.rcpresd[3] = W * H;
+		    Constants.rcpresd[0] = 1.0f / W;
+		    Constants.rcpresd[1] = 1.0f / H;
+		    Constants.rcpresd[2] = W / H;
+		    Constants.rcpresd[3] = W * H;
 		  }
+#endif
 		  break;
 	//	case SURFACE_ID_WATER12: *pWidth = *pHeight = 256; break;
 
@@ -785,6 +794,7 @@ void CreateRenderSurfaceHook(void) {
 	/* combined reflection and water passes: 0049E880 */
 	/* combined hdr related: 0049E880 */
 
+#ifndef	OBGE_NOSHADER
 	/* ReflectionPass */
 	*((int *)&CombinerPass)          = 0x0040C830;
 	*((int *)&ReflectionCull)        = 0x0049CBF0;
@@ -835,6 +845,7 @@ void CreateRenderSurfaceHook(void) {
 
 	*((int *)&IdlePass) = 0x007D71C0;
 	*((int *)&IsScriptRunning) = 0x004F8DB0;
+#endif
 
 	/* GetRenderedSurfaceParameters */
 	*((int *)&GetRenderedSurface          ) = 0x007C1B50;
@@ -845,6 +856,7 @@ void CreateRenderSurfaceHook(void) {
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
 
+#ifndef	OBGE_NOSHADER
 	DetourAttach(&(PVOID&)CombinerPass,          *((PVOID *)&TrackCombinerPass));
 	DetourAttach(&(PVOID&)ReflectionCull,        *((PVOID *)&TrackReflectionCull));
 	DetourAttach(&(PVOID&)ReflectionPass,        *((PVOID *)&TrackReflectionPass));
@@ -869,7 +881,8 @@ void CreateRenderSurfaceHook(void) {
 	DetourAttach(&(PVOID&)MiscPass,              *((PVOID *)&TrackMiscPass));
 
 	DetourAttach(&(PVOID&)IdlePass, TrackIdlePass);
-	DetourAttach(&(PVOID&)IsScriptRunning, TrackIsScriptRunning);
+//	DetourAttach(&(PVOID&)IsScriptRunning, TrackIsScriptRunning);
+#endif
 
 	DetourAttach(&(PVOID&)GetRenderedSurface, *((PVOID *)&TrackRenderedSurface         ));
 	DetourAttach(&(PVOID&)GetRenderedSurfaceParameters,   TrackRenderedSurfaceParameters);
@@ -884,8 +897,10 @@ void CreateRenderSurfaceHook(void) {
 		_MESSAGE("Detoured GetRenderedSurfaceParameters(); failed");
         }
 
+#ifndef	OBGE_NOSHADER
 	/* enable default automipmapping */
 	AMFilter = (D3DTEXTUREFILTERTYPE)AutoGenerateMipMaps.Get();
+#endif
 
 	/* Reflection Render-Surface Dimension (square) */
 	if ((ReflectionMapSize.Get() >= 256) &&

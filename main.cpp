@@ -221,10 +221,12 @@ static CommandInfo kShowMemoryDump =
 #include "Hooking/apihijack.h"
 #include "Hooking/apihijack.cpp"
 
+#ifndef	OBGE_NOSHADER
 #include "Hooking/D3D9.cpp"
 #include "Hooking/D3DX.cpp"
 #include "Hooking/K32.cpp"
 #include "Hooking/U32.cpp"
+#endif
 
 extern "C" {
 
@@ -266,13 +268,20 @@ bool OBSEPlugin_Query(const OBSEInterface * obse, PluginInfo * info)
 
 	//	assert(NULL);
 
+#if	!defined(OBGE_NOSHADER)
 		HookAPICalls(&K32Hook);		// static DLL linkage
 		HookAPICalls(&U32Hook);		// static DLL linkage
 	//	HookAPICalls(&D3DHook);		// dynamic DLL linkage
+
+#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING)
 		HookAPICalls(&D3XHook27);	// static DLL linkage
 		HookAPICalls(&D3XHook31);	// static DLL linkage
 		HookAPICalls(&D3XHook41);	// static DLL linkage
 		HookAPICalls(&D3XHook43);	// static DLL linkage
+#endif
+
+		OBGEDirect3DCreate9Hook();	// second chance hack-away D3D
+#endif
 	}
 	else
 	{
@@ -345,11 +354,13 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 	obse->RegisterCommand(&kCommandInfo_SetEffectSamplerTexture);			// 2120
 	obse->RegisterCommand(&kCommandInfo_IsEffectEnabled);				// 2121
 
+#ifndef	OBGE_NOSHADER
 	/* shaders -------------------------------------------------------------------- */
 	obse->RegisterCommand(&kCommandInfo_SetShaderConstantB);			// 2122
 	obse->RegisterCommand(&kCommandInfo_SetShaderConstantI);			// 2123
 	obse->RegisterCommand(&kCommandInfo_SetShaderConstantF);			// 2124
 	obse->RegisterCommand(&kCommandInfo_SetShaderSamplerTexture);			// 2125
+#endif
 
 	/* dev ------------------------------------------------------------------------ */
 #ifdef	OBGE_DEVLING
@@ -381,8 +392,14 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 
 			CreateDepthBufferHook();
 			CreateRenderSurfaceHook();
+
+#if	!defined(OBGE_NOSHADER)
 			CreateShaderIOHook();
+#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING)
 			CreateTextureIOHook();
+#endif
+#endif
+
 		//	v1_2_416::NiDX9RenderStateEx::HookRenderStateManager();
 		}
 		else

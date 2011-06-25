@@ -1,3 +1,5 @@
+#ifndef	OBGE_NOSHADER
+
 #include <assert.h>
 #include <windows.h>
 
@@ -80,12 +82,12 @@ void CreateShaderIOHook(void) {
 	DetourAttach(&(PVOID&)GetShaderBinary, *((PVOID *)&ReplaceShaderBinary));
         LONG error = DetourTransactionCommit();
 
-        if (error == NO_ERROR) {
+        if (error == NO_ERROR)
 		_MESSAGE("Detoured GetShaderBinary(); succeeded");
-        }
-        else {
+        else
 		_MESSAGE("Detoured GetShaderBinary(); failed");
-        }
 
 	return;
 }
+
+#endif

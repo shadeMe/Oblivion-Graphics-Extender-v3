@@ -1,4 +1,5 @@
 #pragma once
+#ifndef	OBGE_NOSHADER
 
 #include <d3dx9.h>
 #include <d3dx9shader.h>
@@ -259,50 +260,7 @@ typedef std::list<ShaderRecord *> BuiltInShaderList;
 typedef std::map<IUnknown *, RuntimeShaderRecord *> ShaderList;
 typedef std::map<std::string, RuntimeConstant::mem> ConstsList;
 
-struct ShaderConstants
-{
-	// ****** Global static shader constants ******
-	v1_2_416::NiVector4		rcpres;
-	v1_2_416::NiVector4		rcpresh;	// heightmap
-	v1_2_416::NiVector4		rcpresd;	// displacement
-
-	// ****** Global shader constants (Updated each scene) ******
-	D3DMATRIX			wrld;
-	D3DMATRIX			view;
-	D3DMATRIX			proj;
-
-	v1_2_416::NiVector4		ZRange;
-	v1_2_416::NiVector4		FoV;
-	v1_2_416::NiVector4		SunDir;
-	v1_2_416::NiVector4		SunTiming;
-	v1_2_416::NiVector4		PlayerPosition;
-
-	v1_2_416::NiVector4		GameTime;
-	v1_2_416::NiVector4		TikTiming;
-
-	inline void UpdateWorld(const D3DMATRIX *mx) {
-	  wrld = *mx;
-	}
-
-	inline void UpdateView(const D3DMATRIX *mx) {
-	  view = *mx;
-	}
-
-	inline void UpdateProjection(const D3DMATRIX *mx) {
-	  proj = *mx;
-
-	  ZRange.y = (proj._43 / proj._33);
-	  ZRange.x = (proj._33 * ZRange.y) / (proj._33 - 1.0f);
-	  ZRange.z = ZRange.x - ZRange.y;
-	  ZRange.w = ZRange.x + ZRange.y;
-
-#define acot(x)	(M_PI_2 - atan(x))
-	  FoV.x = acot(proj._11) * 1;
-	  FoV.y = acot(proj._22) * 1;
-	  FoV.z = (FoV.x * 360.0) / M_PI;
-	  FoV.w = (FoV.y * 360.0) / M_PI;
-	}
-};
+#include "Constants.h"
 
 struct GlobalConstants
 {
@@ -368,7 +326,7 @@ public:
 	ShaderRecord *					cqv;  // COPYQUAD.vso
 	TextureRecord *					unbound;
 
-	ShaderConstants					ShaderConst;
+//	ShaderConstants					ShaderConst;
 	GlobalConstants					GlobalConst;
 
 public:
@@ -460,3 +418,23 @@ public:
 #endif
 #endif
 };
+
+#else
+#include <d3dx9.h>
+
+class ShaderManager {
+
+public:
+  ShaderManager();
+  ~ShaderManager();
+
+  static ShaderManager*		GetSingleton(void);
+  static ShaderManager*		Singleton;
+
+  void						OnCreateDevice(void) {};
+  void						OnLostDevice(void) {};
+  void						OnResetDevice(void) {};
+  void						OnReleaseDevice(void) {};
+  void						PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum = -1) {};
+};
+#endif

@@ -5,6 +5,9 @@
 
 #include "D3D9Identifiers.hpp"
 
+/* ------------------------------------------------------------------------------- */
+#ifndef	OBGE_NOSHADER
+
 const char *passNames[OBGEPASS_NUM] = {
   "0. No particular pass",
   "1. Reflection pass (off-screen)",
@@ -51,6 +54,7 @@ const char *passScens[OBGEPASS_NUM][16] = {
   /* OBGEPASS_UNKNOWN		*/
   {},
 };
+#endif
 
 /* Shader-tandems:
  *

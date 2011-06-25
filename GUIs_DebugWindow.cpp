@@ -1,3 +1,5 @@
+#ifndef	OBGE_NOSHADER
+
 #include <assert.h>
 
 #include "obse/Utilities.h"
@@ -4610,5 +4612,6 @@ void DebugWindow::SetProgress(int a, int amax, int b, int bmax) {
 	sdev->SetProgress(a, amax, b, bmax);
 }
 
+#endif
 #endif
 #endif

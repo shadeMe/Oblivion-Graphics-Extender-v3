@@ -8,7 +8,7 @@ typedef FARPROC (WINAPI *GetProcAddress_t)(HMODULE hModule, LPCSTR lpProcName);
 
 // Function prototypes.
 HMODULE WINAPI OBGELoadLibraryA(LPCTSTR dllName);
-//ODULE WINAPI OBGELoadLibraryW(LPCTSTR dllName);
+HMODULE WINAPI OBGELoadLibraryW(LPCWSTR dllName);
 FARPROC WINAPI OBGEGetProcAddress(HMODULE hModule, LPCSTR lpProcName);
 
 #endif

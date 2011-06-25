@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "TextureManager.h"
+#include "ShaderManager.h"
 #include "EffectManager.h"
 #include "ScreenElements.h"
 #include "obse\pluginapi.h"
@@ -12,6 +13,8 @@
 #include "D3D9Device.hpp"
 
 static global<bool> PurgeOnNewGame(false, NULL, "Textures", "bPurgeOnNewGame");
+static global<int> SetAnisotropy(1, NULL, "Textures", "iSamplerAnisotropy");
+static global<float> SetMipmapBias(0.0, NULL, "Textures", "fSamplerLODBias");
 
 // *********************************************************************************************************
 
@@ -242,7 +245,7 @@ void TextureRecord::Purge(int TexNum) {
     ShaderManager::GetSingleton()->PurgeTexture(this->textureC, TexNum);
   }
   else if (this->IsType(TR_VOLUMETRIC)) {
-       HUDManager::GetSingleton()->PurgeTexture(this->textureV, TexNum);
+    HUDManager::GetSingleton()->PurgeTexture(this->textureV, TexNum);
     EffectManager::GetSingleton()->PurgeTexture(this->textureV, TexNum);
     ShaderManager::GetSingleton()->PurgeTexture(this->textureV, TexNum);
   }
@@ -300,6 +303,9 @@ int ManagedTextureRecord::Release() {
 TextureManager::TextureManager() {
   TextureIndex = 0;
   MaxTextureIndex = 0;
+
+  Anisotropy = SetAnisotropy.Get();
+  LODBias = SetMipmapBias.Get();
 }
 
 TextureManager::~TextureManager() {

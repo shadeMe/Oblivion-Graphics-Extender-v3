@@ -1,3 +1,4 @@
+#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING)
 #ifndef	HOOKING_D3DX_CPP
 #define	HOOKING_D3DX_CPP
 
@@ -161,4 +162,5 @@ enum
 
 #include "D3DX_XX.cpp"
 
+#endif
 #endif
