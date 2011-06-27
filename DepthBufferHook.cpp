@@ -52,8 +52,13 @@ bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3
     D3DDevice->GetDirect3D(&pD3D);
     pD3D->GetAdapterDisplayMode( D3DADAPTER_DEFAULT, &d3ddm );
 
-    hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, (D3DFORMAT)MAKEFOURCC('R', 'E', 'S', 'Z'));
+    hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, (D3DFORMAT)MAKEFOURCC('R', 'A', 'W', 'Z'));
+    if (hr == D3D_OK)
+      _MESSAGE("RAWZ format supported.");
+    else
+      _MESSAGE("RAWZ not supported.");
 
+    hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, (D3DFORMAT)MAKEFOURCC('R', 'E', 'S', 'Z'));
     if (hr == D3D_OK)
       _MESSAGE("RESZ format supported.");
     else
@@ -99,7 +104,8 @@ bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3
           }
 
 	  /* failed, turn it off */
-	  if (!EffectManager::GetSingleton()->SetRAWZ(IsRAWZflag))
+	  if (!ShaderManager::GetSingleton()->SetRAWZ(IsRAWZflag) ||
+	      !EffectManager::GetSingleton()->SetRAWZ(IsRAWZflag))
 	    UseRAWZfix.Set(false);
 
           break;
@@ -166,8 +172,13 @@ void static _cdecl DepthBufferHook(IDirect3DDevice9 *Device, UInt32 u2) {
     Device->GetDirect3D(&pD3D);
     pD3D->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm);
 
-    hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, (D3DFORMAT)MAKEFOURCC('R', 'E', 'S', 'Z'));
+    hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, (D3DFORMAT)MAKEFOURCC('R', 'A', 'W', 'Z'));
+    if (hr == D3D_OK)
+      _MESSAGE("RAWZ format supported.");
+    else
+      _MESSAGE("RAWZ not supported.");
 
+    hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, (D3DFORMAT)MAKEFOURCC('R', 'E', 'S', 'Z'));
     if (hr == D3D_OK)
       _MESSAGE("RESZ format supported.");
     else

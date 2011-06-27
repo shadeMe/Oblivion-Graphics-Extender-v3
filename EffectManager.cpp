@@ -116,8 +116,19 @@ static FXIncludeManager incl;
 #define	EFFECTBUF_LBUF		EFFECTCOND_HASLBUF
 #define	EFFECTBUF_ZBUF		EFFECTCOND_HASZBUF
 
-static D3DXMACRO defs[] = {
-  {"IN_RAWZ"	        	, "0"},
+typedef struct _myD3DXMACRO
+{
+  const char *Name;
+  char *Definition;
+
+} myD3DXMACRO;
+
+static char IN_RAWZ[] = "0";
+static char IN_LINZ[] = "0";
+
+static myD3DXMACRO defs[] = {
+  {"IN_RAWZ"	        	, IN_RAWZ},
+  {"IN_LINZ"	        	, IN_LINZ},
 
   {"EFFECTGROUP_FIRST"		, stringify(EFFECTGROUP_FIRST		)},
   {"EFFECTGROUP_PRE"		, stringify(EFFECTGROUP_PRE		)},
@@ -282,14 +293,14 @@ inline void EffectBuffer::SetRenderTarget(IDirect3DDevice9 *Device) {
 inline void EffectBuffer::Copy(IDirect3DDevice9 *Device, EffectBuffer *from) {
   for (int rt = 0; rt < EBUFRT_NUM; rt++) {
     if (from->Srf[rt] && Srf[rt])
-      Device->StretchRect(from->Srf[rt], 0, Srf[rt], 0, D3DTEXF_NONE);
+      minStretchRect(Device, from->Srf[rt], 0, Srf[rt], 0, D3DTEXF_NONE);
   }
 }
 
 inline void EffectBuffer::Copy(IDirect3DDevice9 *Device, IDirect3DSurface9 *from) {
   for (int rt = 0; rt < EBUFRT_NUM; rt++) {
     if (from && Srf[rt])
-      Device->StretchRect(from, 0, Srf[rt], 0, D3DTEXF_NONE);
+      minStretchRect(Device, from, 0, Srf[rt], 0, D3DTEXF_NONE);
   }
 }
 
@@ -460,7 +471,7 @@ bool EffectRecord::LoadEffect(const char *Filename, UINT32 refID, bool Private, 
   if (strlen(Filename) > 240)
     return false;
   if (!defs)
-    defs = ::defs;
+    defs = (D3DXMACRO *)::defs;
 
   struct stat sb, sx;
   char strFileFull[MAX_PATH], *ext;
@@ -960,7 +971,7 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 
   if (!IsEnabled())
     return;
 
-  D3DDevice->BeginScene();
+  markerStart(D3DDevice);
 
   // Have to do this in case the effect has no vertex effect. The stupid effect system
   // uses the last vertex effect that was active and much strangeness occurs.
@@ -977,19 +988,19 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 
     if (++pass >= passes)
       break;
 
-    D3DDevice->StretchRect(RenderTo, 0, RenderCopy, 0, D3DTEXF_NONE);
+    minStretchRect(D3DDevice, RenderTo, 0, RenderCopy, 0, D3DTEXF_NONE);
   }
 
   pEffect->End();
 
-  D3DDevice->EndScene();
+  markerStop(D3DDevice);
 }
 
 inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue) {
   if (!IsEnabled())
     return false;
 
-  D3DDevice->BeginScene();
+  markerStart(D3DDevice);
 
   // Have to do this in case the effect has no vertex effect. The stupid effect system
   // uses the last vertex effect that was active and much strangeness occurs.
@@ -1018,7 +1029,7 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue
   passScene = this->GetName();
 #endif
 
-  D3DDevice->EndScene();
+  markerStop(D3DDevice);
 
   Queue->End(pEffect);
 
@@ -1029,7 +1040,7 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice) {
   if (!IsEnabled())
     return;
 
-  D3DDevice->BeginScene();
+  markerStart(D3DDevice);
 
   // Have to do this in case the effect has no vertex effect. The stupid effect system
   // uses the last vertex effect that was active and much strangeness occurs.
@@ -1052,7 +1063,7 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice) {
 
   pEffect->End();
 
-  D3DDevice->EndScene();
+  markerStop(D3DDevice);
 }
 
 ID3DXEffect *EffectRecord::GetEffect() const {
@@ -1429,10 +1440,12 @@ bool EffectManager::SetRAWZ(bool enabled) {
   if ((RenderLinZ || RenderPrjZ) && (RenderRawZ != enabled))
     CurrDS.Release();
 
+  /* TODO: recompile all effects to read non-linear-z instead of linear-z */
+
   if ((RenderRawZ = enabled))
-    *((char *)defs[0].Definition) = '1';
+    defs[0].Definition[0] = '1';
   else
-    *((char *)defs[0].Definition) = '0';
+    defs[0].Definition[0] = '0';
 
   if (RenderTransferZ && !EffectDepth) {
     EffectDepth = new EffectRecord();
@@ -1442,7 +1455,7 @@ bool EffectManager::SetRAWZ(bool enabled) {
       delete EffectDepth;
       EffectDepth = NULL;
 
-      _MESSAGE("ERROR - TransferZ.fx is missing and required! Please reinstall OBGEv2.2");
+      _MESSAGE("ERROR - TransferZ.fx is missing and required! Please reinstall OBGE");
       return false;
     }
 
@@ -1466,6 +1479,13 @@ bool EffectManager::SetLinearZ(bool enabled) {
   if (RenderLinZ != enabled)
     CurrDS.Release();
 
+  /* TODO: recompile all effects to read linear-z instead of non-linear-z */
+
+  if ((RenderLinZ = enabled))
+    *((char *)defs[1].Definition) = '1';
+  else
+    *((char *)defs[1].Definition) = '0';
+
   RenderLinZ = enabled;
 
   if (RenderTransferZ && !EffectDepth) {
@@ -1476,7 +1496,7 @@ bool EffectManager::SetLinearZ(bool enabled) {
       delete EffectDepth;
       EffectDepth = NULL;
 
-      _MESSAGE("ERROR - TransferZ.fx is missing and required! Please reinstall OBGEv2.2");
+      _MESSAGE("ERROR - TransferZ.fx is missing and required! Please reinstall OBGE");
       return false;
     }
 
@@ -1500,6 +1520,13 @@ bool EffectManager::SetProjectZ(bool enabled) {
   if (RenderPrjZ != enabled)
     CurrDS.Release();
 
+  /* TODO: recompile all effects to read linear-z instead of non-linear-z */
+
+  if ((RenderLinZ = enabled))
+    *((char *)defs[1].Definition) = '1';
+  else
+    *((char *)defs[1].Definition) = '0';
+
   RenderPrjZ = enabled;
 
   if (RenderTransferZ && !EffectDepth) {
@@ -1510,7 +1537,7 @@ bool EffectManager::SetProjectZ(bool enabled) {
       delete EffectDepth;
       EffectDepth = NULL;
 
-      _MESSAGE("ERROR - TransferZ.fx is missing and required! Please reinstall OBGEv2.2");
+      _MESSAGE("ERROR - TransferZ.fx is missing and required! Please reinstall OBGE");
       return false;
     }
 
@@ -1943,7 +1970,7 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
 
   D3DDevice->StretchRect(RenderTo, 0, lastframeSurf, 0, D3DTEXF_NONE);
 #else
-  D3DDevice->EndScene();
+  markerStop(D3DDevice);
 
   /* over frames */
   if (OrigRT.Initialise(RenderFrom) != D3D_OK) {
@@ -2024,7 +2051,7 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
 				   &TrgtRT
   );
 
-  D3DDevice->BeginScene();
+  markerStart(D3DDevice);
 #endif
 }
 
@@ -2034,7 +2061,7 @@ void EffectManager::RenderRAWZfix(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9
     EffectDepth = new EffectRecord();
 
     if (!EffectDepth->LoadEffect("RAWZfix.fx", 0)) {
-      _MESSAGE("ERROR - RAWZfix.fx is missing! Please reinstall OBGEv2.2");
+      _MESSAGE("ERROR - RAWZfix.fx is missing! Please reinstall OBGE");
       return;
     }
 

@@ -17,6 +17,28 @@
 #include "TextureIOHook.hpp"
 #include "ShaderManager.h"
 
+#ifndef	OBGE_DEVLING
+/* the doc says StretchRect can not be called inside Begin/EndScene
+ * but the SDK-samples contradict this! In practice it indeed works
+ * without
+ */
+#define	minStretchRect(dev, src, srcR, dst, dstR, flt) {	\
+   /* dev->EndScene(); */					\
+      dev->StretchRect(src, srcR, dst, dstR, flt);		\
+   /* dev->BeginScene(); */					\
+  }
+#define	markerStart(dev) {}
+#define	markerStop(dev) {}
+
+#else
+#define	minStretchRect(dev, src, srcR, dst, dstR, flt)		\
+      dev->StretchRect(src, srcR, dst, dstR, flt);
+#define	markerStart(dev)					\
+      dev->BeginScene();
+#define	markerStop(dev)						\
+      dev->EndScene();
+#endif
+
 /* ----------------------------------------------------------------------------- */
 
 // Hook-Tracker

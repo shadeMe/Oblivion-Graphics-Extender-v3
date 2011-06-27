@@ -284,6 +284,7 @@ public:
 	static ShaderManager*		GetSingleton(void);
 	static ShaderManager*		Singleton;
 
+	bool						SetRAWZ(bool enabled);
 	void						OnCreateDevice(void);
 	void						OnLostDevice(void);
 	void						OnResetDevice(void);
@@ -425,16 +426,17 @@ public:
 class ShaderManager {
 
 public:
-  ShaderManager();
-  ~ShaderManager();
+	ShaderManager();
+	~ShaderManager();
 
-  static ShaderManager*		GetSingleton(void);
-  static ShaderManager*		Singleton;
+	static ShaderManager*		GetSingleton(void);
+	static ShaderManager*		Singleton;
 
-  void						OnCreateDevice(void) {};
-  void						OnLostDevice(void) {};
-  void						OnResetDevice(void) {};
-  void						OnReleaseDevice(void) {};
-  void						PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum = -1) {};
+	bool						SetRAWZ(bool enabled) {};
+	void						OnCreateDevice(void) {};
+	void						OnLostDevice(void) {};
+	void						OnResetDevice(void) {};
+	void						OnReleaseDevice(void) {};
+	void						PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum = -1) {};
 };
 #endif

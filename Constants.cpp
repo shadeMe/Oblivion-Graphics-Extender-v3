@@ -67,20 +67,50 @@ void sConstants::UpdateSun() {
   SunTiming.z = climate->sunsetBegin  * 10 * 60;
   SunTiming.w = climate->sunsetEnd    * 10 * 60;
 
-  SunTiming.x = climate->sunriseBegin * 10 * 60;
-  SunTiming.y = climate->sunriseEnd   * 10 * 60;
-  SunTiming.z = climate->sunsetBegin  * 10 * 60;
-  SunTiming.w = climate->sunsetEnd    * 10 * 60;
-
   v1_2_416::NiNode *SunContainer = pSun->SunBillboard.Get()->ParentNode;
   float deltaz = SunDir.z;
   bool SunHasBenCulled = SunContainer->m_flags.individual.AppCulled;
-  
+
   SunDir.x = SunContainer->m_localTranslate.x;
   SunDir.y = SunContainer->m_localTranslate.y;
   SunDir.z = SunContainer->m_localTranslate.z;
   SunDir.Normalize3();
 
+#if 1
+  /* calculation of the real position of the sun */
+  /* length of day in "seconds" */
+  float daylength = SunTiming.w - SunTiming.x;
+  float highnoon = SunTiming.x + (daylength / 2);
+  float midnight = highnoon - (12 * 60 * 60);
+  /* length of day in "degree / 2" */
+  float dayangleh = daylength   * (M_PI     / (24 * 60 * 60));
+  float midangle  = midnight    * (M_PI * 2 / (24 * 60 * 60));
+  float curangle  = iGameTime.x * (M_PI * 2 / (24 * 60 * 60));
+  /* dis-position of tangent-line from the center
+   * of the circle in [0,1] == [center,radius], d
+   * lies on the rotated z-axis midnight->highnoon
+   */
+  float deltapos = 1.0 * cos(dayangleh);
+
+  /* calculate unit-positions on the circle [0,1] */
+  SunPos.x =  sin(curangle - midangle);
+  SunPos.y = 0;
+  SunPos.z = -cos(curangle - midangle);
+
+  /* apply dis-poition and renormalize */
+  SunPos.y = SunDir.y;
+  SunPos.z = SunPos.z - deltapos;
+  SunPos.Normalize3();
+
+  /* pitch sun-circle
+  SunPos.y = SunPos.z * sin(M_PI / 2 - dayangleh);
+  SunPos.z = SunPos.z * cos(M_PI / 2 - dayangleh);
+  SunPos.Normalize3(); */
+
+  SunDir = SunPos;
+#endif
+
+#if 0
   // Sunrise is at 06:00, Sunset at 20:00
   if ((iGameTime.x > SunTiming.w + (10 * 60)) ||
       (iGameTime.x < SunTiming.x - (10 * 60)))
@@ -97,6 +127,7 @@ void sConstants::UpdateSun() {
   }
 //if ((GameTime.y < 6) || (GameTime.y >= 21))
 //  SunDir.z = -fabs(SunDir.z);
+#endif
 
   SunDir.w = SunHasBenCulled;
 }

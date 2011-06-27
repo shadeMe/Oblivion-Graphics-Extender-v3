@@ -93,7 +93,18 @@ static HLSLIncludeManager incl;
 #define	MAINPASS	(1 << 6) /*(1 << OBGEPASS_MAIN)*/
 #define	EFFECTPASS	(1 << 7) /*(1 << OBGEPASS_EFFECTS)*/
 
-static D3DXMACRO defs[] = {
+typedef struct _myD3DXMACRO
+{
+  const char *Name;
+  char *Definition;
+
+} myD3DXMACRO;
+
+static char IN_RAWZ[] = "0";
+
+static myD3DXMACRO defs[] = {
+  {"IN_RAWZ"	        , IN_RAWZ},
+
   {"FUSED"		, stringify(FUSED  )},
   {"OFF"		, stringify(OFF	   )},
   {"DEFAULT"		, stringify(DEFAULT)},
@@ -954,6 +965,7 @@ bool ShaderRecord::CompileShader(bool forced) {
   if (!::CompileSources.Get() && !forced)
     return false;
 
+  D3DXMACRO *defs = (D3DXMACRO *)::defs;
   LPSTR src = NULL; int len;
   LPD3DXBUFFER p = NULL;
   LPD3DXCONSTANTTABLE c = NULL;
@@ -1252,7 +1264,7 @@ void RuntimeShaderRecord::Buffers::GrabRT(IDirect3DDevice9 *StateDevice, IDirect
     }
 
     if (pGrabRT) {
-      SceneDevice->StretchRect(pCurrRT, NULL, pGrabRT, NULL, D3DTEXF_NONE);
+      minStretchRect(SceneDevice, pCurrRT, NULL, pGrabRT, NULL, D3DTEXF_NONE);
       bCFilled = true;
     }
   }
@@ -1276,7 +1288,7 @@ void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect
     }
 
     if (pGrabDS) {
-      SceneDevice->StretchRect(pCurrDS, NULL, pGrabDS, NULL, D3DTEXF_NONE);
+      minStretchRect(SceneDevice, pCurrDS, NULL, pGrabDS, NULL, D3DTEXF_NONE);
       bDFilled = true;
     }
   }
@@ -1761,11 +1773,11 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
 		 doDZ = pCopyDZ && (!buf->pTextDZ || !buf->bZLoaded);
 
       if (doRT /*|| doDS*/)
-	SceneDevice->EndScene();
+	markerStart(SceneDevice);
       if (doRT)
 	buf->GrabRT(StateDevice, SceneDevice);
       if (doRT /*|| doDS*/)
-	SceneDevice->BeginScene();
+	markerStop(SceneDevice);
       if (doDS)
 	buf->GrabDS(StateDevice, SceneDevice);
       if (doDZ)
@@ -1784,7 +1796,8 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
 	do {
 	  StateDevice->SetTexture(rV->offset, rV->vals.texture);
 	} while ((++rV)->length);
-      if ((rV = pSampler))
+      if ((rV = pSampler)) {
+	Anisotropy = -Anisotropy;
 	do {
 	  RuntimeVariable::mem::tv *rT;
 	  if ((rT = rV->vals.state))
@@ -1792,6 +1805,8 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
 	      StateDevice->SetSamplerState(rV->offset, rT->Type, rT->Value);
 	    } while ((++rT)->Type);
 	} while ((++rV)->length);
+	Anisotropy = -Anisotropy;
+      }
 
       /* set the constant arrays */
       if ((rV = pBool))
@@ -1815,7 +1830,8 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
 	do {
 	  StateDevice->SetTexture(rV->offset, rV->vals.texture);
 	} while ((++rV)->length);
-      if ((rV = pSampler))
+      if ((rV = pSampler)) {
+	Anisotropy = -Anisotropy;
 	do {
 	  RuntimeVariable::mem::tv *rT;
 	  if ((rT = rV->vals.state))
@@ -1823,6 +1839,8 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
 	      StateDevice->SetSamplerState(rV->offset, rT->Type, rT->Value);
 	    } while ((++rT)->Type);
 	} while ((++rV)->length);
+	Anisotropy = -Anisotropy;
+      }
 
       /* set the constant arrays */
       if ((rV = pBool))
@@ -2058,6 +2076,15 @@ void ShaderManager::Reset() {
 #ifdef	OBGE_DEVLING
   Clear();
 #endif
+}
+
+bool ShaderManager::SetRAWZ(bool enabled) {
+  if (enabled)
+    defs[0].Definition[0] = '1';
+  else
+    defs[0].Definition[0] = '0';
+
+  return true;
 }
 
 void ShaderManager::OnCreateDevice() {

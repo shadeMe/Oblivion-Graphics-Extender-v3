@@ -28,6 +28,7 @@ extern struct sConstants
 	v1_2_416::NiVector4		FoV;
 
 	v1_2_416::NiVector4		SunDir;
+	v1_2_416::NiVector4		SunPos;
 	v1_2_416::NiVector4		SunTiming;
 	v1_2_416::NiVector4		SunCoEffs;
 	v1_2_416::NiVector4		SunColor;

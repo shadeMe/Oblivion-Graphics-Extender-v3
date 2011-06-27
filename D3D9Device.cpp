@@ -1237,18 +1237,23 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::GetSamplerSt
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetSamplerState(DWORD Sampler, D3DSAMPLERSTATETYPE Type, DWORD Value) {
+#if	defined(OBGE_ANISOTROPY)
+//if ((Type == D3DSAMP_MIPFILTER) && (Anisotropy > 1)) {
+  if (Anisotropy > 1) {
+    if ((Type == D3DSAMP_MIPFILTER) ||
+        (Type == D3DSAMP_MINFILTER)/* ||
+        (Type == D3DSAMP_MAGFILTER)*/) 
+      Value = D3DTEXF_ANISOTROPIC;
+    else if (Type == D3DSAMP_MAXANISOTROPY)
+      Value = *((DWORD *)&Anisotropy);
+    else if (Type == D3DSAMP_MIPMAPLODBIAS)
+      Value = *((DWORD *)&LODBias);
+  }
+#endif
+
 #ifdef	OBGE_DEVLING
   if (HasShaderManager)
     m_shaders->traced[currentPass].states_s[Sampler][Type] = Value;
-#endif
-
-#if	defined(OBGE_ANISOTROPY)
-//if ((Type == D3DSAMP_MIPFILTER) && (Anisotropy > 1)) {
-  if ((Anisotropy - (Type == D3DSAMP_MIPFILTER)) > 0) {
-    m_device->SetSamplerState(Sampler, D3DSAMP_MIPFILTER, D3DTEXF_ANISOTROPIC);
-    m_device->SetSamplerState(Sampler, D3DSAMP_MIPMAPLODBIAS, *((DWORD *)&LODBias));
-    m_device->SetSamplerState(Sampler, D3DSAMP_MAXANISOTROPY, *((DWORD *)&Anisotropy));
-  }
 #endif
 
   return m_device->SetSamplerState(Sampler, Type, Value);
