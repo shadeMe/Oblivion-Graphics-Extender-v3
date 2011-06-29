@@ -17,11 +17,16 @@ namespace v1_2_416
 	};
 }
 
+D3DFORMAT GetDepthBufferFormat(IDirect3D9 *pD3D, D3DFORMAT def, D3DMULTISAMPLE_TYPE MS);
 void static _cdecl DepthBufferHook(IDirect3DDevice9 *Device,UInt32 u2);
 UInt32 static _cdecl TextureSanityCheckHook(D3DFORMAT TextureFormat, UInt32 u2);
 void CreateDepthBufferHook(void);
+
+IDirect3DTexture9 *ResolvableDepthBuffer(IDirect3DSurface9 *DepthS = NULL, IDirect3DTexture9 *DepthT = NULL);
+bool ResolveDepthBuffer(IDirect3DDevice9 *Device);
 IDirect3DTexture9 *GetDepthBufferTexture(void);
 bool LostDepthBuffer(bool stage,void *parameters);
+
 bool HasDepth(void);
 bool IsRAWZ(void);
 bool DoesRESZ(void);

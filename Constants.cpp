@@ -102,7 +102,7 @@ void sConstants::UpdateSun() {
   SunPos.z = SunPos.z - deltapos;
   SunPos.Normalize3();
 
-  /* pitch sun-circle
+  /* tilt sun-circle
   SunPos.y = SunPos.z * sin(M_PI / 2 - dayangleh);
   SunPos.z = SunPos.z * cos(M_PI / 2 - dayangleh);
   SunPos.Normalize3(); */

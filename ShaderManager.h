@@ -432,7 +432,7 @@ public:
 	static ShaderManager*		GetSingleton(void);
 	static ShaderManager*		Singleton;
 
-	bool						SetRAWZ(bool enabled) {};
+	bool						SetRAWZ(bool enabled) { return true; };
 	void						OnCreateDevice(void) {};
 	void						OnLostDevice(void) {};
 	void						OnResetDevice(void) {};

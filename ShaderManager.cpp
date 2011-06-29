@@ -1295,7 +1295,7 @@ void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect
 #endif
 
   IDirect3DTexture9 *pCurrDT;
-  if ((pCurrDT = passDepthT[OBGEPASS_ANY])) {
+  if ((pCurrDT = ResolvableDepthBuffer(passDepth[OBGEPASS_ANY], passDepthT[OBGEPASS_ANY]))) {
     D3DSURFACE_DESC CurrD;              pCurrDT->GetLevelDesc(0, &CurrD);
     D3DSURFACE_DESC GrabD; if (pTextDS) pTextDS->GetLevelDesc(0, &GrabD);
 
@@ -1306,33 +1306,47 @@ void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect
       if (pGrabVX) pGrabVX->Release();
 
       pGrabDS = NULL; pTextDS = NULL; pGrabVX = NULL;
-      if (StateDevice->CreateTexture(
-		CurrD.Width, CurrD.Height,
-		1, D3DUSAGE_RENDERTARGET /*CurrD.Usage*/,
-		(BufferZDepthNumBits.Get() != 16 ? D3DFMT_R32F : D3DFMT_R16F) /*CurrD.Format*/,
-		CurrD.Pool, &pTextDS, NULL) == D3D_OK) {
-        if (pTextDS->GetSurfaceLevel(0, &pGrabDS) == D3D_OK) {
-          void *VertexPointer;
+      if (SceneDevice->CreateVertexBuffer(4 * sizeof(CameraQuad), D3DUSAGE_WRITEONLY, CAMERAQUADFORMAT, D3DPOOL_DEFAULT, &pGrabVX, 0) == D3D_OK) {
+	_MESSAGE("Creating shader vertex buffers.");
 
+	void *VertexPointer = NULL;
+	if (pGrabVX->Lock(0, 0, &VertexPointer, 0) == D3D_OK) {
 	  /* pixel exact screen-quad */
-          const float width  = CurrD.Width  - 0.5f;
-          const float height = CurrD.Height - 0.5f;
+	  const float width  = CurrD.Width  - 0.5f;
+	  const float height = CurrD.Height - 0.5f;
 
-          CameraQuad ShaderVertices[] = {
-            {-0.5f,  -0.5f,  0.5f,  1.0f,	0.0f, 0.0f},
-            {width,  -0.5f,  0.5f,  1.0f,	1.0f, 0.0f},
-            {-0.5f, height,  0.5f,  1.0f,	0.0f, 1.0f},
-            {width, height,  0.5f,  1.0f,	1.0f, 1.0f}
-          };
+	  CameraQuad ShaderVertices[] = {
+	    {-0.5f,  -0.5f,  0.5f,  1.0f,	0.0f, 0.0f},
+	    {width,  -0.5f,  0.5f,  1.0f,	1.0f, 0.0f},
+	    {-0.5f, height,  0.5f,  1.0f,	0.0f, 1.0f},
+	    {width, height,  0.5f,  1.0f,	1.0f, 1.0f}
+	  };
 
-          _MESSAGE("Creating shader vertex buffers.");
+	  CopyMemory(VertexPointer, ShaderVertices, sizeof(ShaderVertices));
+	  pGrabVX->Unlock();
+	}
 
-          SceneDevice->CreateVertexBuffer(4 * sizeof(CameraQuad), D3DUSAGE_WRITEONLY, CAMERAQUADFORMAT, D3DPOOL_DEFAULT, &pGrabVX, 0);
-          pGrabVX->Lock(0, 0, &VertexPointer, 0);
-          CopyMemory(VertexPointer, ShaderVertices, sizeof(ShaderVertices));
-          pGrabVX->Unlock();
-        }
+	if (StateDevice->CreateTexture(
+		CurrD.Width, CurrD.Height, 1,
+		D3DUSAGE_RENDERTARGET /*CurrD.Usage*/,
+		(BufferZDepthNumBits.Get() != 16
+		? D3DFMT_R32F
+		: D3DFMT_R16F) /*CurrD.Format*/,
+		CurrD.Pool, &pTextDS, NULL) == D3D_OK) {
+	  if (pTextDS->GetSurfaceLevel(0, &pGrabDS) != D3D_OK) {
+	    /* big failure */
+	    if (pGrabDS) pGrabDS->Release();
+	    if (pTextDS) pTextDS->Release();
+	    if (pGrabVX) pGrabVX->Release();
+
+	    pGrabDS = NULL; pTextDS = NULL; pGrabVX = NULL;
+
+	    _DMESSAGE("Creating grab buffers failed!");
+	  }
+	}
       }
+      else
+	_DMESSAGE("Creating shader vertex buffers failed!");
     }
 
     if (pGrabDS) {
@@ -1371,38 +1385,47 @@ void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect
       struct textureSurface *t = surfaceTexture[passDepth[currentPass]];
 #endif
 
-//    SceneDevice->GetRenderTarget(0, &pCurrRT);
-      SceneDevice->GetTexture(0, &pCurrTX);
-      SceneDevice->GetVertexShader(&pCurrVS);
-      SceneDevice->GetPixelShader(&pCurrPS);
+      /* backup */
 //    SceneDevice->GetRenderState(D3DRS_ZENABLE, &dCurrZW);
       SceneDevice->GetRenderState(D3DRS_CULLMODE, &dCurrCL);
       SceneDevice->GetRenderState(D3DRS_ALPHABLENDENABLE, &dCurrAB);
 //    SceneDevice->GetRenderState(D3DRS_ALPHATESTENABLE, &dCurrAT);
 //    SceneDevice->GetRenderState(D3DRS_STENCILENABLE, &dCurrST);
+//    SceneDevice->GetRenderTarget(0, &pCurrRT);
+      SceneDevice->GetTexture(0, &pCurrTX);
+      SceneDevice->GetVertexShader(&pCurrVS);
+      SceneDevice->GetPixelShader(&pCurrPS);
 //    SceneDevice->GetFVF(&dCurrVF);
       SceneDevice->GetStreamSource(0, &pCurrVX, &dCurrVO, &dCurrVS);
 
 //    SceneDevice->BeginScene();
-      SceneDevice->SetRenderTarget(0, pGrabDS);
+//    SceneDevice->SetRenderState(D3DRS_ZENABLE, FALSE);
+      SceneDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+      SceneDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+//    SceneDevice->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
+//    SceneDevice->SetRenderState(D3DRS_STENCILENABLE, FALSE);
+      if (pCurrDT != passDepthT[OBGEPASS_ANY])
+	ResolveDepthBuffer(SceneDevice);
       SceneDevice->SetDepthStencilSurface(NULL);
+      SceneDevice->SetRenderTarget(0, pGrabDS);
 //    SceneDevice->Clear(0, NULL, D3DCLEAR_TARGET, 0, 0.0, 0);
       SceneDevice->SetTexture(0, pCurrDT);
       SceneDevice->SetVertexShader((IDirect3DVertexShader9 *)sm->cqv->pDX9ShaderClss);
       SceneDevice->SetPixelShader ((IDirect3DPixelShader9  *)sm->cqp->pDX9ShaderClss);
       SceneDevice->SetPixelShaderConstantF(0, (const float *)&Constants.ZRange, 1);
       SceneDevice->SetPixelShaderConstantF(1, (const float *)&Constants.proj, 4);
-//    SceneDevice->SetRenderState(D3DRS_ZENABLE, FALSE);
-      SceneDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-      SceneDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
-//    SceneDevice->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
-//    SceneDevice->SetRenderState(D3DRS_STENCILENABLE, FALSE);
 
       SceneDevice->SetFVF(CAMERAQUADFORMAT);
       SceneDevice->SetStreamSource(0, pGrabVX, 0, sizeof(CameraQuad));
       SceneDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
 //    SceneDevice->EndScene();
 
+      /* restore */
+//    SceneDevice->SetRenderState(D3DRS_ZENABLE, dCurrZW);
+      SceneDevice->SetRenderState(D3DRS_CULLMODE, dCurrCL);
+      SceneDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, dCurrAB);
+//    SceneDevice->SetRenderState(D3DRS_ALPHATESTENABLE, dCurrAT);
+//    SceneDevice->SetRenderState(D3DRS_STENCILENABLE, dCurrST);
 //    SceneDevice->SetRenderTarget(0, pCurrRT);
 //    SceneDevice->SetDepthStencilSurface(pCurrDS);
       SceneDevice->SetRenderTarget(0, passSurface[OBGEPASS_ANY]);
@@ -1410,11 +1433,6 @@ void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect
       SceneDevice->SetTexture(0, pCurrTX);
       SceneDevice->SetVertexShader(pCurrVS);
       SceneDevice->SetPixelShader(pCurrPS);
-//    SceneDevice->SetRenderState(D3DRS_ZENABLE, dCurrZW);
-      SceneDevice->SetRenderState(D3DRS_CULLMODE, dCurrCL);
-      SceneDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, dCurrAB);
-//    SceneDevice->SetRenderState(D3DRS_ALPHATESTENABLE, dCurrAT);
-//    SceneDevice->SetRenderState(D3DRS_STENCILENABLE, dCurrST);
 //    SceneDevice->SetFVF(dCurrVF);
       SceneDevice->SetStreamSource(0, pCurrVX, dCurrVO, dCurrVS);
 

@@ -59,10 +59,23 @@ extern struct sConstants
 	inline void UpdateProjection(const D3DMATRIX &mx) {
 	  proj = mx;
 
-	  ZRange.y = (proj._43 / proj._33);
-	  ZRange.x = (proj._33 * ZRange.y) / (proj._33 - 1.0f);
-	  ZRange.z = ZRange.x - ZRange.y;
-	  ZRange.w = ZRange.x + ZRange.y;
+	  /* row-major:
+	   *
+	   *  w 	0 	 0 	0
+	   *  0 	h 	 0 	0
+	   *  0 	0 	 Q 	1
+	   *  0 	0 	-QN 	0
+	   *
+	   * w = X scaling factor
+	   * h = Y scaling factor
+	   * N = near Z
+	   * F = far Z
+	   * Q = F / (F-N)
+	   */
+	  ZRange.x = (-proj._43             /  proj._33       );
+	  ZRange.y = ( proj._33 * ZRange.x) / (proj._33 - 1.0f);
+	  ZRange.z = ZRange.y - ZRange.x;
+	  ZRange.w = ZRange.y + ZRange.x;
 
 #define acot(x)	(M_PI_2 - atan(x))
 	  FoV.x = acot(proj._11) * 1;

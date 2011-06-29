@@ -15,6 +15,7 @@ static global<char *> EffectDirectory("data\\shaders\\", NULL, "Effects", "sEffe
 static global<char *> EffectListFile("data\\shaders\\shaderlist.txt", NULL, "Effects", "sEffectListFile");
 static global<bool> UseLegacyCompiler(false, NULL, "Effects", "bUseLegacyCompiler");
 static global<bool> Optimize(false, NULL, "Effects", "bOptimize");
+static global<bool> FreezeTweaks(false, NULL, "Effects", "bFreezeTweaks");
 static global<bool> SplitScreen(false, NULL, "Effects", "bRenderHalfScreen");
 static global<bool> PurgeOnNewGame(false, NULL, "Effects", "bPurgeOnNewGame");
 static global<int> BufferTexturesNumBits(0, NULL, "ScreenBuffers", "iBufferTexturesNumBits");
@@ -125,10 +126,13 @@ typedef struct _myD3DXMACRO
 
 static char IN_RAWZ[] = "0";
 static char IN_LINZ[] = "0";
+static char *TWEAK_DYNAMIC = "extern";
+static char *TWEAK_FROZEN  = "static const";
 
 static myD3DXMACRO defs[] = {
   {"IN_RAWZ"	        	, IN_RAWZ},
   {"IN_LINZ"	        	, IN_LINZ},
+  {"iface"	        	, TWEAK_DYNAMIC},
 
   {"EFFECTGROUP_FIRST"		, stringify(EFFECTGROUP_FIRST		)},
   {"EFFECTGROUP_PRE"		, stringify(EFFECTGROUP_PRE		)},
@@ -1375,6 +1379,11 @@ EffectManager::EffectManager() {
   RenderCnd = 0;
   RenderFmt = D3DFMT_UNKNOWN;
 #endif
+
+  if (FreezeTweaks.Get())
+    defs[2].Definition = TWEAK_FROZEN;
+  else
+    defs[2].Definition = TWEAK_DYNAMIC;
 }
 
 EffectManager::~EffectManager() {
@@ -1482,9 +1491,9 @@ bool EffectManager::SetLinearZ(bool enabled) {
   /* TODO: recompile all effects to read linear-z instead of non-linear-z */
 
   if ((RenderLinZ = enabled))
-    *((char *)defs[1].Definition) = '1';
+    defs[1].Definition[0] = '1';
   else
-    *((char *)defs[1].Definition) = '0';
+    defs[1].Definition[0] = '0';
 
   RenderLinZ = enabled;
 
@@ -1523,9 +1532,9 @@ bool EffectManager::SetProjectZ(bool enabled) {
   /* TODO: recompile all effects to read linear-z instead of non-linear-z */
 
   if ((RenderLinZ = enabled))
-    *((char *)defs[1].Definition) = '1';
+    defs[1].Definition[0] = '1';
   else
-    *((char *)defs[1].Definition) = '0';
+    defs[1].Definition[0] = '0';
 
   RenderPrjZ = enabled;
 
@@ -1637,10 +1646,10 @@ void EffectManager::InitialiseFrameTextures() {
     while (bits != 0) {
       /**/ if (bits >=  32) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A32B32G32R32F : D3DFMT_A32B32G32R32F);
       else if (bits >=  16) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A16B16G16R16F : D3DFMT_A16B16G16R16F);
-      else if (bits >=   8) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A8R8G8B8      : D3DFMT_R8G8B8);
+      else if (bits >=   8) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A8R8G8B8      : D3DFMT_X8R8G8B8);
       else if (bits <= -16) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A16B16G16R16  : D3DFMT_A16B16G16R16);
       else if (bits <= -10) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A2B10G10R10   : D3DFMT_A2B10G10R10);
-      else if (bits <=  -8) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A8R8G8B8      : D3DFMT_R8G8B8);
+      else if (bits <=  -8) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A8R8G8B8      : D3DFMT_X8R8G8B8);
       else if (bits <=  -5) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A1R5G5B5      : D3DFMT_R5G6B5);
       else if (bits <=  -4) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A4R4G4B4      : D3DFMT_X4R4G4B4);
       else if (bits <=  -3) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_R3G3B2	      : D3DFMT_R3G3B2);
@@ -1691,6 +1700,10 @@ void EffectManager::InitialiseFrameTextures() {
     else
       RenderBuf |= (RenderFmt != D3DFMT_A8R8G8B8     ) ? EFFECTBUF_COPY : 0;
 
+    /* it seems the rendertarget is resolved just fine without the copy */
+    if (IsMultiSampled() && 0)
+      RenderBuf |=					 EFFECTBUF_COPY    ;
+
     if (RenderBuf & EFFECTBUF_ZBUF) OrigDS.Initialise(GetDepthBufferTexture());
     if (RenderBuf & EFFECTBUF_COPY) CopyRT.Initialise(RenderFmt);
     if (RenderBuf & EFFECTBUF_PAST) PastRT.Initialise(RenderFmt);
@@ -1700,7 +1713,7 @@ void EffectManager::InitialiseFrameTextures() {
     if (RenderBuf & EFFECTBUF_ZBUF) if (RenderTransferZ)
       CurrDS.Initialise(
 	RenderPrjZ
-	  ? (bitz != 16 ? D3DFMT_A32B32G32R32F : D3DFMT_A16B16G16R16)  // linear
+	  ? (bitz != 16 ? D3DFMT_A32B32G32R32F : D3DFMT_A16B16G16R16F)  // linear
 	  :
 	RenderLinZ
 	  ? (bitz != 16 ? D3DFMT_R32F : D3DFMT_R16F)  // linear
@@ -1908,18 +1921,9 @@ void EffectManager::UpdateFrameConstants(v1_2_416::NiDX9Renderer *Renderer) {
 void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo, IDirect3DSurface9 *RenderFrom) {
   v1_2_416::NiDX9Renderer *Renderer = v1_2_416::GetRenderer();
 
-  D3DDevice->SetStreamSource(0, EffectVertex, 0, sizeof(EffectQuad));
-  Renderer->RenderStateManager->SetFVF(EFFECTQUADFORMAT, false);
-
   // Sets up the viewport.
   float test[4] = { 0.0, 1.0, 1.0, 0.0 };
   Renderer->SetupScreenSpaceCamera(test);
-
-  Renderer->RenderStateManager->SetRenderState(D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_ALPHA | D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_RED, false);
-  Renderer->RenderStateManager->SetRenderState(D3DRS_ALPHATESTENABLE, false, false);
-  Renderer->RenderStateManager->SetRenderState(D3DRS_ALPHABLENDENABLE, false, false);
-  Renderer->RenderStateManager->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE, false);
-  Renderer->RenderStateManager->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE, false);
 
   // Set up world/view/proj matrices to identity in case there's no vertex effect.
   D3DXMATRIX mIdent;
@@ -1930,6 +1934,25 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
   D3DDevice->SetTransform(D3DTS_WORLD, &mIdent);
 
   UpdateFrameConstants(Renderer);
+
+  /* is multi-sampled? this has to be done before everything else
+   * as a geometry-call will be done to resolve the depth-target
+   */
+  bool resz;
+  if ((resz = ResolveDepthBuffer(D3DDevice))) {
+//  OrigDS.Initialise(GetDepthBufferTexture());
+//  FXMan->OrigDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect);
+  }
+
+  Renderer->RenderStateManager->SetRenderState(D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_ALPHA | D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_RED, false);
+  Renderer->RenderStateManager->SetRenderState(D3DRS_ALPHATESTENABLE, false, false);
+  Renderer->RenderStateManager->SetRenderState(D3DRS_ALPHABLENDENABLE, false, false);
+  Renderer->RenderStateManager->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE, false);
+  Renderer->RenderStateManager->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE, false);
+
+  /* full-screen quad */
+  D3DDevice->SetStreamSource(0, EffectVertex, 0, sizeof(EffectQuad));
+  Renderer->RenderStateManager->SetFVF(EFFECTQUADFORMAT, false);
 
   /* current state:
    *
@@ -1972,8 +1995,10 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
 #else
   markerStop(D3DDevice);
 
-  /* over frames */
-  if (OrigRT.Initialise(RenderFrom) != D3D_OK) {
+  /* rendertarget without texture, this can happen when the
+   * color-buffer is multi-sampled
+   */
+  if ((OrigRT.Initialise(RenderFrom) != D3D_OK)) {
     OrigRT.Initialise(RenderFmt);
     OrigRT.Copy(D3DDevice, RenderFrom);
   }
@@ -1981,7 +2006,7 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
   /* rendertarget without texture, non-HDR & non-Bloom special case
    * this basically is the raw backbuffer I think
    */
-  if (TrgtRT.Initialise(RenderTo) != D3D_OK) {
+  if ((TrgtRT.Initialise(RenderTo) != D3D_OK)) {
     CopyRT.Initialise(RenderFmt);
     RenderBuf |= EFFECTBUF_COPY;
   }

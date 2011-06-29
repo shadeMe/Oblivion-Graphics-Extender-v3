@@ -304,8 +304,10 @@ TextureManager::TextureManager() {
   TextureIndex = 0;
   MaxTextureIndex = 0;
 
+#ifndef	OBGE_NOSHADER
   Anisotropy = SetAnisotropy.Get();
   LODBias = SetMipmapBias.Get();
+#endif
 }
 
 TextureManager::~TextureManager() {

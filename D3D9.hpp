@@ -1,6 +1,7 @@
-#ifndef	OBGE_NOSHADER
 #ifndef	D3D9_HPP
 #define	D3D9_HPP
+
+#ifndef	OBGE_NOSHADER
 
 #include <intrin.h>
 #include <d3d9.h>
@@ -42,4 +43,7 @@ private:
 };
 
 #endif
+
+extern bool IsMultiSampled();
+
 #endif

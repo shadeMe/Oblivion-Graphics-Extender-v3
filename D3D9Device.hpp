@@ -1,4 +1,3 @@
-#ifndef	OBGE_NOSHADER
 #ifndef	D3D9DEVICE_HPP
 #define	D3D9DEVICE_HPP
 
@@ -39,6 +38,7 @@
       dev->EndScene();
 #endif
 
+#ifndef	OBGE_NOSHADER
 /* ----------------------------------------------------------------------------- */
 
 // Hook-Tracker
@@ -280,8 +280,8 @@ private:
 #endif
 };
 
-#endif
 #else
 #define	frame_log ((IDebugLog *)NULL)
 #define lastOBGEDirect3DDevice9	GetD3DDevice()
+#endif
 #endif
