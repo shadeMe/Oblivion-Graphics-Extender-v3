@@ -307,6 +307,14 @@ TextureManager::TextureManager() {
 #ifndef	OBGE_NOSHADER
   Anisotropy = SetAnisotropy.Get();
   LODBias = SetMipmapBias.Get();
+
+  if (lastOBGEDirect3D9) {
+    if (Anisotropy > lastOBGEDirect3D9CAPS.MaxAnisotropy)
+      Anisotropy = lastOBGEDirect3D9CAPS.MaxAnisotropy;
+  }
+
+  if (Anisotropy <= 1)
+    AFilters = 0;
 #endif
 }
 

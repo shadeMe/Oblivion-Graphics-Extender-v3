@@ -16,11 +16,13 @@ static global<bool> UseRAWZfix(true, NULL, "DepthBuffer", "bUseRAWZfix");
 
 static IDirect3DTexture9 *pDepthTexture = NULL;
 static IDirect3DSurface9 *pDepthSurface = NULL;
+static IDirect3DSurface9 *pMultiSurface = NULL;
 static IDirect3DSurface9 *pOldSurface = NULL;
 static D3DSURFACE_DESC DepthInfo;
 static bool HasDepthVar = false;
 static bool DoResolve = false;
 static bool DoesRESZflag = false;
+static bool DoesNULLflag = false;
 static bool IsRAWZflag = false;
 
 #define	CODE_INTZ	(D3DFORMAT)MAKEFOURCC('I','N','T','Z')
@@ -28,6 +30,7 @@ static bool IsRAWZflag = false;
 #define	CODE_DF16	(D3DFORMAT)MAKEFOURCC('D','F','1','6')
 #define	CODE_RAWZ	(D3DFORMAT)MAKEFOURCC('R','A','W','Z')
 #define	CODE_RESZ	(D3DFORMAT)MAKEFOURCC('R','E','S','Z')
+#define	CODE_NULL	(D3DFORMAT)MAKEFOURCC('N','U','L','L')
 
 struct DFLIST {
   D3DFORMAT	FourCC;
@@ -87,6 +90,7 @@ bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3
   assert(NULL);
 
   DoesRESZflag = false;
+  DoesNULLflag = false;
   IsRAWZflag = false;
 
   Width = v1_2_416::GetRenderer()->SizeWidth;
@@ -113,8 +117,14 @@ bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3
       _MESSAGE("RESZ format supported.");
     else
       _MESSAGE("RESZ not supported.");
-
     DoesRESZflag = (hr == D3D_OK);
+
+    hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, CODE_NULL);
+    if (hr == D3D_OK)
+      _MESSAGE("NULL format supported.");
+    else
+      _MESSAGE("NULL not supported.");
+    DoesNULLflag = (hr == D3D_OK);
 
     int DepthCount;
     for (DepthCount = 0; DepthCount < 4; DepthCount++) {
@@ -129,6 +139,10 @@ bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3
 
         // Check if it's multi-sampled
 	if (DoesRESZflag && (IsMultiSampled() || (DepthInfo.MultiSampleType != D3DMULTISAMPLE_NONE))) {
+	  assert (DoesNULLflag);
+	  D3DDevice->CreateRenderTarget(DepthInfo.Width, DepthInfo.Height, CODE_NULL, DepthInfo.MultiSampleType, DepthInfo.MultiSampleQuality, FALSE, &pMultiSurface, NULL);
+	  assert(pMultiSurface);
+
 	  _MESSAGE("Multi-sampled depth buffer resolve established. %i", DepthInfo.MultiSampleType);
 	  DoResolve = true; break;
 	}
@@ -213,10 +227,13 @@ void static _cdecl DepthBufferHook(IDirect3DDevice9 *Device, UInt32 u2) {
   //Sleep(10000);
 
   _MESSAGE("Pre Hook");
-  assert(NULL);
 
   HRESULT hr;
   UInt32 Width, Height;
+
+  DoesRESZflag = false;
+  DoesNULLflag = false;
+  IsRAWZflag = false;
 
   Width = v1_2_416::GetRenderer()->SizeWidth;
   Height = v1_2_416::GetRenderer()->SizeHeight;
@@ -242,8 +259,14 @@ void static _cdecl DepthBufferHook(IDirect3DDevice9 *Device, UInt32 u2) {
       _MESSAGE("RESZ format supported.");
     else
       _MESSAGE("RESZ not supported.");
-
     DoesRESZflag = (hr == D3D_OK);
+
+    hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, CODE_NULL);
+    if (hr == D3D_OK)
+      _MESSAGE("NULL format supported.");
+    else
+      _MESSAGE("NULL not supported.");
+    DoesNULLflag = (hr == D3D_OK);
 
     int DepthCount;
     for (DepthCount = 0; DepthCount < 4; DepthCount++) {
@@ -258,6 +281,10 @@ void static _cdecl DepthBufferHook(IDirect3DDevice9 *Device, UInt32 u2) {
 
 	// Check if it's multi-sampled
 	if (DoesRESZflag && (IsMultiSampled() || (DepthInfo.MultiSampleType != D3DMULTISAMPLE_NONE))) {
+	  assert (DoesNULLflag);
+	  Device->CreateRenderTarget(DepthInfo.Width, DepthInfo.Height, CODE_NULL, DepthInfo.MultiSampleType, DepthInfo.MultiSampleQuality, FALSE, &pMultiSurface, NULL);
+	  assert(pMultiSurface);
+
 	  _MESSAGE("Multi-sampled depth buffer resolve established. %i", DepthInfo.MultiSampleType);
 	  DoResolve = true; break;
 	}
@@ -400,12 +427,13 @@ IDirect3DTexture9 *ResolvableDepthBuffer(IDirect3DSurface9 *DepthS, IDirect3DTex
 }
 
 bool ResolveDepthBuffer(IDirect3DDevice9 *Device) {
-  if (DoResolve) { 
-//  IDirect3DSurface9 *pSurface = NULL;
-//  Device->GetDepthStencilSurface(&pSurface);
-//  if (pSurface != pOldSurface)
-//    Device->SetDepthStencilSurface(pOldSurface);
-//
+  if (DoResolve) {
+    Device->SetRenderTarget(0, pMultiSurface);
+    IDirect3DSurface9 *pSurface = NULL;
+    Device->GetDepthStencilSurface(&pSurface);
+    if (pSurface != pOldSurface)
+      Device->SetDepthStencilSurface(pOldSurface);
+
 //  Device->EndScene();
 //  Device->BeginScene();
 
@@ -418,29 +446,37 @@ bool ResolveDepthBuffer(IDirect3DDevice9 *Device) {
     // error message is produced
     D3DXVECTOR3 vDummyPoint(0.0f, 0.0f, 0.0f);
 
+    DWORD dCurrZE;
+    DWORD dCurrZW;
+    DWORD dCurrCW;
+
+    Device->GetRenderState(D3DRS_ZENABLE, &dCurrZE);
+    Device->GetRenderState(D3DRS_ZWRITEENABLE, &dCurrZW);
+    Device->GetRenderState(D3DRS_COLORWRITEENABLE, &dCurrCW);
+
     Device->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
     Device->SetRenderState(D3DRS_ZWRITEENABLE, D3DZB_FALSE);
     Device->SetRenderState(D3DRS_COLORWRITEENABLE, 0);
 
-//  Device->SetVertexShader(NULL);
-//  Device->SetPixelShader(NULL);
-//
-//  Device->SetFVF(D3DFVF_XYZ);
+    Device->SetVertexShader(NULL);
+    Device->SetPixelShader(NULL);
+  
+    Device->SetFVF(D3DFVF_XYZ);
     Device->DrawPrimitiveUP(D3DPT_POINTLIST, 1, vDummyPoint, sizeof(D3DXVECTOR3));
-
-    Device->SetRenderState(D3DRS_COLORWRITEENABLE, 0x0F);
-//  Device->SetRenderState(D3DRS_ZENABLE, D3DZB_TRUE);
-//  Device->SetRenderState(D3DRS_ZWRITEENABLE, D3DZB_TRUE);
 
 #define RESZ_MAGIC 0x7fa05000
     // Trigger the depth buffer resolve; after this call texture sampler 0
     // will contain the contents of the resolve operation
     Device->SetRenderState(D3DRS_POINTSIZE, RESZ_MAGIC);
 
+    Device->SetRenderState(D3DRS_ZENABLE, dCurrZE);
+    Device->SetRenderState(D3DRS_ZWRITEENABLE, dCurrZW);
+    Device->SetRenderState(D3DRS_COLORWRITEENABLE, dCurrCW);
+
 //  Device->EndScene();
 //  Device->BeginScene();
-//
-//  Device->SetDepthStencilSurface(pSurface);
+
+    Device->SetDepthStencilSurface(pSurface);
 
     return true;
   }

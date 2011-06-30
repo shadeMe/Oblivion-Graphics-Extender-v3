@@ -1935,7 +1935,13 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
 
   UpdateFrameConstants(Renderer);
 
-  /* is multi-sampled? this has to be done before everything else
+  Renderer->RenderStateManager->SetRenderState(D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_ALPHA | D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_RED, false);
+  Renderer->RenderStateManager->SetRenderState(D3DRS_ALPHATESTENABLE, false, false);
+  Renderer->RenderStateManager->SetRenderState(D3DRS_ALPHABLENDENABLE, false, false);
+  Renderer->RenderStateManager->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE, false);
+  Renderer->RenderStateManager->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE, false);
+
+  /* is it multi-sampled? this has to be done before everything else
    * as a geometry-call will be done to resolve the depth-target
    */
   bool resz;
@@ -1943,12 +1949,6 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
 //  OrigDS.Initialise(GetDepthBufferTexture());
 //  FXMan->OrigDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect);
   }
-
-  Renderer->RenderStateManager->SetRenderState(D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_ALPHA | D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_RED, false);
-  Renderer->RenderStateManager->SetRenderState(D3DRS_ALPHATESTENABLE, false, false);
-  Renderer->RenderStateManager->SetRenderState(D3DRS_ALPHABLENDENABLE, false, false);
-  Renderer->RenderStateManager->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE, false);
-  Renderer->RenderStateManager->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE, false);
 
   /* full-screen quad */
   D3DDevice->SetStreamSource(0, EffectVertex, 0, sizeof(EffectQuad));

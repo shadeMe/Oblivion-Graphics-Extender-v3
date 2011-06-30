@@ -757,7 +757,7 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	    char *end = (char *)strchr(af, ';'); if (end) *end = '\0';
 
 	    /* currently fixed */
-	    float col = 0.0; sscanf(af, "MaxAnisotropy = %f", &col);
+	    int col = 0; sscanf(af, "MaxAnisotropy = %d", &col);
 	    *States++ = D3DSAMP_MAXANISOTROPY;
 	    *States++ = *((DWORD *)&col);
 	  }
@@ -1791,11 +1791,11 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
 		 doDZ = pCopyDZ && (!buf->pTextDZ || !buf->bZLoaded);
 
       if (doRT /*|| doDS*/)
-	markerStart(SceneDevice);
+	markerReset(SceneDevice);
       if (doRT)
 	buf->GrabRT(StateDevice, SceneDevice);
       if (doRT /*|| doDS*/)
-	markerStop(SceneDevice);
+	markerReset(SceneDevice);
       if (doDS)
 	buf->GrabDS(StateDevice, SceneDevice);
       if (doDZ)
@@ -1815,7 +1815,7 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
 	  StateDevice->SetTexture(rV->offset, rV->vals.texture);
 	} while ((++rV)->length);
       if ((rV = pSampler)) {
-	Anisotropy = -Anisotropy;
+	DWORD bak = AFilters; AFilters = 0;
 	do {
 	  RuntimeVariable::mem::tv *rT;
 	  if ((rT = rV->vals.state))
@@ -1823,7 +1823,7 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
 	      StateDevice->SetSamplerState(rV->offset, rT->Type, rT->Value);
 	    } while ((++rT)->Type);
 	} while ((++rV)->length);
-	Anisotropy = -Anisotropy;
+	AFilters = bak;
       }
 
       /* set the constant arrays */
@@ -1849,7 +1849,7 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
 	  StateDevice->SetTexture(rV->offset, rV->vals.texture);
 	} while ((++rV)->length);
       if ((rV = pSampler)) {
-	Anisotropy = -Anisotropy;
+	DWORD bak = AFilters; AFilters = 0;
 	do {
 	  RuntimeVariable::mem::tv *rT;
 	  if ((rT = rV->vals.state))
@@ -1857,7 +1857,7 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
 	      StateDevice->SetSamplerState(rV->offset, rT->Type, rT->Value);
 	    } while ((++rT)->Type);
 	} while ((++rV)->length);
-	Anisotropy = -Anisotropy;
+	AFilters = bak;
       }
 
       /* set the constant arrays */

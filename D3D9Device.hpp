@@ -28,6 +28,7 @@
   }
 #define	markerStart(dev) {}
 #define	markerStop(dev) {}
+#define	markerReset(dev) {}
 
 #else
 #define	minStretchRect(dev, src, srcR, dst, dstR, flt)		\
@@ -36,6 +37,8 @@
       dev->BeginScene();
 #define	markerStop(dev)						\
       dev->EndScene();
+#define	markerReset(dev)					\
+      dev->EndScene(), dev->BeginScene();
 #endif
 
 #ifndef	OBGE_NOSHADER
@@ -56,6 +59,8 @@ extern const char        *passScene; // named scene
 
 /* hacking CreateTexure passed via the RenderSurfaceParameters-hook */
 extern D3DTEXTUREFILTERTYPE AMFilter;
+extern unsigned long AFilters;
+extern unsigned long ALODs;
 extern int Anisotropy;
 extern float LODBias;
 

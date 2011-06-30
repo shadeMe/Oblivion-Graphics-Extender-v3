@@ -25,6 +25,8 @@ const char        *passScene;
 
 /* hacking CreateTexure passed via the RenderSurfaceParameters-hook */
 D3DTEXTUREFILTERTYPE AMFilter = D3DTEXF_NONE;
+unsigned long AFilters = 0;
+unsigned long ALODs = 0;
 int Anisotropy = 1;
 float LODBias = 0.0;
 
@@ -71,6 +73,12 @@ OBGEDirect3DDevice9::OBGEDirect3DDevice9(IDirect3D9 *d3d, IDirect3DDevice9 *devi
   /* add to vector and replace by the new version */
   lastOBGEDirect3DDevice9 = this;
   OBGEDevices.push_back(this);
+
+    ALODs    |= 1 << D3DSAMP_MIPFILTER;
+  if (lastOBGEDirect3D9CAPS.TextureCaps & D3DPTFILTERCAPS_MAGFANISOTROPIC)
+    AFilters |= 1 << D3DSAMP_MAGFILTER;
+  if (lastOBGEDirect3D9CAPS.TextureCaps & D3DPTFILTERCAPS_MINFANISOTROPIC)
+    AFilters |= 1 << D3DSAMP_MINFILTER;
 
   /* must be on in any case, otherwise we can not get
    * access to any of the rendertargets/depthstencils
@@ -1219,8 +1227,8 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTexture(D
   }
 #endif
 
+  assert(!pTexture || (pTexture != passTexture[OBGEPASS_ANY]));
   HRESULT res = m_device->SetTexture(Sampler, pTexture);
-
   return res;
 }
 
@@ -1238,15 +1246,14 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::GetSamplerSt
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetSamplerState(DWORD Sampler, D3DSAMPLERSTATETYPE Type, DWORD Value) {
 #if	defined(OBGE_ANISOTROPY)
-//if ((Type == D3DSAMP_MIPFILTER) && (Anisotropy > 1)) {
   if (currentPass == OBGEPASS_MAIN) {
-    if (((Type == D3DSAMP_MIPFILTER)) && (Value >= D3DTEXF_LINEAR))
+    // MIP
+    if (((1 << Type) & ALODs   ) && (Value >= D3DTEXF_LINEAR))
       m_device->SetSamplerState(Sampler, D3DSAMP_MIPMAPLODBIAS, *((DWORD *)&LODBias));
-
-    if (((Type == D3DSAMP_MIPFILTER) ||
-	 (Type == D3DSAMP_MINFILTER) ||
-	 (Type == D3DSAMP_MAGFILTER)) && (Value == D3DTEXF_LINEAR) && (Anisotropy > 1)) {
+    // MIN & MAG
+    if (((1 << Type) & AFilters) && (Value == D3DTEXF_LINEAR)) {
       m_device->SetSamplerState(Sampler, D3DSAMP_MAXANISOTROPY, *((DWORD *)&Anisotropy));
+
       Value = D3DTEXF_ANISOTROPIC;
     }
   }
@@ -1264,7 +1271,9 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetSamplerSt
     m_shaders->traced[currentPass].states_s[Sampler][Type] = Value;
 #endif
 
-  return m_device->SetSamplerState(Sampler, Type, Value);
+  HRESULT res = m_device->SetSamplerState(Sampler, Type, Value);
+  assert(res == D3D_OK);
+  return res;
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::ValidateDevice(DWORD *pNumPasses) {
@@ -1371,7 +1380,9 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawIndexedP
     frame_log->Outdent();
   }
 
-  return m_device->DrawIndexedPrimitive(PrimitiveType, BaseVertexIndex, MinVertexIndex, NumVertices, startIndex, primCount);
+  HRESULT res = m_device->DrawIndexedPrimitive(PrimitiveType, BaseVertexIndex, MinVertexIndex, NumVertices, startIndex, primCount);
+  assert(res == D3D_OK);
+  return res;
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawPrimitiveUP(D3DPRIMITIVETYPE PrimitiveType, UINT PrimitiveCount, CONST void *pVertexStreamZeroData, UINT VertexStreamZeroStride) {
@@ -1403,7 +1414,9 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawPrimitiv
     frame_log->Outdent();
   }
 
-  return m_device->DrawPrimitiveUP(PrimitiveType, PrimitiveCount, pVertexStreamZeroData, VertexStreamZeroStride);
+  HRESULT res = m_device->DrawPrimitiveUP(PrimitiveType, PrimitiveCount, pVertexStreamZeroData, VertexStreamZeroStride);
+  assert(res == D3D_OK);
+  return res;
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawIndexedPrimitiveUP(D3DPRIMITIVETYPE PrimitiveType, UINT MinVertexIndex, UINT NumVertices, UINT PrimitiveCount, CONST void *pIndexData, D3DFORMAT IndexDataFormat, CONST void *pVertexStreamZeroData, UINT VertexStreamZeroStride) {

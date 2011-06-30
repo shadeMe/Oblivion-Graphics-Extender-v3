@@ -42,6 +42,8 @@ private:
 	IDirect3D9* m_d3d;
 };
 
+extern D3DCAPS9 lastOBGEDirect3D9CAPS;
+
 #endif
 
 extern bool IsMultiSampled();
