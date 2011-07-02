@@ -14,7 +14,7 @@
 
 static global<bool> PurgeOnNewGame(false, NULL, "Textures", "bPurgeOnNewGame");
 static global<int> SetAnisotropy(1, NULL, "Textures", "iSamplerAnisotropy");
-static global<float> SetMipmapBias(0.0, NULL, "Textures", "fSamplerLODBias");
+static global<float> SetLODBias(0.0, NULL, "Textures", "fSamplerLODBias");
 
 // *********************************************************************************************************
 
@@ -305,8 +305,8 @@ TextureManager::TextureManager() {
   MaxTextureIndex = 0;
 
 #ifndef	OBGE_NOSHADER
-  Anisotropy = SetAnisotropy.Get();
-  LODBias = SetMipmapBias.Get();
+  Anisotropy = ::SetAnisotropy.Get();
+  LODBias = ::SetLODBias.Get();
 
   if (lastOBGEDirect3D9) {
     if (Anisotropy > lastOBGEDirect3D9CAPS.MaxAnisotropy)
@@ -675,3 +675,29 @@ void TextureManager::LoadGame(OBSESerializationInterface *Interface) {
     PTexture++;
   }
 }
+
+#ifdef	OBGE_ANISOTROPY
+void TextureManager::SetAnisotropy(int af) {
+  ::SetAnisotropy.Set(af);
+
+  Anisotropy = af;
+  if (lastOBGEDirect3D9) {
+    if (Anisotropy > lastOBGEDirect3D9CAPS.MaxAnisotropy)
+      Anisotropy = lastOBGEDirect3D9CAPS.MaxAnisotropy;
+  }
+}
+
+void TextureManager::SetLODBias(float bias) {
+  ::SetLODBias.Set(bias);
+
+  LODBias = bias;
+}
+
+int TextureManager::SetAnisotropy() {
+  return ::SetAnisotropy.Get();
+}
+
+float TextureManager::SetLODBias() {
+  return ::SetLODBias.Get();
+}
+#endif

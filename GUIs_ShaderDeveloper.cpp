@@ -111,6 +111,36 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	
 	SDMenubar->Append( SDTools, wxT("Tools") ); 
 	
+	SDTweaks = new wxMenu();
+	SDTweaksAF = new wxMenu();
+	wxMenuItem* SDTweakAF1;
+	SDTweakAF1 = new wxMenuItem( SDTweaksAF, wxID_AF1, wxString( wxT("1") ) , wxEmptyString, wxITEM_RADIO );
+	SDTweaksAF->Append( SDTweakAF1 );
+	
+	wxMenuItem* SDTweakAF2;
+	SDTweakAF2 = new wxMenuItem( SDTweaksAF, wxID_AF2, wxString( wxT("2") ) , wxEmptyString, wxITEM_RADIO );
+	SDTweaksAF->Append( SDTweakAF2 );
+	
+	wxMenuItem* SDTweakAF4;
+	SDTweakAF4 = new wxMenuItem( SDTweaksAF, wxID_AF4, wxString( wxT("4") ) , wxEmptyString, wxITEM_RADIO );
+	SDTweaksAF->Append( SDTweakAF4 );
+	
+	wxMenuItem* SDTweakAF8;
+	SDTweakAF8 = new wxMenuItem( SDTweaksAF, wxID_AF8, wxString( wxT("8") ) , wxEmptyString, wxITEM_RADIO );
+	SDTweaksAF->Append( SDTweakAF8 );
+	
+	wxMenuItem* SDTweakAF16;
+	SDTweakAF16 = new wxMenuItem( SDTweaksAF, wxID_AF16, wxString( wxT("16") ) , wxEmptyString, wxITEM_RADIO );
+	SDTweaksAF->Append( SDTweakAF16 );
+	
+	wxMenuItem* SDTweakAF32;
+	SDTweakAF32 = new wxMenuItem( SDTweaksAF, wxID_AF32, wxString( wxT("32") ) , wxEmptyString, wxITEM_RADIO );
+	SDTweaksAF->Append( SDTweakAF32 );
+	
+	SDTweaks->Append( -1, wxT("Anisotropy"), SDTweaksAF );
+	
+	SDMenubar->Append( SDTweaks, wxT("Tweaks") ); 
+	
 	this->SetMenuBar( SDMenubar );
 	
 	wxBoxSizer* bSizer1;
@@ -878,6 +908,12 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	this->Connect( SDConvertQDM->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDM ) );
 	this->Connect( SDConvertCLR->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipCLR ) );
 	this->Connect( SDConvertNM->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipNM ) );
+	this->Connect( SDTweakAF1->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
+	this->Connect( SDTweakAF2->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
+	this->Connect( SDTweakAF4->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
+	this->Connect( SDTweakAF8->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
+	this->Connect( SDTweakAF16->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
+	this->Connect( SDTweakAF32->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
 	SDChoicePass->Connect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoRenderpassSwitch ), NULL, this );
 	SDViewSwitch->Connect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxNotebookEventHandler( wxShaderDeveloper::DoViewSwitch ), NULL, this );
 	SDComboShader->Connect( wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderSwitch ), NULL, this );
@@ -944,6 +980,12 @@ wxShaderDeveloper::~wxShaderDeveloper()
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDM ) );
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipCLR ) );
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipNM ) );
+	this->Disconnect( wxID_AF1, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
+	this->Disconnect( wxID_AF2, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
+	this->Disconnect( wxID_AF4, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
+	this->Disconnect( wxID_AF8, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
+	this->Disconnect( wxID_AF16, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
+	this->Disconnect( wxID_AF32, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
 	SDChoicePass->Disconnect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoRenderpassSwitch ), NULL, this );
 	SDViewSwitch->Disconnect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxNotebookEventHandler( wxShaderDeveloper::DoViewSwitch ), NULL, this );
 	SDComboShader->Disconnect( wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderSwitch ), NULL, this );

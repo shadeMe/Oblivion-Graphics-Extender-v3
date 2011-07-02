@@ -1,11 +1,15 @@
 #pragma once
 
+#include <vector>
+
 #include "obse\PluginAPI.h"
 #include "d3dx9.h"
-#include <vector>
+#include "nodes\NiDX9Renderer.h"
+
 #include "DepthBufferHook.h"
 #include "Rendering.h"
-#include "nodes\NiDX9Renderer.h"
+
+#include "D3D9Identifiers.hpp"
 
 #define TEXTUREVERSION 1
 
@@ -113,5 +117,14 @@ private:
 	TextureRegistry					Textures;
 //	EffectList					Textures;
 	ManagedTextureList				ManagedTextures;
+
+#ifdef	OBGE_ANISOTROPY
+public:
+	void 						SetAnisotropy(int af);
+	void						SetLODBias(float bias);
+
+	int						SetAnisotropy();
+	float						SetLODBias();
+#endif
 };
 

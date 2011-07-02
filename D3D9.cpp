@@ -25,7 +25,7 @@ OBGEDirect3D9::OBGEDirect3D9(IDirect3D9 *d3d) : m_d3d(d3d) {
   m_d3d->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm);
   m_d3d->GetDeviceCaps(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, &lastOBGEDirect3D9CAPS);
 
-#if 0
+#if 1
   /* --------------------------------------------------- */
   HRESULT hr;
   char rts[2048]; rts[0] = '\0';

@@ -1158,6 +1158,16 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTexture(D
     pTexture = NULL;
 #endif
 
+#if	defined(OBGE_ANISOTROPY)
+  if (currentPass == OBGEPASS_MAIN) {
+    // stablelize AF override, SetTexture is called before any SetSamplerState
+    if (AFilters) {
+      m_device->SetSamplerState(Sampler, D3DSAMP_MINFILTER, D3DTEXF_ANISOTROPIC);
+      m_device->SetSamplerState(Sampler, D3DSAMP_MAXANISOTROPY, *((DWORD *)&Anisotropy));
+    }
+  }
+#endif
+
   if (HasShaderManager) {
 #if 1
     /* shaders may like to get some absolute texture information
@@ -1227,7 +1237,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTexture(D
   }
 #endif
 
-  assert(!pTexture || (pTexture != passTexture[OBGEPASS_ANY]));
+//assert(!pTexture || (pTexture != passTexture[OBGEPASS_ANY]));
   HRESULT res = m_device->SetTexture(Sampler, pTexture);
   return res;
 }
@@ -1381,7 +1391,6 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawIndexedP
   }
 
   HRESULT res = m_device->DrawIndexedPrimitive(PrimitiveType, BaseVertexIndex, MinVertexIndex, NumVertices, startIndex, primCount);
-  assert(res == D3D_OK);
   return res;
 }
 
@@ -1415,7 +1424,6 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawPrimitiv
   }
 
   HRESULT res = m_device->DrawPrimitiveUP(PrimitiveType, PrimitiveCount, pVertexStreamZeroData, VertexStreamZeroStride);
-  assert(res == D3D_OK);
   return res;
 }
 

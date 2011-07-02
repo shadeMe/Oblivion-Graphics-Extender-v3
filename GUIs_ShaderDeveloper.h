@@ -50,6 +50,12 @@
 #define wxID_PROFILE 1011
 #define wxID_KILLTEX 1012
 #define wxID_AMPLIFY 1013
+#define wxID_AF1 1014
+#define wxID_AF2 1015
+#define wxID_AF4 1016
+#define wxID_AF8 1017
+#define wxID_AF16 1018
+#define wxID_AF32 1019
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Class wxShaderDeveloper
@@ -65,6 +71,8 @@ class wxShaderDeveloper : public wxFrame
 		wxMenu* SDProfileOptions;
 		wxMenu* SDTools;
 		wxMenu* SDToolsSettings;
+		wxMenu* SDTweaks;
+		wxMenu* SDTweaksAF;
 		wxChoice* SDChoicePass;
 		wxNotebook* SDViewSwitch;
 		wxPanel* SDPanelShaders;
@@ -169,6 +177,7 @@ class wxShaderDeveloper : public wxFrame
 		virtual void DoToolPMtoQDM( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoToolRemipCLR( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoToolRemipNM( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoAF( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoRenderpassSwitch( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoViewSwitch( wxNotebookEvent& event ) { event.Skip(); }
 		virtual void DoShaderSwitch( wxCommandEvent& event ) { event.Skip(); }

@@ -981,8 +981,13 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 
   // uses the last vertex effect that was active and much strangeness occurs.
   D3DDevice->SetVertexShader(NULL);
 
+#ifdef	OBGE_STATEBLOCKS
   UINT pass = 0;
-  UINT passes; pEffect->Begin(&passes, NULL);
+  UINT passes; pEffect->Begin(&passes, D3DXFX_DONOTSAVESTATE);
+#else
+  UINT pass = 0;
+  UINT passes; pEffect->Begin(&passes, 0);
+#endif
 
   while (true) {
     pEffect->BeginPass(pass);
@@ -1013,8 +1018,13 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue
   ApplyConstants();
   ApplyDynamics();
 
+#ifdef	OBGE_STATEBLOCKS
   UINT pass = 0; Queue->Begin(pEffect);
-  UINT passes; pEffect->Begin(&passes, NULL);
+  UINT passes; pEffect->Begin(&passes, D3DXFX_DONOTSAVESTATE);
+#else
+  UINT pass = 0; Queue->Begin(pEffect);
+  UINT passes; pEffect->Begin(&passes, 0);
+#endif
 
   while (true) {
     pEffect->BeginPass(pass);
@@ -1053,8 +1063,13 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice) {
   ApplyConstants();
   ApplyDynamics();
 
+#ifdef	OBGE_STATEBLOCKS
   UINT pass = 0;
-  UINT passes; pEffect->Begin(&passes, NULL);
+  UINT passes; pEffect->Begin(&passes, D3DXFX_DONOTSAVESTATE);
+#else
+  UINT pass = 0;
+  UINT passes; pEffect->Begin(&passes, 0);
+#endif
 
   while (true) {
     pEffect->BeginPass(pass);
@@ -1921,6 +1936,8 @@ void EffectManager::UpdateFrameConstants(v1_2_416::NiDX9Renderer *Renderer) {
 void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo, IDirect3DSurface9 *RenderFrom) {
   v1_2_416::NiDX9Renderer *Renderer = v1_2_416::GetRenderer();
 
+  markerStop(D3DDevice);
+
   // Sets up the viewport.
   float test[4] = { 0.0, 1.0, 1.0, 0.0 };
   Renderer->SetupScreenSpaceCamera(test);
@@ -1993,8 +2010,6 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
 
   D3DDevice->StretchRect(RenderTo, 0, lastframeSurf, 0, D3DTEXF_NONE);
 #else
-  markerStop(D3DDevice);
-
   /* rendertarget without texture, this can happen when the
    * color-buffer is multi-sampled
    */
@@ -2059,6 +2074,12 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
     (RenderBuf & EFFECTBUF_COPY) ? &CopyRT : NULL
   );
 
+#if 0 //def	OBGE_STATEBLOCKS
+  /* auto backup (not strictly needed, all states can be changed) */
+  IDirect3DStateBlock9 *pStateBlock = NULL;
+  D3DDevice->CreateStateBlock(D3DSBT_ALL, &pStateBlock);
+#endif
+
   /* count if something happens */
   int run = 0;
 
@@ -2069,15 +2090,21 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
       run += (*e)->Render(D3DDevice, &RenderQueue);
   }
 
+#if 0 //def	OBGE_STATEBLOCKS
+  /* auto restore (not strictly needed, all states can be changed) */
+  pStateBlock->Apply();
+  pStateBlock->Release();
+#endif
+
   /* nothing happend */
   if (!run) TrgtRT.Copy(D3DDevice, &OrigRT);
 
   RenderQueue.End(
 				   &TrgtRT
   );
+#endif
 
   markerStart(D3DDevice);
-#endif
 }
 
 void EffectManager::RenderRAWZfix(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo) {

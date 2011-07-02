@@ -477,6 +477,106 @@
                         <event name="OnUpdateUI"></event>
                     </object>
                 </object>
+                <object class="wxMenu" expanded="1">
+                    <property name="label">Tweaks</property>
+                    <property name="name">SDTweaks</property>
+                    <property name="permission">protected</property>
+                    <object class="submenu" expanded="1">
+                        <property name="label">Anisotropy</property>
+                        <property name="name">SDTweaksAF</property>
+                        <property name="permission">protected</property>
+                        <object class="wxMenuItem" expanded="1">
+                            <property name="bitmap"></property>
+                            <property name="checked">0</property>
+                            <property name="enabled">1</property>
+                            <property name="help"></property>
+                            <property name="id">wxID_AF1</property>
+                            <property name="kind">wxITEM_RADIO</property>
+                            <property name="label">1</property>
+                            <property name="name">SDTweakAF1</property>
+                            <property name="permission">none</property>
+                            <property name="shortcut"></property>
+                            <property name="unchecked_bitmap"></property>
+                            <event name="OnMenuSelection">DoAF</event>
+                            <event name="OnUpdateUI"></event>
+                        </object>
+                        <object class="wxMenuItem" expanded="1">
+                            <property name="bitmap"></property>
+                            <property name="checked">0</property>
+                            <property name="enabled">1</property>
+                            <property name="help"></property>
+                            <property name="id">wxID_AF2</property>
+                            <property name="kind">wxITEM_RADIO</property>
+                            <property name="label">2</property>
+                            <property name="name">SDTweakAF2</property>
+                            <property name="permission">none</property>
+                            <property name="shortcut"></property>
+                            <property name="unchecked_bitmap"></property>
+                            <event name="OnMenuSelection">DoAF</event>
+                            <event name="OnUpdateUI"></event>
+                        </object>
+                        <object class="wxMenuItem" expanded="1">
+                            <property name="bitmap"></property>
+                            <property name="checked">0</property>
+                            <property name="enabled">1</property>
+                            <property name="help"></property>
+                            <property name="id">wxID_AF4</property>
+                            <property name="kind">wxITEM_RADIO</property>
+                            <property name="label">4</property>
+                            <property name="name">SDTweakAF4</property>
+                            <property name="permission">none</property>
+                            <property name="shortcut"></property>
+                            <property name="unchecked_bitmap"></property>
+                            <event name="OnMenuSelection">DoAF</event>
+                            <event name="OnUpdateUI"></event>
+                        </object>
+                        <object class="wxMenuItem" expanded="1">
+                            <property name="bitmap"></property>
+                            <property name="checked">0</property>
+                            <property name="enabled">1</property>
+                            <property name="help"></property>
+                            <property name="id">wxID_AF8</property>
+                            <property name="kind">wxITEM_RADIO</property>
+                            <property name="label">8</property>
+                            <property name="name">SDTweakAF8</property>
+                            <property name="permission">none</property>
+                            <property name="shortcut"></property>
+                            <property name="unchecked_bitmap"></property>
+                            <event name="OnMenuSelection">DoAF</event>
+                            <event name="OnUpdateUI"></event>
+                        </object>
+                        <object class="wxMenuItem" expanded="1">
+                            <property name="bitmap"></property>
+                            <property name="checked">0</property>
+                            <property name="enabled">1</property>
+                            <property name="help"></property>
+                            <property name="id">wxID_AF16</property>
+                            <property name="kind">wxITEM_RADIO</property>
+                            <property name="label">16</property>
+                            <property name="name">SDTweakAF16</property>
+                            <property name="permission">none</property>
+                            <property name="shortcut"></property>
+                            <property name="unchecked_bitmap"></property>
+                            <event name="OnMenuSelection">DoAF</event>
+                            <event name="OnUpdateUI"></event>
+                        </object>
+                        <object class="wxMenuItem" expanded="1">
+                            <property name="bitmap"></property>
+                            <property name="checked">0</property>
+                            <property name="enabled">1</property>
+                            <property name="help"></property>
+                            <property name="id">wxID_AF32</property>
+                            <property name="kind">wxITEM_RADIO</property>
+                            <property name="label">32</property>
+                            <property name="name">SDTweakAF32</property>
+                            <property name="permission">none</property>
+                            <property name="shortcut"></property>
+                            <property name="unchecked_bitmap"></property>
+                            <event name="OnMenuSelection">DoAF</event>
+                            <event name="OnUpdateUI"></event>
+                        </object>
+                    </object>
+                </object>
             </object>
             <object class="wxBoxSizer" expanded="1">
                 <property name="minimum_size"></property>

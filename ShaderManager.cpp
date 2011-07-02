@@ -1352,6 +1352,12 @@ void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect
     if (pGrabDS) {
       ShaderManager *sm = ShaderManager::GetSingleton();
 
+#ifdef	OBGE_STATEBLOCKS
+      /* auto backup */
+      IDirect3DStateBlock9 *pStateBlock = NULL;
+      SceneDevice->CreateStateBlock(D3DSBT_ALL, &pStateBlock);
+#else
+      /* manual backup */
 //    IDirect3DSurface9 *pCurrRT;
       IDirect3DBaseTexture9 *pCurrTX;
       IDirect3DVertexShader9 *pCurrVS;
@@ -1397,6 +1403,7 @@ void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect
       SceneDevice->GetPixelShader(&pCurrPS);
 //    SceneDevice->GetFVF(&dCurrVF);
       SceneDevice->GetStreamSource(0, &pCurrVX, &dCurrVO, &dCurrVS);
+#endif
 
 //    SceneDevice->BeginScene();
 //    SceneDevice->SetRenderState(D3DRS_ZENABLE, FALSE);
@@ -1420,7 +1427,8 @@ void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect
       SceneDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
 //    SceneDevice->EndScene();
 
-      /* restore */
+#ifndef	OBGE_STATEBLOCKS
+      /* manual restore */
 //    SceneDevice->SetRenderState(D3DRS_ZENABLE, dCurrZW);
       SceneDevice->SetRenderState(D3DRS_CULLMODE, dCurrCL);
       SceneDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, dCurrAB);
@@ -1428,13 +1436,19 @@ void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect
 //    SceneDevice->SetRenderState(D3DRS_STENCILENABLE, dCurrST);
 //    SceneDevice->SetRenderTarget(0, pCurrRT);
 //    SceneDevice->SetDepthStencilSurface(pCurrDS);
-      SceneDevice->SetRenderTarget(0, passSurface[OBGEPASS_ANY]);
-      SceneDevice->SetDepthStencilSurface(passDepth[OBGEPASS_ANY]);
       SceneDevice->SetTexture(0, pCurrTX);
       SceneDevice->SetVertexShader(pCurrVS);
       SceneDevice->SetPixelShader(pCurrPS);
 //    SceneDevice->SetFVF(dCurrVF);
       SceneDevice->SetStreamSource(0, pCurrVX, dCurrVO, dCurrVS);
+#else
+      /* auto restore */
+      pStateBlock->Apply();
+      pStateBlock->Release();
+#endif
+
+      SceneDevice->SetRenderTarget(0, passSurface[OBGEPASS_ANY]);
+      SceneDevice->SetDepthStencilSurface(passDepth[OBGEPASS_ANY]);
 
       bDFilled = true;
     }

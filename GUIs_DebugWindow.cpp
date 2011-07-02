@@ -295,6 +295,31 @@ public:
     /* start enabling these functions */
     SDButtonEffectNew->Enable();
 
+    if (1 > lastOBGEDirect3D9CAPS.MaxAnisotropy)
+      SDTweaksAF->FindChildItem(wxID_AF1, NULL)->Enable(false);
+    else if (1 == Anisotropy)
+      SDTweaksAF->FindChildItem(wxID_AF1, NULL)->Check(true);
+    if (2 > lastOBGEDirect3D9CAPS.MaxAnisotropy)
+      SDTweaksAF->FindChildItem(wxID_AF2, NULL)->Enable(false);
+    else if (2 == Anisotropy)
+      SDTweaksAF->FindChildItem(wxID_AF2, NULL)->Check(true);
+    if (4 > lastOBGEDirect3D9CAPS.MaxAnisotropy)
+      SDTweaksAF->FindChildItem(wxID_AF4, NULL)->Enable(false);
+    else if (4 == Anisotropy)
+      SDTweaksAF->FindChildItem(wxID_AF4, NULL)->Check(true);
+    if (8 > lastOBGEDirect3D9CAPS.MaxAnisotropy)
+      SDTweaksAF->FindChildItem(wxID_AF8, NULL)->Enable(false);
+    else if (8 == Anisotropy)
+      SDTweaksAF->FindChildItem(wxID_AF8, NULL)->Check(true);
+    if (16 > lastOBGEDirect3D9CAPS.MaxAnisotropy)
+      SDTweaksAF->FindChildItem(wxID_AF16, NULL)->Enable(false);
+    else if (16 == Anisotropy)
+      SDTweaksAF->FindChildItem(wxID_AF16, NULL)->Check(true);
+    if (32 > lastOBGEDirect3D9CAPS.MaxAnisotropy)
+      SDTweaksAF->FindChildItem(wxID_AF32, NULL)->Enable(false);
+    else if (32 == Anisotropy)
+      SDTweaksAF->FindChildItem(wxID_AF32, NULL)->Check(true);
+
 #if 0
     SDStatusGauge = new wxGauge(SDStatusBar, wxID_ANY, 100);
     SDStatusGauge->SetValue(50);
@@ -4470,6 +4495,29 @@ public:
     }
 
     SDStatusBar->SetStatusText(wxT("Ready"), 0);
+//  event.Skip();
+  }
+
+  /* --------------------------------------------------------------
+   */
+
+  virtual void DoAF(wxCommandEvent& event) {
+    TextureManager *em = TextureManager::GetSingleton();
+    wxMenuItem *mi;
+
+    mi = SDTweaksAF->FindChildItem(wxID_AF1, NULL);
+    if (mi->IsChecked()) em->SetAnisotropy(1);
+    mi = SDTweaksAF->FindChildItem(wxID_AF2, NULL);
+    if (mi->IsChecked()) em->SetAnisotropy(2);
+    mi = SDTweaksAF->FindChildItem(wxID_AF4, NULL);
+    if (mi->IsChecked()) em->SetAnisotropy(4);
+    mi = SDTweaksAF->FindChildItem(wxID_AF8, NULL);
+    if (mi->IsChecked()) em->SetAnisotropy(8);
+    mi = SDTweaksAF->FindChildItem(wxID_AF16, NULL);
+    if (mi->IsChecked()) em->SetAnisotropy(16);
+    mi = SDTweaksAF->FindChildItem(wxID_AF32, NULL);
+    if (mi->IsChecked()) em->SetAnisotropy(32);
+
 //  event.Skip();
   }
 
