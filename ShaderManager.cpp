@@ -102,6 +102,8 @@ typedef struct _myD3DXMACRO
 
 static char IN_RAWZ[] = "0";
 
+#define	DEFS_INRAWZ	0
+
 static myD3DXMACRO defs[] = {
   {"IN_RAWZ"	        , IN_RAWZ},
 
@@ -2110,11 +2112,8 @@ void ShaderManager::Reset() {
 #endif
 }
 
-bool ShaderManager::SetRAWZ(bool enabled) {
-  if (enabled)
-    defs[0].Definition[0] = '1';
-  else
-    defs[0].Definition[0] = '0';
+bool ShaderManager::SetTransferZ(long MaskZ) {
+  defs[DEFS_INRAWZ].Definition[0] = (MaskZ & 1 ? '1' : '0');
 
   return true;
 }

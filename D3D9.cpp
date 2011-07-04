@@ -10,7 +10,7 @@ static global<int> MultiSample(0, "Oblivion.ini", "Display", "iMultiSample");
 
 // Tracker
 OBGEDirect3D9 *lastOBGEDirect3D9 = NULL;
-D3DCAPS9 lastOBGEDirect3D9CAPS;
+D3DCAPS9 lastOBGEDirect3D9CAPS = {D3DDEVTYPE_HAL};
 static std::vector<OBGEDirect3D9 *> OBGEDrivers;
 
 /* ----------------------------------------------------------------------------- */
@@ -21,40 +21,40 @@ static std::vector<OBGEDirect3D9 *> OBGEDrivers;
 OBGEDirect3D9::OBGEDirect3D9(IDirect3D9 *d3d) : m_d3d(d3d) {
   _MESSAGE("OD3D9: Driver 0x%08x constructed from 0x%08x (%d drivers available)", this, _ReturnAddress(), OBGEDrivers.size() + 1);
 
-  D3DDISPLAYMODE d3ddm;
-  m_d3d->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm);
-  m_d3d->GetDeviceCaps(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, &lastOBGEDirect3D9CAPS);
-
-#if 1
   /* --------------------------------------------------- */
-  HRESULT hr;
-  char rts[2048]; rts[0] = '\0';
-  char dss[2048]; dss[0] = '\0';
-  for (int fmt = D3DFMT_R8G8B8; fmt < D3DFMT_BINARYBUFFER; fmt++) {
-    const char *FMT = findFormat((D3DFORMAT)fmt);
-    if (strcmp(FMT, "unknown")) {
-	hr = m_d3d->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, (D3DFORMAT)fmt);
-	if (hr == D3D_OK) {
-	  if (rts[0])
-	    strcat(rts, ", ");
-	  strcat(rts, FMT);
-	}
+  D3DDISPLAYMODE d3ddm;
+  if (m_d3d->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm) == D3D_OK) {
+    m_d3d->GetDeviceCaps(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, &lastOBGEDirect3D9CAPS);
 
-	hr = m_d3d->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_SURFACE, (D3DFORMAT)fmt);
-	if (hr == D3D_OK) {
-	  if (dss[0])
-	    strcat(dss, ", ");
-	  strcat(dss, FMT);
-	}
+    HRESULT hr;
+    char rts[2048]; rts[0] = '\0';
+    char dss[2048]; dss[0] = '\0';
+    for (int fmt = D3DFMT_R8G8B8; fmt < D3DFMT_BINARYBUFFER; fmt++) {
+      const char *FMT = findFormat((D3DFORMAT)fmt);
+      if (strcmp(FMT, "unknown")) {
+	  hr = m_d3d->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, (D3DFORMAT)fmt);
+	  if (hr == D3D_OK) {
+	    if (rts[0])
+	      strcat(rts, ", ");
+	    strcat(rts, FMT);
+	  }
+
+	  hr = m_d3d->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_SURFACE, (D3DFORMAT)fmt);
+	  if (hr == D3D_OK) {
+	    if (dss[0])
+	      strcat(dss, ", ");
+	    strcat(dss, FMT);
+	  }
+      }
     }
+
+    _MESSAGE("OD3D9: Supported render-targets: %s", rts);
+    _MESSAGE("OD3D9: Supported depth-stencils: %s", dss);
+
+    hr = m_d3d->CheckDeviceMultiSampleType(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, (D3DFORMAT)MAKEFOURCC('N','U','L','L'), FALSE, D3DMULTISAMPLE_2_SAMPLES, NULL);
+
+    _MESSAGE("OD3D9: NULL has multi-sample support: %s", hr == D3D_OK ? "yes" : "no");
   }
-
-  _MESSAGE("OD3D9: Supported render-targets: %s", rts);
-  _MESSAGE("OD3D9: Supported depth-stencils: %s", dss);
-
-  hr = m_d3d->CheckDeviceMultiSampleType(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, (D3DFORMAT)MAKEFOURCC('N','U','L','L'), FALSE, D3DMULTISAMPLE_2_SAMPLES, NULL);
-  _MESSAGE("OD3D9: NULL has multi-sample support: %s", hr == D3D_OK ? "yes" : "no");
-#endif
 
   /* add to vector and replace by the new version */
   lastOBGEDirect3D9 = this;
@@ -149,7 +149,9 @@ HRESULT STDMETHODCALLTYPE OBGEDirect3D9::CreateDevice(
 	IDirect3DDevice9 **ppReturnedDeviceInterface) {
 
   HRESULT hr;
+  D3DFORMAT asbak;
 
+#if 0
   /* check if the format isn't possibly really available */
   if (MultiSample.Get() && (pPresentationParameters->MultiSampleType == D3DMULTISAMPLE_NONE)) {
     D3DFORMAT frmt = D3DFMT_UNKNOWN;
@@ -165,15 +167,22 @@ HRESULT STDMETHODCALLTYPE OBGEDirect3D9::CreateDevice(
       pPresentationParameters->Flags &= ~D3DPRESENTFLAG_LOCKABLE_BACKBUFFER;
     }
   }
+#endif
 
   /* replace whatever by INTZ for example if possible */
   pPresentationParameters->AutoDepthStencilFormat =
-    GetDepthBufferFormat(m_d3d,
-    pPresentationParameters->AutoDepthStencilFormat,
-      pPresentationParameters->MultiSampleType);
+    GetDepthBufferFormat(m_d3d, asbak =
+      pPresentationParameters->AutoDepthStencilFormat,
+	pPresentationParameters->MultiSampleType);
 
+  /* try -> fail -> restore */
   hr = m_d3d->CreateDevice(Adapter, DeviceType, hFocusWindow, BehaviorFlags,
                            pPresentationParameters, ppReturnedDeviceInterface);
+  if (!SUCCEEDED(hr)) {
+    pPresentationParameters->AutoDepthStencilFormat = asbak;
+    hr = m_d3d->CreateDevice(Adapter, DeviceType, hFocusWindow, BehaviorFlags,
+			     pPresentationParameters, ppReturnedDeviceInterface);
+  }
 
   _MESSAGE("OD3D9: Device queried from 0x%08x", _ReturnAddress());
   _MESSAGE("OD3D9: Queue %d, MS-type %d, MS-quality %d",
@@ -181,10 +190,9 @@ HRESULT STDMETHODCALLTYPE OBGEDirect3D9::CreateDevice(
     pPresentationParameters->MultiSampleType,
     pPresentationParameters->MultiSampleQuality);
 
-  if (SUCCEEDED(hr)) {
-    // Return our device
+  // Return our device
+  if (SUCCEEDED(hr))
     *ppReturnedDeviceInterface = new OBGEDirect3DDevice9(this, *ppReturnedDeviceInterface);
-  }
 
   return hr;
 }

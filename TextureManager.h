@@ -11,7 +11,11 @@
 
 #include "D3D9Identifiers.hpp"
 
+#ifndef	NO_DEPRECATED
 #define TEXTUREVERSION 1
+#else
+#define TEXTUREVERSION 2
+#endif
 
 typedef enum {
   TR_PLANAR = 0,

@@ -59,24 +59,20 @@ DepthList[4] = {
 };
 
 D3DFORMAT GetDepthBufferFormat(IDirect3D9 *pD3D, D3DFORMAT def, D3DMULTISAMPLE_TYPE MS) {
-  HRESULT hr;
-
   D3DDISPLAYMODE d3ddm;
-  pD3D->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm);
+  if (pD3D->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm) == D3D_OK) {
+    int DepthCount;
+    for (DepthCount = 0; DepthCount < 8; DepthCount++) {
+      if (pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_SURFACE, ReplacementList[DepthCount].FourCC) != D3D_OK)
+	continue;
 
-  int DepthCount;
-  for (DepthCount = 0; DepthCount < 8; DepthCount++) {
-    hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_SURFACE, ReplacementList[DepthCount].FourCC);
-    if (hr != D3D_OK)
-      continue;
+      if (MS != D3DMULTISAMPLE_NONE)
+	if (pD3D->CheckDeviceMultiSampleType(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, ReplacementList[DepthCount].FourCC, FALSE, MS, NULL) != D3D_OK)
+	  continue;
 
-    if (MS != D3DMULTISAMPLE_NONE) {
-      hr = pD3D->CheckDeviceMultiSampleType(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, ReplacementList[DepthCount].FourCC, FALSE, MS, NULL);
-      if (hr != D3D_OK)
-        continue;
+      _MESSAGE("Replaced depth-stencil by %s", ReplacementList[DepthCount].Name);
+      return ReplacementList[DepthCount].FourCC;
     }
-
-    return ReplacementList[DepthCount].FourCC;
   }
 
   return def;
@@ -173,8 +169,8 @@ bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3
           }
 
 	  /* failed, turn it off */
-	  if (!ShaderManager::GetSingleton()->SetRAWZ(IsRAWZflag) ||
-	      !EffectManager::GetSingleton()->SetRAWZ(IsRAWZflag))
+	  if (!ShaderManager::GetSingleton()->SetTransferZ(IsRAWZflag ? 1 : 0) ||
+	      !EffectManager::GetSingleton()->SetTransferZ(IsRAWZflag ? 1 : 0))
 	    UseRAWZfix.Set(false);
 
           break;
@@ -315,7 +311,8 @@ void static _cdecl DepthBufferHook(IDirect3DDevice9 *Device, UInt32 u2) {
           }
 
 	  /* failed, turn it off */
-	  if (!EffectManager::GetSingleton()->SetRAWZ(IsRAWZflag))
+	  if (!ShaderManager::GetSingleton()->SetTransferZ(IsRAWZflag ? 1 : 0) ||
+	      !EffectManager::GetSingleton()->SetTransferZ(IsRAWZflag ? 1 : 0))
 	    UseRAWZfix.Set(false);
 
           break;
@@ -460,7 +457,7 @@ bool ResolveDepthBuffer(IDirect3DDevice9 *Device) {
 
     Device->SetVertexShader(NULL);
     Device->SetPixelShader(NULL);
-  
+
     Device->SetFVF(D3DFVF_XYZ);
     Device->DrawPrimitiveUP(D3DPT_POINTLIST, 1, vDummyPoint, sizeof(D3DXVECTOR3));
 

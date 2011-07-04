@@ -100,38 +100,54 @@ static FXIncludeManager incl;
 #define	EFFECTCOND_UNDERWATER	(1 << 10)
 #define	EFFECTCOND_ISDAY	(1 << 16)
 #define	EFFECTCOND_ISNIGHT	(1 << 17)
-#define	EFFECTCOND_HASREFL	(1 << 24)
-#define	EFFECTCOND_HASACHN	(1 << 26)	// special one
-#define	EFFECTCOND_HASMIPS	(1 << 27)	// special one
-#define	EFFECTCOND_HASNBUF	(1 << 28)	// special one
-#define	EFFECTCOND_HASPBUF	(1 << 29)	// special one
+#define	EFFECTCOND_HASREFL	(1 << 18)
+#define	EFFECTCOND_HASACHN	(1 << 19)	// special one
+#define	EFFECTCOND_HASMIPS	(1 << 20)	// special one
+#define	EFFECTCOND_HASWNRM	(1 << 26)	// special one
+#define	EFFECTCOND_HASWPOS	(1 << 27)	// special one
+#define	EFFECTCOND_HASENRM	(1 << 28)	// special one
+#define	EFFECTCOND_HASEPOS	(1 << 29)	// special one
 #define	EFFECTCOND_HASLBUF	(1 << 30)	// special one
 #define	EFFECTCOND_HASZBUF	(1 << 31)	// special one
 
-#define	EFFECTBUF_COPY		(1 << 25)	// need frame "copy" because the effect surfaces have other format
-#define	EFFECTBUF_PREV		(1 << 26)	// need previous effect "copy"
-#define	EFFECTBUF_PAST		(1 << 27)	// need previous frame "copy"
+#define	EFFECTBUF_RAWZ		(1 <<  0)	// special one
+#define	EFFECTBUF_COPY		(1 <<  1)	// need frame "copy" because the effect surfaces have other format
+#define	EFFECTBUF_PREV		(1 <<  2)	// need previous effect "copy"
+#define	EFFECTBUF_PAST		(1 <<  3)	// need previous frame "copy"
 #define	EFFECTBUF_ACHN		EFFECTCOND_HASACHN
-#define	EFFECTBUF_NBUF		EFFECTCOND_HASNBUF
-#define	EFFECTBUF_PBUF		EFFECTCOND_HASPBUF
+#define	EFFECTBUF_WNRM		EFFECTCOND_HASWNRM
+#define	EFFECTBUF_WPOS		EFFECTCOND_HASWPOS
+#define	EFFECTBUF_ENRM		EFFECTCOND_HASENRM
+#define	EFFECTBUF_EPOS		EFFECTCOND_HASEPOS
 #define	EFFECTBUF_LBUF		EFFECTCOND_HASLBUF
 #define	EFFECTBUF_ZBUF		EFFECTCOND_HASZBUF
+#define	EFFECTBUF_ZMASK		(EFFECTCOND_HASWNRM | EFFECTCOND_HASWPOS | EFFECTCOND_HASENRM | EFFECTCOND_HASEPOS | EFFECTCOND_HASLBUF | EFFECTCOND_HASZBUF | EFFECTBUF_RAWZ)
+#define	EFFECTBUF_TRANSFERZMASK	(EFFECTCOND_HASWNRM | EFFECTCOND_HASWPOS | EFFECTCOND_HASENRM | EFFECTCOND_HASEPOS | EFFECTCOND_HASLBUF |                      EFFECTBUF_RAWZ)
 
 typedef struct _myD3DXMACRO
 {
   const char *Name;
   char *Definition;
-
 } myD3DXMACRO;
 
 static char IN_RAWZ[] = "0";
 static char IN_LINZ[] = "0";
+static char IN_PRJZ[] = "0";
+static char IN_NRMZ[] = "0";
 static char *TWEAK_DYNAMIC = "extern";
 static char *TWEAK_FROZEN  = "static const";
+
+#define	DEFS_INRAWZ	0
+#define	DEFS_INLINZ	1
+#define	DEFS_INPRJZ	2
+#define	DEFS_INNRMZ	3
+#define	DEFS_iface	4
 
 static myD3DXMACRO defs[] = {
   {"IN_RAWZ"	        	, IN_RAWZ},
   {"IN_LINZ"	        	, IN_LINZ},
+  {"IN_PRJZ"	        	, IN_PRJZ},
+  {"IN_NRMZ"	        	, IN_NRMZ},
   {"iface"	        	, TWEAK_DYNAMIC},
 
   {"EFFECTGROUP_FIRST"		, stringify(EFFECTGROUP_FIRST		)},
@@ -161,8 +177,8 @@ static myD3DXMACRO defs[] = {
 
   {"EFFECTCOND_ZBUFFER"		, stringify(EFFECTCOND_HASZBUF		)}, // hm, error
   {"EFFECTCOND_LBUFFER"		, stringify(EFFECTCOND_HASLBUF		)}, // hm, error
-  {"EFFECTCOND_PBUFFER"		, stringify(EFFECTCOND_HASPBUF		)}, // hm, error
-  {"EFFECTCOND_NBUFFER"		, stringify(EFFECTCOND_HASNBUF		)}, // hm, error
+  {"EFFECTCOND_PBUFFER"		, stringify(EFFECTCOND_HASEPOS		)}, // hm, error
+  {"EFFECTCOND_NBUFFER"		, stringify(EFFECTCOND_HASENRM		)}, // hm, error
   {"EFFECTCOND_MIPMAPS"		, stringify(EFFECTCOND_HASMIPS		)}, // hm, error
   {"EFFECTCOND_ACHANNEL"	, stringify(EFFECTCOND_HASACHN		)}, // hm, error
 
@@ -182,7 +198,7 @@ static myD3DXMACRO defs[] = {
   {"m44view"			, "oblv_ViewTransform_MAINPASS"		 },
   {"m44proj"			, "oblv_ProjectionTransform_MAINPASS"	 },
   {"f3EyeForward"		, "oblv_CameraForward_MAINPASS"		 },
-//{"f4Time"			, "oblv_GameTime"			 },
+  {"f4Time"			, "oblv_GameTime"			 },
   {"f4SunDir"			, "oblv_SunDirection"			 },
 #endif
 
@@ -202,10 +218,7 @@ EffectBuffer::~EffectBuffer() {
 }
 
 inline HRESULT EffectBuffer::Initialise(IDirect3DTexture9 *text) {
-  for (int rt = 0; rt < EBUFRT_NUM; rt++) {
-    Tex[rt] = NULL;
-    Srf[rt] = NULL;
-  }
+  Release();
 
   Tex[0] = text;
 //Tex[0]->GetSurfaceLevel(0, &Srf[0]);
@@ -214,17 +227,32 @@ inline HRESULT EffectBuffer::Initialise(IDirect3DTexture9 *text) {
 }
 
 inline HRESULT EffectBuffer::Initialise(IDirect3DSurface9 *surf) {
-  for (int rt = 0; rt < EBUFRT_NUM; rt++) {
-    Tex[rt] = NULL;
-    Srf[rt] = NULL;
-  }
+  IDirect3DTexture9 *text = NULL;
 
 #ifndef	OBGE_NOSHADER
-  Tex[0] = surfaceTexture[surf] ? surfaceTexture[surf]->tex : NULL;
+  text = surfaceTexture[surf] ? surfaceTexture[surf]->tex : NULL;
 #endif
-  Srf[0] =                surf                                    ;
+  surf =                surf                                    ;
 
-  return (Tex[0] ? D3D_OK : S_FALSE);
+  if (!text) {
+    /* no alternative replacement target available, so we
+     * preserve the surface anyway
+     */
+    if (!Tex[0]) {
+      Tex[0] = text;
+      Srf[0] = surf;
+    }
+
+    return S_FALSE;
+  }
+
+  /* this is now the texture/surface-pair to use */
+  Release();
+
+  Tex[0] = text;
+  Srf[0] = surf;
+
+  return D3D_OK;
 }
 
 inline HRESULT EffectBuffer::Initialise(const D3DFORMAT fmt[EBUFRT_NUM]) {
@@ -254,11 +282,8 @@ inline HRESULT EffectBuffer::Initialise(const D3DFORMAT fmt[EBUFRT_NUM]) {
 
 inline void EffectBuffer::Release() {
   for (int rt = 0; rt < EBUFRT_NUM; rt++) {
-    if (Tex[rt]) Tex[rt]->Release();
-    if (Srf[rt]) Srf[rt]->Release();
-
-    Tex[rt] = NULL;
-    Srf[rt] = NULL;
+    if (Tex[rt]) Tex[rt]->Release(); Tex[rt] = NULL;
+    if (Srf[rt]) Srf[rt]->Release(); Srf[rt] = NULL;
   }
 }
 
@@ -605,7 +630,7 @@ bool EffectRecord::SaveEffect() {
   return false;
 }
 
-bool EffectRecord::CompileEffect(bool forced) {
+bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
   /* nobody wants the automatic recompile */
   if (0/*!::CompileSources.Get()*/ && !forced)
     return false;
@@ -643,7 +668,7 @@ bool EffectRecord::CompileEffect(bool forced) {
       D3DXSHADER_DEBUG | (
       ::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
       ::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
-      NULL,
+      FXMan ? FXMan->EffectPool : NULL,
       &x,
       &pErrorMsgs
       );
@@ -661,7 +686,7 @@ bool EffectRecord::CompileEffect(bool forced) {
 	&incl,
 	D3DXSHADER_DEBUG | (
 	D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
-	NULL,
+	FXMan ? FXMan->EffectPool : NULL,
 	&x,
 	&pErrorMsgs
 	);
@@ -780,8 +805,14 @@ void EffectRecord::ApplyCompileDirectives() {
 	      Parameters |= EFFECTBUF_ZBUF;
 	    else if (Description.Name == strstr(Description.Name, "oblv_CurrLinearDepthZ"))
 	      Parameters |= EFFECTBUF_ZBUF | EFFECTBUF_LBUF;
-	    else if (Description.Name == strstr(Description.Name, "oblv_CurrProjectedXYZD_EFFECTPASS"))
-	      Parameters |= EFFECTBUF_ZBUF | EFFECTBUF_LBUF | EFFECTBUF_PBUF;
+	    else if (Description.Name == strstr(Description.Name, "oblv_CurrEyeProjectedZXYD_EFFECTPASS"))
+	      Parameters |= EFFECTBUF_ZBUF | EFFECTBUF_LBUF | EFFECTBUF_EPOS;
+	    else if (Description.Name == strstr(Description.Name, "oblv_CurrEyeProjectedNormals_EFFECTPASS"))
+	      Parameters |= EFFECTBUF_ZBUF | EFFECTBUF_LBUF | EFFECTBUF_EPOS | EFFECTBUF_ENRM;
+	    else if (Description.Name == strstr(Description.Name, "oblv_CurrWorldProjectedZXYL_EFFECTPASS"))
+	      Parameters |= EFFECTBUF_ZBUF | EFFECTBUF_LBUF | EFFECTBUF_WPOS;
+	    else if (Description.Name == strstr(Description.Name, "oblv_CurrWorldProjectedNormals_EFFECTPASS"))
+	      Parameters |= EFFECTBUF_ZBUF | EFFECTBUF_LBUF | EFFECTBUF_WPOS | EFFECTBUF_WNRM;
 	  }
       }
     }
@@ -909,14 +940,21 @@ inline void EffectRecord::ApplyPermanents(EffectManager *FXMan) {
 
   /* convert WHATEVER to linearized form (CurrDS) */
   /* convert linearized to unlinearize form (OrigDS) */
-  if (FXMan->RenderLinZ || FXMan->RenderPrjZ) {
-    FXMan->CurrDS.SetTexture("oblv_CurrProjectedXYZD_EFFECTPASS", pEffect);
-    FXMan->CurrDS.SetTexture("oblv_CurrLinearDepthZ_EFFECTPASS", pEffect);
-    FXMan->OrigDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect);
+  if (FXMan->RenderTransferZ) {
+    if (FXMan->RenderTransferZ > EFFECTBUF_RAWZ) {
+      FXMan->CurrNM.SetTexture("oblv_CurrWorldProjectedNormals_EFFECTPASS", pEffect);
+      FXMan->CurrDS.SetTexture("oblv_CurrWorldProjectedZXYL_EFFECTPASS", pEffect);
+
+      FXMan->CurrNM.SetTexture("oblv_CurrEyeProjectedNormals_EFFECTPASS", pEffect);
+      FXMan->CurrDS.SetTexture("oblv_CurrEyeProjectedZXYD_EFFECTPASS", pEffect);
+
+      FXMan->CurrDS.SetTexture("oblv_CurrLinearDepthZ_EFFECTPASS", pEffect);
+      FXMan->OrigDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect);
+    }
+    else
+      /* convert linearized to unlinearize form (OrigDS) */
+      FXMan->CurrDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect);
   }
-  else if (FXMan->RenderRawZ)
-    /* convert linearized to unlinearize form (OrigDS) */
-    FXMan->CurrDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect);
   else
     /* convert linearized to unlinearize form (OrigDS) */
     FXMan->OrigDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect);
@@ -931,26 +969,32 @@ inline void EffectRecord::ApplyPermanents(EffectManager *FXMan) {
 #endif
 }
 
-inline void EffectRecord::ApplyConstants() {
+inline void EffectRecord::ApplySharedConstants() {
   pEffect->SetMatrix("oblv_WorldTransform_MAINPASS", &Constants.wrld);
+//pEffect->SetMatrix("oblv_WorldInverse_MAINPASS", &Constants.wrld_inv);
   pEffect->SetMatrix("oblv_ViewTransform_MAINPASS", &Constants.view);
+  pEffect->SetMatrix("oblv_ViewInverse_MAINPASS", &Constants.view_inv);
   pEffect->SetMatrix("oblv_ProjectionTransform_MAINPASS", &Constants.proj);
+  pEffect->SetMatrix("oblv_ProjectionInverse_MAINPASS", &Constants.proj_inv);
+
+  pEffect->SetMatrix("oblv_ViewProjectionTransform_MAINPASS", &Constants.viewproj);
+  pEffect->SetMatrix("oblv_ViewProjectionInverse_MAINPASS", &Constants.viewproj_inv);
+
+  pEffect->SetMatrix("oblv_WorldViewProjectionTransform_MAINPASS", &Constants.wrldviewproj);
+  pEffect->SetMatrix("oblv_WorldViewProjectionInverse_MAINPASS", &Constants.wrldviewproj_inv);
+
+  pEffect->SetFloatArray("oblv_CameraForward_MAINPASS", &Constants.EyeForward.x, 3);
+  pEffect->SetMatrix("oblv_CameraFrustum_MAINPASS", &Constants.EyeFrustum);
+
   pEffect->SetVector("oblv_ProjectionDepthRange_MAINPASS", &Constants.ZRange);
   pEffect->SetVector("oblv_ProjectionFoV_MAINPASS", &Constants.FoV);
-  pEffect->SetFloatArray("oblv_CameraForward_MAINPASS", &Constants.EyeForward.x, 3);
 
   pEffect->SetIntArray("oblv_GameTime", &Constants.iGameTime.x, 4);
   pEffect->SetIntArray("obge_Tick", &Constants.iTikTiming.x, 4);
+
   pEffect->SetVector("oblv_SunDirection", &Constants.SunDir);
   pEffect->SetVector("oblv_SunTiming", &Constants.SunTiming);
 
-  /* deprecated */
-#ifndef	NO_DEPRECATED
-  pEffect->SetVector("f4Time", &Constants.time);
-#endif
-}
-
-inline void EffectRecord::ApplyDynamics() {
 #ifndef	OBGE_NOSHADER
   pEffect->SetTexture("oblv_Rendertarget0_REFLECTIONPASS", passTexture[OBGEPASS_REFLECTION]);
 
@@ -959,6 +1003,9 @@ inline void EffectRecord::ApplyDynamics() {
   pEffect->SetBool("bHasReflection", !!passTexture[OBGEPASS_REFLECTION]);
 #endif
 #endif
+}
+
+inline void EffectRecord::ApplyUniqueConstants() {
 }
 
 inline void EffectRecord::OnLostDevice(void) {
@@ -1015,8 +1062,10 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue
   // uses the last vertex effect that was active and much strangeness occurs.
   D3DDevice->SetVertexShader(NULL);
 
-  ApplyConstants();
-  ApplyDynamics();
+#ifndef OBGE_CONSTANTPOOLS
+  ApplySharedConstants();
+#endif
+  ApplyUniqueConstants();
 
 #ifdef	OBGE_STATEBLOCKS
   UINT pass = 0; Queue->Begin(pEffect);
@@ -1060,8 +1109,10 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice) {
   // uses the last vertex effect that was active and much strangeness occurs.
   D3DDevice->SetVertexShader(NULL);
 
-  ApplyConstants();
-  ApplyDynamics();
+#ifndef OBGE_CONSTANTPOOLS
+  ApplySharedConstants();
+#endif
+  ApplyUniqueConstants();
 
 #ifdef	OBGE_STATEBLOCKS
   UINT pass = 0;
@@ -1366,8 +1417,10 @@ EffectManager::EffectManager() {
   EffectIndex = 0;
   MaxEffectIndex = 0;
 
+  EffectPool = NULL;
   EffectVertex = NULL;
   EffectDepth = NULL;
+  EffectShare = NULL;
 
 #ifdef	OLD_QUEUE
   // these are all private
@@ -1386,24 +1439,23 @@ EffectManager::EffectManager() {
 
   RAWZflag = false;
 #else
-  RenderTransferZ = 0;
-  RenderRawZ = false;
-  RenderLinZ = false;
-  RenderPrjZ = false;
+  RenderTransferZ = (IsRAWZ() ? EFFECTBUF_RAWZ : 0);
   RenderBuf = 0;
   RenderCnd = 0;
   RenderFmt = D3DFMT_UNKNOWN;
 #endif
 
   if (FreezeTweaks.Get())
-    defs[2].Definition = TWEAK_FROZEN;
+    defs[DEFS_iface].Definition = TWEAK_FROZEN;
   else
-    defs[2].Definition = TWEAK_DYNAMIC;
+    defs[DEFS_iface].Definition = TWEAK_DYNAMIC;
 }
 
 EffectManager::~EffectManager() {
   Singleton = NULL;
 
+  if (EffectPool)
+    while (EffectPool->Release()) {};
   if (EffectVertex)
     while (EffectVertex->Release()) {};
 
@@ -1431,7 +1483,8 @@ EffectManager::~EffectManager() {
                                   LastRT.Release();
 
   if (RenderBuf & EFFECTBUF_ZBUF) if (RenderTransferZ)
-				  CurrDS.Release();
+                                  CurrDS.Release(),
+                                  CurrNM.Release();
 #endif
 }
 
@@ -1456,124 +1509,54 @@ void EffectManager::Reset() {
 #endif
 }
 
-bool EffectManager::SetRAWZ(bool enabled) {
+bool EffectManager::SetTransferZ(long MaskZ) {
+  /* mask out Z-relevant bits */
+  MaskZ |= (IsRAWZ() ? EFFECTBUF_RAWZ : 0);
+  MaskZ &= EFFECTBUF_TRANSFERZMASK;
+
   /* nodo */
-  if (RenderRawZ == enabled)
+  if (RenderTransferZ == MaskZ)
     return true;
+
   /* redo */
-  if ((RenderLinZ || RenderPrjZ) && (RenderRawZ != enabled))
+  if ((RenderTransferZ & (EFFECTBUF_LBUF | EFFECTBUF_EPOS | EFFECTBUF_WPOS)) !=
+      (MaskZ           & (EFFECTBUF_LBUF | EFFECTBUF_EPOS | EFFECTBUF_WPOS)))
     CurrDS.Release();
 
-  /* TODO: recompile all effects to read non-linear-z instead of linear-z */
+  if ((RenderTransferZ & (EFFECTBUF_LBUF | EFFECTBUF_ENRM | EFFECTBUF_WNRM)) !=
+      (MaskZ           & (EFFECTBUF_LBUF | EFFECTBUF_ENRM | EFFECTBUF_WNRM)))
+    CurrNM.Release();
 
-  if ((RenderRawZ = enabled))
-    defs[0].Definition[0] = '1';
-  else
-    defs[0].Definition[0] = '0';
+//if (RenderTransferZ & (EFFECTBUF_RAWZ) !=
+//    MaskZ           & (EFFECTBUF_RAWZ))
+//  delete EffectDepth;
 
-  if (RenderTransferZ && !EffectDepth) {
+  /* put all indicators into the effects (optimize) */
+  defs[DEFS_INRAWZ].Definition[0] = (MaskZ &           EFFECTBUF_RAWZ          ? '1' : '0');
+  defs[DEFS_INLINZ].Definition[0] = (MaskZ &           EFFECTBUF_LBUF          ? '1' : '0');
+  defs[DEFS_INPRJZ].Definition[0] = (MaskZ & (EFFECTBUF_EPOS | EFFECTBUF_WPOS) ? '1' : '0');
+  defs[DEFS_INNRMZ].Definition[0] = (MaskZ & (EFFECTBUF_ENRM | EFFECTBUF_WNRM) ? '1' : '0');
+
+  if (MaskZ && !EffectDepth) {
     EffectDepth = new EffectRecord();
 
     if (!EffectDepth->LoadEffect("TransferZ.fx", 0) ||
-	!EffectDepth->CompileEffect()) {
+	!EffectDepth->CompileEffect(this)) {
       delete EffectDepth;
       EffectDepth = NULL;
 
       _MESSAGE("ERROR - TransferZ.fx is missing and required! Please reinstall OBGE");
-      return false;
+      exit(0); return false;
     }
 
     EffectDepth->Enable(true);
   }
-  else if (!RenderTransferZ && EffectDepth) {
-    CurrDS.Release();
-
+  else if (!MaskZ && EffectDepth) {
     delete EffectDepth;
     EffectDepth = NULL;
   }
 
-  return true;
-}
-
-bool EffectManager::SetLinearZ(bool enabled) {
-  /* nodo */
-  if (RenderLinZ == enabled)
-    return true;
-  /* redo */
-  if (RenderLinZ != enabled)
-    CurrDS.Release();
-
-  /* TODO: recompile all effects to read linear-z instead of non-linear-z */
-
-  if ((RenderLinZ = enabled))
-    defs[1].Definition[0] = '1';
-  else
-    defs[1].Definition[0] = '0';
-
-  RenderLinZ = enabled;
-
-  if (RenderTransferZ && !EffectDepth) {
-    EffectDepth = new EffectRecord();
-
-    if (!EffectDepth->LoadEffect("TransferZ.fx", 0) ||
-        !EffectDepth->CompileEffect()) {
-      delete EffectDepth;
-      EffectDepth = NULL;
-
-      _MESSAGE("ERROR - TransferZ.fx is missing and required! Please reinstall OBGE");
-      return false;
-    }
-
-    EffectDepth->Enable(true);
-  }
-  else if (!RenderTransferZ && EffectDepth) {
-    CurrDS.Release();
-
-    delete EffectDepth;
-    EffectDepth = NULL;
-  }
-
-  return true;
-}
-
-bool EffectManager::SetProjectZ(bool enabled) {
-  /* nodo */
-  if (RenderPrjZ == enabled)
-    return true;
-  /* redo */
-  if (RenderPrjZ != enabled)
-    CurrDS.Release();
-
-  /* TODO: recompile all effects to read linear-z instead of non-linear-z */
-
-  if ((RenderLinZ = enabled))
-    defs[1].Definition[0] = '1';
-  else
-    defs[1].Definition[0] = '0';
-
-  RenderPrjZ = enabled;
-
-  if (RenderTransferZ && !EffectDepth) {
-    EffectDepth = new EffectRecord();
-
-    if (!EffectDepth->LoadEffect("TransferZ.fx", 0) ||
-	!EffectDepth->CompileEffect()) {
-      delete EffectDepth;
-      EffectDepth = NULL;
-
-      _MESSAGE("ERROR - TransferZ.fx is missing and required! Please reinstall OBGE");
-      return false;
-    }
-
-    EffectDepth->Enable(true);
-  }
-  else if (!RenderTransferZ && EffectDepth) {
-    CurrDS.Release();
-
-    delete EffectDepth;
-    EffectDepth = NULL;
-  }
-
+  RenderTransferZ = MaskZ;
   return true;
 }
 
@@ -1656,35 +1639,36 @@ void EffectManager::InitialiseFrameTextures() {
   if (RenderFmt == D3DFMT_UNKNOWN) {
     D3DFORMAT frmt = D3DFMT_UNKNOWN;
     D3DDISPLAYMODE d3ddm;
-    lastOBGEDirect3D9->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm);
 
-    while (bits != 0) {
-      /**/ if (bits >=  32) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A32B32G32R32F : D3DFMT_A32B32G32R32F);
-      else if (bits >=  16) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A16B16G16R16F : D3DFMT_A16B16G16R16F);
-      else if (bits >=   8) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A8R8G8B8      : D3DFMT_X8R8G8B8);
-      else if (bits <= -16) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A16B16G16R16  : D3DFMT_A16B16G16R16);
-      else if (bits <= -10) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A2B10G10R10   : D3DFMT_A2B10G10R10);
-      else if (bits <=  -8) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A8R8G8B8      : D3DFMT_X8R8G8B8);
-      else if (bits <=  -5) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A1R5G5B5      : D3DFMT_R5G6B5);
-      else if (bits <=  -4) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A4R4G4B4      : D3DFMT_X4R4G4B4);
-      else if (bits <=  -3) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_R3G3B2	      : D3DFMT_R3G3B2);
-      else                  frmt = D3DFMT_UNKNOWN;
+    if (lastOBGEDirect3D9->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm) == D3D_OK) {
+      while (bits != 0) {
+	/**/ if (bits >=  32) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A32B32G32R32F : D3DFMT_A32B32G32R32F);
+	else if (bits >=  16) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A16B16G16R16F : D3DFMT_A16B16G16R16F);
+	else if (bits >=   8) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A8R8G8B8      : D3DFMT_X8R8G8B8);
+	else if (bits <= -16) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A16B16G16R16  : D3DFMT_A16B16G16R16);
+	else if (bits <= -10) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A2B10G10R10   : D3DFMT_A2B10G10R10);
+	else if (bits <=  -8) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A8R8G8B8      : D3DFMT_X8R8G8B8);
+	else if (bits <=  -5) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A1R5G5B5      : D3DFMT_R5G6B5);
+	else if (bits <=  -4) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A4R4G4B4      : D3DFMT_X4R4G4B4);
+	else if (bits <=  -3) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_R3G3B2	      : D3DFMT_R3G3B2);
+	else                  frmt = D3DFMT_UNKNOWN;
 
-      if (frmt != D3DFMT_UNKNOWN) {
-	HRESULT hr;
-	if ((hr = lastOBGEDirect3D9->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, frmt)) == D3D_OK)
-	  break;
+	if (frmt != D3DFMT_UNKNOWN) {
+	  HRESULT hr;
+	  if ((hr = lastOBGEDirect3D9->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, frmt)) == D3D_OK)
+	    break;
+	}
+
+	/**/ if (bits >=  32) bits = 16;
+	else if (bits >=  16) bits = 8;
+	else if (bits >=   8) bits = 0;
+	else if (bits <= -16) bits = -10;
+	else if (bits <= -10) bits = -8;
+	else if (bits <=  -8) bits = -5;
+	else if (bits <=  -5) bits = -4;
+	else if (bits <=  -4) bits = -3;
+	else if (bits <=  -3) bits = 0;
       }
-
-      /**/ if (bits >=  32) bits = 16;
-      else if (bits >=  16) bits = 8;
-      else if (bits >=   8) bits = 0;
-      else if (bits <= -16) bits = -10;
-      else if (bits <= -10) bits = -8;
-      else if (bits <=  -8) bits = -5;
-      else if (bits <=  -5) bits = -4;
-      else if (bits <=  -4) bits = -3;
-      else if (bits <=  -3) bits = 0;
     }
 
     /* TODO extract this out of Oblivion and make the
@@ -1727,17 +1711,22 @@ void EffectManager::InitialiseFrameTextures() {
 
     if (RenderBuf & EFFECTBUF_ZBUF) if (RenderTransferZ)
       CurrDS.Initialise(
-	RenderPrjZ
-	  ? (bitz != 16 ? D3DFMT_A32B32G32R32F : D3DFMT_A16B16G16R16F)  // linear
+	RenderTransferZ & EFFECTBUF_EPOS
+	  ? (bitz > 16 ? D3DFMT_A32B32G32R32F : D3DFMT_A16B16G16R16F)  // linear
 	  :
-	RenderLinZ
-	  ? (bitz != 16 ? D3DFMT_R32F : D3DFMT_R16F)  // linear
-	  : (bitz != 16 ? D3DFMT_R32F : D3DFMT_R16F)  // non-linear
+	RenderTransferZ & EFFECTBUF_LBUF
+	  ? (bitz > 16 ? D3DFMT_R32F          : D3DFMT_R16F         )	// linear
+	  : (bitz > 16 ? D3DFMT_R32F          : D3DFMT_R16F         )	// non-linear
+      );
+    if (RenderBuf & EFFECTBUF_ENRM) if (RenderTransferZ)
+      CurrNM.Initialise(
+	    (bitz >  8 ? D3DFMT_A16B16G16R16  : D3DFMT_A8B8G8R8     )  // linear
       );
  }
 #endif
 
   RenderCnd = (RenderCnd & ~EFFECTCOND_HASZBUF) | (OrigDS.IsValid() || CurrDS.IsValid() ? EFFECTCOND_HASZBUF : 0);
+  RenderCnd = (RenderCnd & ~EFFECTCOND_HASENRM) | (                    CurrNM.IsValid() ? EFFECTCOND_HASENRM : 0);
 #ifndef	OBGE_NOSHADER
   RenderCnd = (RenderCnd & ~EFFECTCOND_HASMIPS) | (AMFilter != D3DTEXF_NONE		? EFFECTCOND_HASMIPS : 0);
 #endif
@@ -1793,7 +1782,8 @@ void EffectManager::ReleaseFrameTextures() {
 				  LastRT.Release();
 
   if (RenderBuf & EFFECTBUF_ZBUF) if (RenderTransferZ)
-				  CurrDS.Release();
+				  CurrDS.Release(),
+				  CurrNM.Release();
 #endif
 }
 
@@ -1812,6 +1802,8 @@ void EffectManager::InitialiseBuffers() {
   uadj = Constants.rcpres[0] * 0.5;
   vadj = Constants.rcpres[1] * 0.5;
 
+  _MESSAGE("Creating effect vertex buffers.");
+
   if (SplitScreen.data) {
     minx = 0;
     minu = 0.5;
@@ -1822,18 +1814,33 @@ void EffectManager::InitialiseBuffers() {
   }
 
   EffectQuad ShaderVertices[] = {
-    {minx , +1 , 1, minu + uadj , 0 + vadj},
-    {minx , -1 , 1, minu + uadj , 1 + vadj},
-    {1    , +1 , 1, 1    + uadj , 0 + vadj},
-    {1    , -1 , 1, 1    + uadj , 1 + vadj}
+    {minx, +1, 1, minu + uadj, 0 + vadj, 0},
+    {minx, -1, 1, minu + uadj, 1 + vadj, 1},
+    {1   , +1, 1, 1    + uadj, 0 + vadj, 2},
+    {1   , -1, 1, 1    + uadj, 1 + vadj, 3}
   };
-
-  _MESSAGE("Creating effect vertex buffers.");
 
   GetD3DDevice()->CreateVertexBuffer(4 * sizeof(EffectQuad), D3DUSAGE_WRITEONLY, EFFECTQUADFORMAT, D3DPOOL_DEFAULT, &EffectVertex, 0);
   EffectVertex->Lock(0, 0, &VertexPointer, 0);
   CopyMemory(VertexPointer, ShaderVertices, sizeof(ShaderVertices));
   EffectVertex->Unlock();
+
+#ifdef OBGE_CONSTANTPOOLS
+  _MESSAGE("Creating effect constants pool.");
+
+  /* utilize effect-pools to set less parameters per frame */
+  D3DXCreateEffectPool(&EffectPool);
+
+  EffectShare = new EffectRecord();
+  if (!EffectShare->LoadEffect("Constants.fx", 0) ||
+      !EffectShare->CompileEffect(this)) {
+    delete EffectShare;
+    EffectShare = NULL;
+
+    _MESSAGE("ERROR - Constants.fx is missing and required! Please reinstall OBGE");
+    exit(0); return;
+  }
+#endif
 
   Constants.bHasDepth = ::HasDepth();
 }
@@ -1844,6 +1851,18 @@ void EffectManager::ReleaseBuffers() {
 
     while (EffectVertex->Release()) {}
     EffectVertex = NULL;
+  }
+
+  if (EffectPool) {
+    _MESSAGE("Releasing effect constants pool.");
+
+    while (EffectPool->Release()) {}
+    EffectPool = NULL;
+  }
+
+  if (EffectShare) {
+    delete EffectShare;
+    EffectShare = NULL;
   }
 }
 
@@ -1862,10 +1881,8 @@ void EffectManager::OnReleaseDevice() {
 
   Reset();
 
-  if (EffectDepth) {
-    delete EffectDepth;
-    EffectDepth = NULL;
-  }
+  if (EffectDepth) { delete EffectDepth; EffectDepth = NULL; }
+  if (EffectShare) { delete EffectShare; EffectShare = NULL; }
 }
 
 void EffectManager::OnLostDevice() {
@@ -1879,8 +1896,8 @@ void EffectManager::OnLostDevice() {
     SEffect++;
   }
 
-  if (EffectDepth)
-    EffectDepth->OnLostDevice();
+  if (EffectDepth) EffectDepth->OnLostDevice();
+  if (EffectShare) EffectShare->OnLostDevice();
 }
 
 void EffectManager::OnResetDevice() {
@@ -1899,12 +1916,12 @@ void EffectManager::OnResetDevice() {
     SEffect++;
   }
 
-  if (EffectDepth)
-    EffectDepth->OnResetDevice();
+  if (EffectDepth) EffectDepth->OnResetDevice();
+  if (EffectShare) EffectShare->OnResetDevice();
 }
 
-void EffectManager::UpdateFrameConstants(v1_2_416::NiDX9Renderer *Renderer) {
-  Constants.UpdateView((D3DXMATRIX)Renderer->m44View);
+inline void EffectManager::UpdateFrameConstants(v1_2_416::NiDX9Renderer *Renderer) {
+  Constants.UpdateView      ((D3DXMATRIX)Renderer->m44View      );
   Constants.UpdateProjection((D3DXMATRIX)Renderer->m44Projection);
 
   v1_2_416::NiCamera **pMainCamera = (v1_2_416::NiCamera **)0x00B43124;
@@ -1918,6 +1935,9 @@ void EffectManager::UpdateFrameConstants(v1_2_416::NiDX9Renderer *Renderer) {
   char *CamName = (*pMainCamera)->m_pcName;
   (*pMainCamera)->m_worldRotate.GetForwardVector(&Constants.EyeForward);
 
+  /* products and inverses */
+  Constants.UpdateProducts();
+
   // Sunrise is at 06:00, Sunset at 20:00
   bool DayTime =
     (Constants.iGameTime.x >= Constants.SunTiming.x) &&
@@ -1925,6 +1945,12 @@ void EffectManager::UpdateFrameConstants(v1_2_416::NiDX9Renderer *Renderer) {
   bool SunHasBenCulled =
     (Constants.SunDir.w == 0.0);
 
+#ifdef OBGE_CONSTANTPOOLS
+  /* we use pooling, just this has to be set */
+  EffectShare->ApplySharedConstants();
+#endif
+
+  /* setup flags for effect-filtering */
   RenderCnd = (RenderCnd & ~EFFECTCOND_ISDAY  ) | ( DayTime			    ? EFFECTCOND_ISDAY   : 0);
   RenderCnd = (RenderCnd & ~EFFECTCOND_ISNIGHT) | (!DayTime			    ? EFFECTCOND_ISNIGHT : 0);
   RenderCnd = (RenderCnd & ~EFFECTCOND_HASSUN ) | (!SunHasBenCulled                 ? EFFECTCOND_HASSUN  : 0);
@@ -1998,8 +2024,8 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
 
   while (SEffect != ManagedEffects.end()) {
     if ((*SEffect)->IsEnabled()) {
-      (*SEffect)->ApplyConstants(&EffectConst);
-      (*SEffect)->ApplyDynamics();
+      (*SEffect)->ApplySharedConstants(&EffectConst);
+      (*SEffect)->ApplyUniqueConstants();
       (*SEffect)->Render(D3DDevice, RenderTo, lastpassSurf);
 
       D3DDevice->StretchRect(RenderTo, 0, thisframeSurf, 0, D3DTEXF_NONE);
@@ -2033,14 +2059,27 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
     OrigDS.SetTexture("zbufferTexture", EffectDepth->GetEffect());
     CurrDS.SetRenderTarget(D3DDevice);
 
-    if (RenderLinZ || RenderPrjZ) {
-      /* convert WHATEVER to linearized form (CurrDS) */
-      if (RenderPrjZ)
+    if (RenderTransferZ > EFFECTBUF_RAWZ) {
+      if (RenderTransferZ & EFFECTBUF_EPOS) {
+        /* convert WHATEVER to projected form (CurrDS) */
 	tec = EffectDepth->GetEffect()->GetTechniqueByName("project");
+
+	if (RenderTransferZ & EFFECTBUF_ENRM) {
+	  EffectDepth->GetEffect()->SetTechnique(tec);
+	  EffectDepth->Render(D3DDevice);
+
+	  CurrDS.SetTexture("zbufferTexture", EffectDepth->GetEffect());
+	  CurrNM.SetRenderTarget(D3DDevice);
+
+	  /* convert projected positions to normals (OrigDS) */
+	  tec = EffectDepth->GetEffect()->GetTechniqueByName("normal");
+	}
+      }
       else
+        /* convert WHATEVER to linearized form (CurrDS) */
 	tec = EffectDepth->GetEffect()->GetTechniqueByName("linearize");
 
-      if (RenderRawZ) {
+      if (RenderTransferZ & EFFECTBUF_RAWZ) {
 	EffectDepth->GetEffect()->SetTechnique(tec);
 	EffectDepth->Render(D3DDevice);
 
@@ -2051,10 +2090,13 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
         tec = EffectDepth->GetEffect()->GetTechniqueByName("unlinearize");
       }
     }
-    else if (RenderRawZ) {
+    else
       /* convert WHATEVER to unlinearize form (CurrDS) */
       tec = EffectDepth->GetEffect()->GetTechniqueByName("copy");
-    }
+
+    /* OrigDS always contains "nonlinearized" INTZ */
+    /* CurrDS always contains "linearized" or "projected" */
+    /* CurrNM always contains "normal" */
 
     EffectDepth->GetEffect()->SetTechnique(tec);
     EffectDepth->Render(D3DDevice);
@@ -2090,14 +2132,14 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
       run += (*e)->Render(D3DDevice, &RenderQueue);
   }
 
+  /* nothing happend */
+  if (!run) TrgtRT.Copy(D3DDevice, &OrigRT);
+
 #if 0 //def	OBGE_STATEBLOCKS
   /* auto restore (not strictly needed, all states can be changed) */
   pStateBlock->Apply();
   pStateBlock->Release();
 #endif
-
-  /* nothing happend */
-  if (!run) TrgtRT.Copy(D3DDevice, &OrigRT);
 
   RenderQueue.End(
 				   &TrgtRT
@@ -2114,7 +2156,7 @@ void EffectManager::RenderRAWZfix(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9
 
     if (!EffectDepth->LoadEffect("RAWZfix.fx", 0)) {
       _MESSAGE("ERROR - RAWZfix.fx is missing! Please reinstall OBGE");
-      return;
+      exit(0); return;
     }
 
     EffectDepth->CompileEffect();
@@ -2134,7 +2176,7 @@ int EffectManager::AddPrivateEffect(const char *Filename, UINT32 refID) {
   }
 
   /* you are allowed to fail */
-  NewEffect->CompileEffect();
+  NewEffect->CompileEffect(this);
 
   /* prepare */
   NewEffect->SetPriority(ManagedEffects.size());
@@ -2157,7 +2199,7 @@ int EffectManager::AddManagedEffect(const char *Filename, UINT32 refID) {
   while (SEffect != Effects.end()) {
     if (!SEffect->second->IsPrivate()) {
       if (!_stricmp(Filename, SEffect->second->GetName())/*&& ((pEffect->second->ParentRefID & 0xff000000) == (refID & 0xff000000))*/) {
-	_MESSAGE("Loading effect that already exists. Returning index of existing effect.");
+	_MESSAGE("Loading effect \"%s\" that already exists. Returning index \"%d\" of existing effect.", SEffect->second->GetName(), SEffect->first);
 
 	SEffect->second->AddRef();
 	return SEffect->first;
@@ -2175,7 +2217,7 @@ int EffectManager::AddManagedEffect(const char *Filename, UINT32 refID) {
   }
 
   /* you are allowed to fail */
-  NewEffect->CompileEffect();
+  NewEffect->CompileEffect(this);
 
   /* prepare */
   NewEffect->SetPriority(ManagedEffects.size());
@@ -2197,7 +2239,7 @@ int EffectManager::AddDependtEffect(const char *Filename, UINT32 refID) {
   /* search for a any effect */
   while (SEffect != Effects.end()) {
     if (!_stricmp(Filename, SEffect->second->GetName())/*&& ((pEffect->second->ParentRefID & 0xff000000) == (refID & 0xff000000))*/) {
-      _MESSAGE("Loading effect that already exists. Returning index of existing effect.");
+      _MESSAGE("Loading effect \"%s\" that already exists. Returning index \"%d\" of existing effect.", SEffect->second->GetName(), SEffect->first);
 
       SEffect->second->AddRef();
       return SEffect->first;
@@ -2214,7 +2256,7 @@ int EffectManager::AddDependtEffect(const char *Filename, UINT32 refID) {
   }
 
   /* you are allowed to fail */
-  NewEffect->CompileEffect();
+  NewEffect->CompileEffect(this);
 
   /* prepare */
   NewEffect->SetPriority(ManagedEffects.size());
@@ -2279,8 +2321,7 @@ void EffectManager::Recalculate() {
     }
   }
 
-  SetLinearZ(!!(RenderBuf & EFFECTBUF_LBUF));
-  SetProjectZ(!!(RenderBuf & EFFECTBUF_PBUF));
+  SetTransferZ(RenderBuf);
 
   /* update the buffers */
   InitialiseFrameTextures();
@@ -2384,7 +2425,7 @@ void EffectManager::SaveGame(OBSESerializationInterface *Interface) {
 
   Interface->WriteRecord('SIDX', SHADERVERSION, &EffectIndex, sizeof(EffectIndex));
 
-  _MESSAGE("pEffect index = %d", EffectIndex);
+  _MESSAGE("Save-game will reference %i effects.", EffectIndex);
 
   while (pEffect != ManagedEffects.end()) {
     if (!(*pEffect)->IsPrivate()) {
@@ -2403,7 +2444,7 @@ void EffectManager::SaveGame(OBSESerializationInterface *Interface) {
 	}
 
 	/* locals */
-	const char *Name = (*pEffect)->GetName();
+	const char *Name   = (*pEffect)->GetName();
 	const bool Enabled = (*pEffect)->IsEnabled();
 	const UINT32 RefID = (*pEffect)->GetRefID();
 
@@ -2439,10 +2480,10 @@ void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
 
   if (type == 'SIDX') {
     Interface->ReadRecordData(&EffectIndex, length);
-    _MESSAGE("pEffect Index = %d", EffectIndex);
+    _MESSAGE("Save-game references to %i effects.", EffectIndex);
   }
   else {
-    _MESSAGE("No effect data in save file.");
+    _MESSAGE("No effect data in save-game.");
     return;
   }
 
@@ -2451,7 +2492,7 @@ void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
   while (type != 'SEOF') {
     if (type == 'SNUM') {
       Interface->ReadRecordData(&LoadShaderNum, length);
-      _MESSAGE("pEffect num = %d", LoadShaderNum);
+      _MESSAGE("Found SNUM record = %d", LoadShaderNum);
     }
     else {
       _MESSAGE("Error loading game. type!=SNUM");
@@ -2561,7 +2602,7 @@ void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
     else {
       Interface->GetNextRecordInfo(&type, &version, &length);
       while (type != 'SEOD') {
-        Interface->ReadRecordData(&LoadFilepath, length);
+        Interface->ReadRecordData(LoadFilepath, length);
         Interface->GetNextRecordInfo(&type, &version, &length);
       }
     }

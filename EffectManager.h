@@ -19,7 +19,11 @@
 #include "obse/PluginAPI.h"
 #include "D3D9Identifiers.hpp"
 
+#ifndef	NO_DEPRECATED
 #define SHADERVERSION 1
+#else
+#define SHADERVERSION 2
+#endif
 
 class EffectManager;
 
@@ -124,13 +128,13 @@ public:
 	bool RuntimeFlush();
 	bool RuntimeEffect(const char *fx);
 
-	bool CompileEffect(bool forced = false);
+	bool CompileEffect(EffectManager *FXMan, bool forced = false);
 	bool SaveEffect();
 
 	void ApplyCompileDirectives();
 	void ApplyPermanents(EffectManager *FXMan);
-	void ApplyConstants();
-	void ApplyDynamics();
+	void ApplySharedConstants();
+	void ApplyUniqueConstants();
 
 	void OnLostDevice(void);
 	void OnResetDevice(void);
@@ -251,9 +255,7 @@ public:
 	void						ReleaseBuffers();
 	void						ReleaseFrameTextures();
 
-	bool						SetRAWZ(bool enabled);
-	bool						SetLinearZ(bool enabled);
-	bool						SetProjectZ(bool enabled);
+	bool						SetTransferZ(long MaskZ);
 	void						LoadEffectList(void);
 
 	void						NewGame(void);
@@ -301,28 +303,26 @@ private:
 //	EffectList					Effects;
 	ManagedEffectList				ManagedEffects;
 
-//ruct EffectQuad { float x,y,z, rhw; float u,v; };
-struct EffectQuad { float x,y,z;      float u,v; };
+//ruct EffectQuad { float x,y,z, rhw; float u,v, i; };
+struct EffectQuad { float x,y,z;      float u,v, i; };
 
-//efine EFFECTQUADFORMAT D3DFVF_XYZRHW | D3DFVF_TEX1
-#define EFFECTQUADFORMAT D3DFVF_XYZ    | D3DFVF_TEX1
+//efine EFFECTQUADFORMAT D3DFVF_XYZRHW | D3DFVF_TEX1 | D3DFVF_TEXCOORDSIZE3(0)
+#define EFFECTQUADFORMAT D3DFVF_XYZ    | D3DFVF_TEX1 | D3DFVF_TEXCOORDSIZE3(0)
 
 	IDirect3DVertexBuffer9 *			EffectVertex;
 	EffectRecord *					EffectDepth;
 //	EffectConstants					EffectConst;
 
+#if 1 //def OBGE_CONSTANTPOOLS
+	ID3DXEffectPool *				EffectPool;
+	EffectRecord *					EffectShare;
+#endif
+
 	EffectBuffer					OrigRT, CopyRT, TrgtRT;
 	EffectBuffer					LastRT, PrevRT, PastRT;
-	EffectBuffer					OrigDS, CurrDS;
+	EffectBuffer					OrigDS, CurrDS, CurrNM;
 
-	union {
-	  long						RenderTransferZ;
-	  struct {
-	    bool					RenderRawZ;
-	    bool					RenderLinZ;
-	    bool					RenderPrjZ;
-	  };
-	};
+	long						RenderTransferZ;
 
 	EffectQueue					RenderQueue;
 	unsigned long					RenderBuf;

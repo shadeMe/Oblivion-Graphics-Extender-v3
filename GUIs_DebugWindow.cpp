@@ -2173,7 +2173,7 @@ public:
 
   void SetEffectRecord(EffectRecord *o) {
     if (o && !o->pEffect)
-      o->CompileEffect(true);
+      o->CompileEffect(em, true);
 
     GetEffectRecordStatus(o);
     UpdateEffectOptions(o);

@@ -561,11 +561,15 @@ void TextureManager::NewGame() {
 }
 
 void TextureManager::SaveGame(OBSESerializationInterface *Interface) {
-  _MESSAGE("EffectManager::SaveGame");
+  int temp;
+
+  _MESSAGE("TextureManager::SaveGame");
 
   TextureRegistry::iterator Texture = Textures.begin();
 
   Interface->WriteRecord('TIDX', TEXTUREVERSION, &TextureIndex, sizeof(TextureIndex));
+
+  _MESSAGE("Save-game will reference %i textures.", TextureIndex);
 
   while (Texture != Textures.end()) {
     if (!Texture->second->IsPrivate()) {
@@ -578,14 +582,19 @@ void TextureManager::SaveGame(OBSESerializationInterface *Interface) {
         Interface->WriteRecord('TPAT', TEXTUREVERSION, path, strlen(path) + 1);
         Interface->WriteRecord('TFFL', TEXTUREVERSION, &fromfile, sizeof(fromfile));
         Interface->WriteRecord('TTYP', TEXTUREVERSION, &type, sizeof(type));
-//      Interface->WriteRecord('TEOD', TEXTUREVERSION, &temp, 1);
+
+#ifdef	NO_DEPRECATED
+        Interface->WriteRecord('TEOD', TEXTUREVERSION, &temp, 1);
+#endif
       }
     }
 
     Texture++;
   }
 
-//Interface->WriteRecord('TEOF', TEXTUREVERSION, &temp, 1);
+#ifdef	NO_DEPRECATED
+  Interface->WriteRecord('TEOF', TEXTUREVERSION, &temp, 1);
+#endif
 }
 
 void TextureManager::LoadGame(OBSESerializationInterface *Interface) {
@@ -604,13 +613,27 @@ void TextureManager::LoadGame(OBSESerializationInterface *Interface) {
 
   if (type == 'TIDX') {
     Interface->ReadRecordData(&maxtex, length);
-    _MESSAGE("Save file links %i textures.", maxtex);
+    _MESSAGE("Save-game references to %i textures.", maxtex);
   }
   else {
-    _MESSAGE("No texture data found in save file.");
+    _MESSAGE("No texture data found in save-game.");
     return;
   }
 
+#ifdef	NO_DEPRECATED
+  Interface->GetNextRecordInfo(&type, &version, &length);
+
+  while (type != 'TEOF') {
+    if (type == 'TNUM') {
+      OldTextureNum = TextureNum;
+      Interface->ReadRecordData(&TextureNum, length);
+      _MESSAGE("Found TNUM record = %i.", TextureNum);
+    }
+    else {
+      _MESSAGE("Error loading game. type!=TNUM");
+      return;
+    }
+#else
   while (TextureNum < (maxtex - 1)) {
     Interface->GetNextRecordInfo(&type, &version, &length);
 
@@ -618,6 +641,7 @@ void TextureManager::LoadGame(OBSESerializationInterface *Interface) {
       OldTextureNum = TextureNum;
       Interface->ReadRecordData(&TextureNum, length);
       _MESSAGE("Found TNUM record = %i.", TextureNum);
+#endif
 
       Interface->GetNextRecordInfo(&type, &version, &length);
 
@@ -655,14 +679,27 @@ void TextureManager::LoadGame(OBSESerializationInterface *Interface) {
       if (LoadManagedTexture(TexturePath, TextureType, NONPOW2) == -1) {
         _MESSAGE("Error loading texture list: texture (%s) no longer exists.", TexturePath);
       }
+
+#ifdef	NO_DEPRECATED
+      else {
+	Interface->GetNextRecordInfo(&type, &version, &length);
+	while (type != 'SEOD') {
+	  Interface->ReadRecordData(TexturePath, length);
+	  Interface->GetNextRecordInfo(&type, &version, &length);
+	}
+      }
+
+      Interface->GetNextRecordInfo(&type, &version, &length);
+#else
     }
     else {
       _MESSAGE("Error loading texture list: too small.");
       return;
     }
+#endif
   }
 
-  /* release previous non-priate textures, those are supposed
+  /* release previous non-private textures, those are supposed
    * to be handled entirely by the game-save
    */
   TextureRegistry::iterator PTexture = prevTextures.begin();

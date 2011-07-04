@@ -27,12 +27,16 @@
 
 #define EXTRACTARGS paramInfo, arg1, opcodeOffsetPtr, thisObj, arg3, scriptObj, eventList
 
-#define VERSION 2
-
+#ifndef	NO_DEPRECATED
+#define		VERSION 2
 IDebugLog	gLog("OBGEv2.log");
+#else
+#define		VERSION 3
+IDebugLog	gLog("OBGE.log");
+#endif
 
-PluginHandle				g_pluginHandle = kPluginHandle_Invalid;
-OBSESerializationInterface	* g_serialization = NULL;
+PluginHandle			g_pluginHandle = kPluginHandle_Invalid;
+OBSESerializationInterface    * g_serialization = NULL;
 
 
 int *PixelShaderVersion = (int *)0x00B42F48;
@@ -234,9 +238,15 @@ bool OBSEPlugin_Query(const OBSEInterface * obse, PluginInfo * info)
 {
 
 	// fill out the info structure
+#ifndef	NO_DEPRECATED
 	info->infoVersion = PluginInfo::kInfoVersion;
 	info->name = "OBGEv2";
 	info->version = VERSION;
+#else
+	info->infoVersion = PluginInfo::kInfoVersion;
+	info->name = "OBGEv2";
+	info->version = VERSION;
+#endif
 
 	// version checks
 	if(!obse->isEditor)
