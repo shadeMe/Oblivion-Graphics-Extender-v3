@@ -21,6 +21,7 @@
 //efine	OBGE_PROFILE
 #define	OBGE_STATEBLOCKS	0	// 0 = just hint
 #define	OBGE_CONSTANTPOOLS	0	// 0 = just hint
+#define	OBGE_GAMMACORRECTION	0	// 0 = just hint, 1 = apply globally
 #define	OBGE_ANISOTROPY		0	// 0 = just hint
 #define	OBGE_AUTOMIPMAP		0	// 0 = just hint, 1 = call GenerateMipSubLevels
 #define	OBGE_TRACKER		0	// replace by OBGE-implementation, 0 = only rendertargets, 1 = all

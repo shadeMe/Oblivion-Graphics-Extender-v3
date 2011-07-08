@@ -430,6 +430,21 @@
                             <event name="OnMenuSelection"></event>
                             <event name="OnUpdateUI"></event>
                         </object>
+                        <object class="wxMenuItem" expanded="1">
+                            <property name="bitmap"></property>
+                            <property name="checked">0</property>
+                            <property name="enabled">1</property>
+                            <property name="help"></property>
+                            <property name="id">wxID_MIPGAMMA</property>
+                            <property name="kind">wxITEM_CHECK</property>
+                            <property name="label">Gamma correction for MIPs</property>
+                            <property name="name">SDToolsSettingsGamma</property>
+                            <property name="permission">none</property>
+                            <property name="shortcut"></property>
+                            <property name="unchecked_bitmap"></property>
+                            <event name="OnMenuSelection"></event>
+                            <event name="OnUpdateUI"></event>
+                        </object>
                     </object>
                     <object class="wxMenuItem" expanded="0">
                         <property name="bitmap"></property>
@@ -575,6 +590,21 @@
                             <event name="OnMenuSelection">DoAF</event>
                             <event name="OnUpdateUI"></event>
                         </object>
+                    </object>
+                    <object class="wxMenuItem" expanded="1">
+                        <property name="bitmap"></property>
+                        <property name="checked">0</property>
+                        <property name="enabled">1</property>
+                        <property name="help"></property>
+                        <property name="id">wxID_LINEAR</property>
+                        <property name="kind">wxITEM_CHECK</property>
+                        <property name="label">Linear colorspace</property>
+                        <property name="name">SDTweaksGamma</property>
+                        <property name="permission">none</property>
+                        <property name="shortcut"></property>
+                        <property name="unchecked_bitmap"></property>
+                        <event name="OnMenuSelection">DoLinear</event>
+                        <event name="OnUpdateUI"></event>
                     </object>
                 </object>
             </object>

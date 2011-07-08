@@ -122,11 +122,17 @@ private:
 //	EffectList					Textures;
 	ManagedTextureList				ManagedTextures;
 
-#ifdef	OBGE_ANISOTROPY
 public:
+#ifdef OBGE_GAMMACORRECTION
+	void						DoDeGamma(bool enable);
+	void						DoReGamma(bool enable);
+	bool						DoDeGamma();
+	bool						DoReGamma();
+#endif
+
+#ifdef	OBGE_ANISOTROPY
 	void 						SetAnisotropy(int af);
 	void						SetLODBias(float bias);
-
 	int						SetAnisotropy();
 	float						SetLODBias();
 #endif

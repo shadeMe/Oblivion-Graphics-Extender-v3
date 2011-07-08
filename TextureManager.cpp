@@ -13,6 +13,8 @@
 #include "D3D9Device.hpp"
 
 static global<bool> PurgeOnNewGame(false, NULL, "Textures", "bPurgeOnNewGame");
+static global<bool> DoDeGamma(true, NULL, "Textures", "bSamplerDeGamma");
+static global<bool> DoReGamma(true, NULL, "Textures", "bSamplerReGamma");
 static global<int> SetAnisotropy(1, NULL, "Textures", "iSamplerAnisotropy");
 static global<float> SetLODBias(0.0, NULL, "Textures", "fSamplerLODBias");
 
@@ -305,6 +307,17 @@ TextureManager::TextureManager() {
   MaxTextureIndex = 0;
 
 #ifndef	OBGE_NOSHADER
+#ifdef OBGE_GAMMACORRECTION
+  DeGamma = ::DoDeGamma.Get();
+  ReGamma = ::DoReGamma.Get();
+
+  Constants.Gamma.x = DeGamma ? 1.0 : 0.0;
+  Constants.Gamma.y = DeGamma ? 2.2 : 1.0;
+  Constants.Gamma.z = ReGamma ? 1.0 : 0.0;
+  Constants.Gamma.w = ReGamma ? 2.2 : 1.0;
+#endif
+
+#ifdef	OBGE_ANISOTROPY
   Anisotropy = ::SetAnisotropy.Get();
   LODBias = ::SetLODBias.Get();
 
@@ -315,6 +328,7 @@ TextureManager::TextureManager() {
 
   if (Anisotropy <= 1)
     AFilters = 0;
+#endif
 #endif
 }
 
@@ -712,6 +726,34 @@ void TextureManager::LoadGame(OBSESerializationInterface *Interface) {
     PTexture++;
   }
 }
+
+#ifdef OBGE_GAMMACORRECTION
+void TextureManager::DoDeGamma(bool enable) {
+  ::DoDeGamma.Set(enable);
+
+  DeGamma = enable;
+
+  Constants.Gamma.x = DeGamma ? 1.0 : 0.0;
+  Constants.Gamma.y = DeGamma ? 2.2 : 1.0;
+}
+
+void TextureManager::DoReGamma(bool enable) {
+  ::DoReGamma.Set(enable);
+
+  ReGamma = enable;
+
+  Constants.Gamma.z = ReGamma ? 1.0 : 0.0;
+  Constants.Gamma.w = ReGamma ? 2.2 : 1.0;
+}
+
+bool TextureManager::DoDeGamma() {
+  return ::DoDeGamma.Get();
+}
+
+bool TextureManager::DoReGamma() {
+  return ::DoReGamma.Get();
+}
+#endif
 
 #ifdef	OBGE_ANISOTROPY
 void TextureManager::SetAnisotropy(int af) {

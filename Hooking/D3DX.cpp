@@ -1,4 +1,4 @@
-#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING)
+#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING) || defined(OBGE_GAMMACORRECTION)
 #ifndef	HOOKING_D3DX_CPP
 #define	HOOKING_D3DX_CPP
 

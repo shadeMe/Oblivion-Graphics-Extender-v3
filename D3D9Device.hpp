@@ -64,6 +64,10 @@ extern unsigned long ALODs;
 extern int Anisotropy;
 extern float LODBias;
 
+extern GUID GammaGUID;
+extern bool DeGamma;
+extern bool ReGamma;
+
 /* ------------------------------------------------------------------------------- */
 
 #if	defined(OBGE_LOGGING)

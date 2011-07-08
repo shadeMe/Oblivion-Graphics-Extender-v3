@@ -30,6 +30,10 @@ unsigned long ALODs = 0;
 int Anisotropy = 1;
 float LODBias = 0.0;
 
+GUID GammaGUID = {0};
+bool DeGamma = false, DeGammaState = false;
+bool ReGamma = false, ReGammaState = false;
+
 /* ----------------------------------------------------------------------------- */
 
 #include "D3D9Identifiers.hpp"
@@ -343,11 +347,9 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::CreateTextur
     // Return our texture
 #ifdef	OBGE_TRACKER_TEXTURES
 #if	OBGE_TRACKER_TEXTURES < 1
-
     if ((Usage & D3DUSAGE_RENDERTARGET) || (Usage & D3DUSAGE_DEPTHSTENCIL))
 #endif
       *ppTexture = new OBGEDirect3DTexture9(m_d3d, m_device, *ppTexture);
-
 #endif
 
     if (frame_log || frame_trk) {
@@ -380,7 +382,6 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::CreateTextur
           else if (Usage & D3DUSAGE_DEPTHSTENCIL)
             _DMESSAGE("OD3D9: DS GetSurfaceLevel[0]: 0x%08x", ppSurfaceLevel);
         }
-
 #endif
       }
     }
@@ -818,6 +819,27 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::BeginScene(v
   QueryPerformanceCounter(&frame_bgn);
 #endif
 
+#if	defined(OBGE_GAMMACORRECTION) && (OBGE_GAMMACORRECTION > 0)
+  /* we have to experiment with this */
+  if ((currentPass == OBGEPASS_REFLECTION) ||
+      (currentPass == OBGEPASS_MAIN)) {
+    /* gamma-correction on read */
+    for (int s = 0; s < 16; s++)
+      m_device->SetSamplerState(s, D3DSAMP_SRGBTEXTURE, DeGamma);
+
+    /* gamma-correction on write */
+    m_device->SetRenderState(D3DRS_SRGBWRITEENABLE, ReGamma);
+  }
+  else {
+    /* gamma-correction on read */
+    for (int s = 0; s < 16; s++)
+      m_device->SetSamplerState(s, D3DSAMP_SRGBTEXTURE, false);
+
+    /* gamma-correction on write */
+    m_device->SetRenderState(D3DRS_SRGBWRITEENABLE, false);
+  }
+#endif
+
   return m_device->BeginScene();
 }
 
@@ -1158,15 +1180,30 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTexture(D
     pTexture = NULL;
 #endif
 
+  if (pTexture) {
 #if	defined(OBGE_ANISOTROPY)
-  if (currentPass == OBGEPASS_MAIN) {
-    // stablelize AF override, SetTexture is called before any SetSamplerState
-    if (AFilters) {
-      m_device->SetSamplerState(Sampler, D3DSAMP_MINFILTER, D3DTEXF_ANISOTROPIC);
-      m_device->SetSamplerState(Sampler, D3DSAMP_MAXANISOTROPY, *((DWORD *)&Anisotropy));
+    if (currentPass == OBGEPASS_MAIN) {
+      // stablelize AF override, SetTexture is called before any SetSamplerState
+      if (AFilters) {
+	m_device->SetSamplerState(Sampler, D3DSAMP_MINFILTER, D3DTEXF_ANISOTROPIC);
+	m_device->SetSamplerState(Sampler, D3DSAMP_MAXANISOTROPY, *((DWORD *)&Anisotropy));
+      }
     }
-  }
 #endif
+
+#if	defined(OBGE_GAMMACORRECTION)
+    /* we have to experiment with this */
+    if ((currentPass == OBGEPASS_REFLECTION) ||
+	(currentPass == OBGEPASS_MAIN)) {
+      /* gamma-correction on read */
+      bool _DeGamma; DWORD _DGs;
+      if (DeGamma && (pTexture->GetPrivateData(GammaGUID, &_DeGamma, &_DGs) == D3D_OK))
+        m_device->SetSamplerState(Sampler, D3DSAMP_SRGBTEXTURE, DeGamma);
+      else
+        m_device->SetSamplerState(Sampler, D3DSAMP_SRGBTEXTURE, false);
+    }
+#endif
+  }
 
   if (HasShaderManager) {
 #if 1
@@ -1275,7 +1312,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetSamplerSt
     frame_log->FormattedMessage("%s: %s", findSamplerState(Type), findSamplerStateValue(Type, Value));
     frame_log->Outdent();
   }
- 
+
 #ifdef	OBGE_DEVLING
   if (HasShaderManager)
     m_shaders->traced[currentPass].states_s[Sampler][Type] = Value;
@@ -1816,6 +1853,16 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::GetPixelShad
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetPixelShaderConstantB(UINT StartRegister, CONST BOOL *pConstantData, UINT  BoolCount) {
+#ifdef	OBGE_DEVLING
+  if (m_shadercp) {
+    memcpy(
+      m_shadercp->traced[currentPass].values_b + StartRegister,
+      pConstantData,
+      BoolCount * sizeof(bool)
+    );
+  }
+#endif
+
   if (frame_log) {
     frame_log->FormattedMessage("SetPixelShaderConstantB[%d+]", StartRegister);
     frame_log->Indent();

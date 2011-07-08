@@ -29,7 +29,7 @@
 
 #ifndef	NO_DEPRECATED
 #define		VERSION 2
-IDebugLog	gLog("OBGEv2.log");
+IDebugLog	gLog("OBGEv2.log"); 
 #else
 #define		VERSION 3
 IDebugLog	gLog("OBGE.log");
@@ -283,7 +283,7 @@ bool OBSEPlugin_Query(const OBSEInterface * obse, PluginInfo * info)
 		HookAPICalls(&U32Hook);		// static DLL linkage
 	//	HookAPICalls(&D3DHook);		// dynamic DLL linkage
 
-#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING)
+#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING) || defined(OBGE_GAMMACORRECTION)
 		HookAPICalls(&D3XHook27);	// static DLL linkage
 		HookAPICalls(&D3XHook31);	// static DLL linkage
 		HookAPICalls(&D3XHook41);	// static DLL linkage
@@ -331,7 +331,9 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 
 	/* textures ------------------------------------------------------------------- */
 	obse->RegisterCommand(&kCommandInfo_LoadTexture);				// 210B
+#ifndef	NO_DEPRECATED
 	obse->RegisterCommand(&kCommandInfo_FreeTexture);				// 210C
+#endif
 
 	/* hud ------------------------------------------------------------------------ */
 	obse->RegisterCommand(&kCommandInfo_CreateHUDElement);				// 210D
@@ -405,7 +407,7 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 
 #if	!defined(OBGE_NOSHADER)
 			CreateShaderIOHook();
-#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING)
+#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING) || defined(OBGE_GAMMACORRECTION)
 			CreateTextureIOHook();
 #endif
 #endif

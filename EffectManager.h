@@ -19,11 +19,7 @@
 #include "obse/PluginAPI.h"
 #include "D3D9Identifiers.hpp"
 
-#ifndef	NO_DEPRECATED
 #define SHADERVERSION 1
-#else
-#define SHADERVERSION 2
-#endif
 
 class EffectManager;
 
@@ -87,6 +83,8 @@ public:
 private:
 	IDirect3DTexture9 *		Tex[EBUFRT_NUM];
 	IDirect3DSurface9 *		Srf[EBUFRT_NUM];
+
+	bool				mine;
 };
 
 class EffectQueue

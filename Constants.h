@@ -51,6 +51,9 @@ extern struct sConstants
 	struct { int x, y, z, w; }	iGameTime;
 	struct { int x, y, z, w; }	iTikTiming;
 
+	// DeGamma, strength, Gamma, strength
+	v1_2_416::NiVector4		Gamma;
+
 	/* deprecated */
 #ifndef	NO_DEPRECATED
 	v1_2_416::NiVector4		time;
@@ -107,7 +110,7 @@ extern struct sConstants
 	  /* http://www.lighthouse3d.com/tutorials/view-frustum-culling/geometric-approach-extracting-the-planes/
 	   *
 	   * Hfar = 2 * tan(fov / 2) * farDist
-	   * Wfar = Hfar * ratio 
+	   * Wfar = Hfar * ratio
 	   */
 	  float Hfar = tan(FoV.y * 0.5) * ZRange.y;
 	  float Wfar = tan(FoV.x * 0.5) * ZRange.y;

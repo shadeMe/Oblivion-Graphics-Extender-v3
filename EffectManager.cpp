@@ -124,6 +124,12 @@ static FXIncludeManager incl;
 #define	EFFECTBUF_ZMASK		(EFFECTCOND_HASWNRM | EFFECTCOND_HASWPOS | EFFECTCOND_HASENRM | EFFECTCOND_HASEPOS | EFFECTCOND_HASLBUF | EFFECTCOND_HASZBUF | EFFECTBUF_RAWZ)
 #define	EFFECTBUF_TRANSFERZMASK	(EFFECTCOND_HASWNRM | EFFECTCOND_HASWPOS | EFFECTCOND_HASENRM | EFFECTCOND_HASEPOS | EFFECTCOND_HASLBUF |                      EFFECTBUF_RAWZ)
 
+/* deprecated */
+#ifndef	NO_DEPRECATED
+#undef	EFFECTBUF_ACHN
+#define	EFFECTBUF_ACHN		-1
+#endif
+
 typedef struct _myD3DXMACRO
 {
   const char *Name;
@@ -149,6 +155,10 @@ static myD3DXMACRO defs[] = {
   {"IN_PRJZ"	        	, IN_PRJZ},
   {"IN_NRMZ"	        	, IN_NRMZ},
   {"iface"	        	, TWEAK_DYNAMIC},
+
+#ifndef	OBGE_CONSTANTPOOLS
+  {"shared"	        	, ""},
+#endif
 
   {"EFFECTGROUP_FIRST"		, stringify(EFFECTGROUP_FIRST		)},
   {"EFFECTGROUP_PRE"		, stringify(EFFECTGROUP_PRE		)},
@@ -198,7 +208,7 @@ static myD3DXMACRO defs[] = {
   {"m44view"			, "oblv_ViewTransform_MAINPASS"		 },
   {"m44proj"			, "oblv_ProjectionTransform_MAINPASS"	 },
   {"f3EyeForward"		, "oblv_CameraForward_MAINPASS"		 },
-  {"f4Time"			, "oblv_GameTime"			 },
+//{"f4Time"			, "oblv_GameTime"			 },
   {"f4SunDir"			, "oblv_SunDirection"			 },
 #endif
 
@@ -209,8 +219,12 @@ static myD3DXMACRO defs[] = {
  */
 
 EffectBuffer::EffectBuffer() {
-  Tex[0] = Tex[1] = Tex[2] = Tex[3] = NULL;
-  Srf[0] = Srf[1] = Srf[2] = Srf[3] = NULL;
+  for (int rt = 0; rt < EBUFRT_NUM; rt++) {
+    Tex[rt] = NULL;
+    Srf[rt] = NULL;
+  }
+
+  mine = false;
 }
 
 EffectBuffer::~EffectBuffer() {
@@ -256,7 +270,7 @@ inline HRESULT EffectBuffer::Initialise(IDirect3DSurface9 *surf) {
 }
 
 inline HRESULT EffectBuffer::Initialise(const D3DFORMAT fmt[EBUFRT_NUM]) {
-  UInt32 Width = v1_2_416::GetRenderer()->SizeWidth;
+  UInt32 Width  = v1_2_416::GetRenderer()->SizeWidth;
   UInt32 Height = v1_2_416::GetRenderer()->SizeHeight;
   HRESULT hr;
 
@@ -277,14 +291,23 @@ inline HRESULT EffectBuffer::Initialise(const D3DFORMAT fmt[EBUFRT_NUM]) {
     }
   }
 
+  mine = true;
   return D3D_OK;
 }
 
 inline void EffectBuffer::Release() {
-  for (int rt = 0; rt < EBUFRT_NUM; rt++) {
-    if (Tex[rt]) Tex[rt]->Release(); Tex[rt] = NULL;
-    if (Srf[rt]) Srf[rt]->Release(); Srf[rt] = NULL;
-  }
+  if (mine)
+    for (int rt = 0; rt < EBUFRT_NUM; rt++) {
+      if (Tex[rt]) Tex[rt]->Release(); Tex[rt] = NULL;
+      if (Srf[rt]) Srf[rt]->Release(); Srf[rt] = NULL;
+    }
+  else
+    for (int rt = 0; rt < EBUFRT_NUM; rt++) {
+      Tex[rt] = NULL;
+      Srf[rt] = NULL;
+    }
+
+  mine = false;
 }
 
 inline bool EffectBuffer::IsValid() {
@@ -295,9 +318,8 @@ inline bool EffectBuffer::IsValid() {
 }
 
 bool EffectBuffer::IsTexture(IDirect3DBaseTexture9 *text) {
-  for (int rt = 0; rt < EBUFRT_NUM; rt++) {
+  for (int rt = 0; rt < EBUFRT_NUM; rt++)
     if (Tex[rt] == text) return true;
-  }
 
   return false;
 }
@@ -321,14 +343,14 @@ inline void EffectBuffer::SetRenderTarget(IDirect3DDevice9 *Device) {
 
 inline void EffectBuffer::Copy(IDirect3DDevice9 *Device, EffectBuffer *from) {
   for (int rt = 0; rt < EBUFRT_NUM; rt++) {
-    if (from->Srf[rt] && Srf[rt])
+    if (from->Srf[rt] && Srf[rt] && (from->Srf[rt] != Srf[rt]))
       minStretchRect(Device, from->Srf[rt], 0, Srf[rt], 0, D3DTEXF_NONE);
   }
 }
 
 inline void EffectBuffer::Copy(IDirect3DDevice9 *Device, IDirect3DSurface9 *from) {
   for (int rt = 0; rt < EBUFRT_NUM; rt++) {
-    if (from && Srf[rt])
+    if (from          && Srf[rt] && (from          != Srf[rt]))
       minStretchRect(Device, from, 0, Srf[rt], 0, D3DTEXF_NONE);
   }
 }
@@ -362,15 +384,15 @@ inline void EffectQueue::Begin(EffectBuffer *orig,
 
   /* 1)  begin() alterning = 1
    *  a) begin() alterning = 0, 0 == target, setrendertarget(target)
-   *     step()  alterning = 1, 1 == alt, setrendertarget(alt)
+   *     step()  alterning = 1, 1 == alt,    setrendertarget(alt)
    *     end()
    *  b) begin() alterning = 0, 0 == target, setrendertarget(target)
-   *     step()  alterning = 1, 1 == alt, setrendertarget(alt)
+   *     step()  alterning = 1, 1 == alt,    setrendertarget(alt)
    *     step()  alterning = 0, 0 == target, setrendertarget(target)
    *     end()
-   *  c) begin() alterning = 1, 1 == alt, setrendertarget(alt)
+   *  c) begin() alterning = 1, 1 == alt,    setrendertarget(alt)
    *     step()  alterning = 0, 0 == target, setrendertarget(target)
-   *     step()  alterning = 1, 1 == alt, setrendertarget(alt)
+   *     step()  alterning = 1, 1 == alt,    setrendertarget(alt)
    *     end()
    *     end()   alterning = 1, 1 == alt, copy alt to target
    */
@@ -418,10 +440,9 @@ inline void EffectQueue::End(ID3DXEffect *pEffect) {
 
 inline void EffectQueue::End(EffectBuffer *target) {
   /* this occurs when "target" never entered the queue,
-   * or when the have an odd number of accumulated passes
+   * or when we have an odd number of accumulated passes
    */
-  if (target != rotate[EQLAST])
-    target->Copy(device, rotate[EQLAST]);
+  target->Copy(device, rotate[EQLAST]);
 
   /* not allocated if not needed! */
   if (past)
@@ -994,6 +1015,10 @@ inline void EffectRecord::ApplySharedConstants() {
 
   pEffect->SetVector("oblv_SunDirection", &Constants.SunDir);
   pEffect->SetVector("oblv_SunTiming", &Constants.SunTiming);
+
+#ifndef	NO_DEPRECATED
+  pEffect->SetVector("f4Time", &Constants.time);
+#endif
 
 #ifndef	OBGE_NOSHADER
   pEffect->SetTexture("oblv_Rendertarget0_REFLECTIONPASS", passTexture[OBGEPASS_REFLECTION]);
@@ -1650,7 +1675,7 @@ void EffectManager::InitialiseFrameTextures() {
 	else if (bits <=  -8) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A8R8G8B8      : D3DFMT_X8R8G8B8);
 	else if (bits <=  -5) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A1R5G5B5      : D3DFMT_R5G6B5);
 	else if (bits <=  -4) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_A4R4G4B4      : D3DFMT_X4R4G4B4);
-	else if (bits <=  -3) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_R3G3B2	      : D3DFMT_R3G3B2);
+	else if (bits <=  -3) frmt = (RenderBuf & EFFECTBUF_ACHN ? D3DFMT_R3G3B2	: D3DFMT_R3G3B2);
 	else                  frmt = D3DFMT_UNKNOWN;
 
 	if (frmt != D3DFMT_UNKNOWN) {
@@ -1659,15 +1684,15 @@ void EffectManager::InitialiseFrameTextures() {
 	    break;
 	}
 
-	/**/ if (bits >=  32) bits = 16;
-	else if (bits >=  16) bits = 8;
-	else if (bits >=   8) bits = 0;
+	/**/ if (bits >=  32) bits =  16;
+	else if (bits >=  16) bits =   8;
+	else if (bits >=   8) bits =   0;
 	else if (bits <= -16) bits = -10;
-	else if (bits <= -10) bits = -8;
-	else if (bits <=  -8) bits = -5;
-	else if (bits <=  -5) bits = -4;
-	else if (bits <=  -4) bits = -3;
-	else if (bits <=  -3) bits = 0;
+	else if (bits <= -10) bits =  -8;
+	else if (bits <=  -8) bits =  -5;
+	else if (bits <=  -5) bits =  -4;
+	else if (bits <=  -4) bits =  -3;
+	else if (bits <=  -3) bits =   0;
       }
     }
 
@@ -1712,15 +1737,16 @@ void EffectManager::InitialiseFrameTextures() {
     if (RenderBuf & EFFECTBUF_ZBUF) if (RenderTransferZ)
       CurrDS.Initialise(
 	RenderTransferZ & EFFECTBUF_EPOS
-	  ? (bitz > 16 ? D3DFMT_A32B32G32R32F : D3DFMT_A16B16G16R16F)  // linear
+	  ? (!bitz || (bitz > 16) ? D3DFMT_A32B32G32R32F : D3DFMT_A16B16G16R16F)  // linear
 	  :
 	RenderTransferZ & EFFECTBUF_LBUF
-	  ? (bitz > 16 ? D3DFMT_R32F          : D3DFMT_R16F         )	// linear
-	  : (bitz > 16 ? D3DFMT_R32F          : D3DFMT_R16F         )	// non-linear
+	  ? (!bitz || (bitz > 16) ? D3DFMT_R32F          : D3DFMT_R16F         )	// linear
+	  : (!bitz || (bitz > 16) ? D3DFMT_R32F          : D3DFMT_R16F         )	// non-linear
       );
     if (RenderBuf & EFFECTBUF_ENRM) if (RenderTransferZ)
       CurrNM.Initialise(
-	    (bitz >  8 ? D3DFMT_A16B16G16R16  : D3DFMT_A8B8G8R8     )  // linear
+//	    (!bitz || (bitz >  8) ? D3DFMT_A16B16G16R16F : D3DFMT_A8B8G8R8     )  // linear
+	    (!bitz || (bitz >  8) ? D3DFMT_A16B16G16R16  : D3DFMT_A8B8G8R8     )  // linear
       );
  }
 #endif
@@ -1802,8 +1828,6 @@ void EffectManager::InitialiseBuffers() {
   uadj = Constants.rcpres[0] * 0.5;
   vadj = Constants.rcpres[1] * 0.5;
 
-  _MESSAGE("Creating effect vertex buffers.");
-
   if (SplitScreen.data) {
     minx = 0;
     minu = 0.5;
@@ -1820,7 +1844,13 @@ void EffectManager::InitialiseBuffers() {
     {1   , -1, 1, 1    + uadj, 1 + vadj, 3}
   };
 
-  GetD3DDevice()->CreateVertexBuffer(4 * sizeof(EffectQuad), D3DUSAGE_WRITEONLY, EFFECTQUADFORMAT, D3DPOOL_DEFAULT, &EffectVertex, 0);
+  _MESSAGE("Creating effect vertex buffers.");
+
+  if (GetD3DDevice()->CreateVertexBuffer(4 * sizeof(EffectQuad), D3DUSAGE_WRITEONLY, EFFECTQUADFORMAT, D3DPOOL_DEFAULT, &EffectVertex, 0) != D3D_OK) {
+    _MESSAGE("ERROR - Unable to create the vertex buffer!");
+    exit(0); return;
+  }
+
   EffectVertex->Lock(0, 0, &VertexPointer, 0);
   CopyMemory(VertexPointer, ShaderVertices, sizeof(ShaderVertices));
   EffectVertex->Unlock();
@@ -1829,7 +1859,10 @@ void EffectManager::InitialiseBuffers() {
   _MESSAGE("Creating effect constants pool.");
 
   /* utilize effect-pools to set less parameters per frame */
-  D3DXCreateEffectPool(&EffectPool);
+  if (D3DXCreateEffectPool(&EffectPool) != D3D_OK) {
+    _MESSAGE("ERROR - Unable to create constants-pool!");
+    exit(0); return;
+  }
 
   EffectShare = new EffectRecord();
   if (!EffectShare->LoadEffect("Constants.fx", 0) ||
@@ -1842,7 +1875,9 @@ void EffectManager::InitialiseBuffers() {
   }
 #endif
 
+#ifndef	NO_DEPRECATED
   Constants.bHasDepth = ::HasDepth();
+#endif
 }
 
 void EffectManager::ReleaseBuffers() {
@@ -1921,18 +1956,19 @@ void EffectManager::OnResetDevice() {
 }
 
 inline void EffectManager::UpdateFrameConstants(v1_2_416::NiDX9Renderer *Renderer) {
-  Constants.UpdateView      ((D3DXMATRIX)Renderer->m44View      );
-  Constants.UpdateProjection((D3DXMATRIX)Renderer->m44Projection);
-
   v1_2_416::NiCamera **pMainCamera = (v1_2_416::NiCamera **)0x00B43124;
-
+  const char *CamName = (*pMainCamera)->m_pcName;
   Renderer->SetCameraViewProj(*pMainCamera);
+
+  /* update matrices after the view/projection has been set */
+  Constants.UpdateView      ((const D3DXMATRIX &)Renderer->m44View      );
+  Constants.UpdateProjection((const D3DXMATRIX &)Renderer->m44Projection);
+
   D3DXMatrixTranslation(&Constants.wrld,
 			-(*pMainCamera)->m_worldTranslate.x,
 			-(*pMainCamera)->m_worldTranslate.y,
 			-(*pMainCamera)->m_worldTranslate.z);
 
-  char *CamName = (*pMainCamera)->m_pcName;
   (*pMainCamera)->m_worldRotate.GetForwardVector(&Constants.EyeForward);
 
   /* products and inverses */
@@ -2039,7 +2075,10 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
   /* rendertarget without texture, this can happen when the
    * color-buffer is multi-sampled
    */
-  if ((OrigRT.Initialise(RenderFrom) != D3D_OK)) {
+#ifndef	OBGE_NOSHADER
+  if ((OrigRT.Initialise(RenderFrom) != D3D_OK))
+#endif
+  {
     OrigRT.Initialise(RenderFmt);
     OrigRT.Copy(D3DDevice, RenderFrom);
   }
@@ -2062,7 +2101,7 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
     if (RenderTransferZ > EFFECTBUF_RAWZ) {
       if (RenderTransferZ & EFFECTBUF_EPOS) {
         /* convert WHATEVER to projected form (CurrDS) */
-	tec = EffectDepth->GetEffect()->GetTechniqueByName("project");
+	tec = EffectDepth->GetEffect()->GetTechniqueByName("projecteye");
 
 	if (RenderTransferZ & EFFECTBUF_ENRM) {
 	  EffectDepth->GetEffect()->SetTechnique(tec);
@@ -2072,7 +2111,7 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
 	  CurrNM.SetRenderTarget(D3DDevice);
 
 	  /* convert projected positions to normals (OrigDS) */
-	  tec = EffectDepth->GetEffect()->GetTechniqueByName("normal");
+	  tec = EffectDepth->GetEffect()->GetTechniqueByName("normaleye");
 	}
       }
       else

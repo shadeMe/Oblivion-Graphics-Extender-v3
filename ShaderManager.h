@@ -114,6 +114,8 @@ public:
 	};
 };
 
+#define	OBGESAMPLER_NUM	16
+
 struct RuntimeConstant {
   union mem {
     bool condition;
@@ -128,7 +130,7 @@ struct RuntimeVariable {
   int offset, length;
   const char *name;
   union mem {
-    bool condition;
+    bool *condition;
     struct iv { int vec[4]; } *integer;
     struct fv { float vec[4]; } *floating;
     struct tv { D3DSAMPLERSTATETYPE Type; DWORD Value; } *state;
@@ -235,8 +237,6 @@ struct CameraQuad { float x,y,z, rhw; float u,v; };
 	int					frame_used[OBGEPASS_NUM];
 	int					frame_pass[OBGEPASS_NUM];
 
-#define	OBGESAMPLER_NUM	16
-
 	/* collect associated pairs of shaders */
 	std::set<RuntimeShaderRecord *>		Paired;
 
@@ -248,8 +248,8 @@ struct CameraQuad { float x,y,z, rhw; float u,v; };
 //	  DWORD					states_t[OBGESAMPLER_NUM][33];	// texturesstage states, D3DTEXTURESTAGESTATETYPE 33
 
 	  IDirect3DBaseTexture9 *		values_s[OBGESAMPLER_NUM];	// ps 16, vs 4
-	  int					values_b[16][4];		// ps 16, vs 16
-	  int					values_i[16][4];		// ps 16, vs 16
+	  bool					values_b[256];		// ps 16, vs 16
+	  int					values_i[256][4];		// ps 16, vs 16
 	  float					values_c[256][4];
 	} traced[OBGEPASS_NUM];
 #endif
@@ -268,7 +268,7 @@ struct GlobalConstants
 	ConstsList		pInt4;
 	ConstsList		pFloat4;
 //	ConstsList		pTexture;
-	RuntimeConstant		pTexture[16];
+	RuntimeConstant		pTexture[OBGESAMPLER_NUM];
 //	ConstsList		pSampler;
 };
 

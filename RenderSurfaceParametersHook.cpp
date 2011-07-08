@@ -28,10 +28,10 @@ static global<bool> UseWaterHiRes(0, "Oblivion.ini", "Water", "bUseWaterHiRes");
 
 class Anonymous {
 
-#ifndef	OBGE_NOSHADER
 public:
   void TrackCombinerPass(int unk1);
 
+#ifndef	OBGE_NOSHADER
   void TrackReflectionCull(int unk1);
   void TrackReflectionPass(int unk1, int unk2);
   void TrackWaterSurfacePass();
@@ -62,9 +62,9 @@ public:
   void *TrackRenderedSurface(v1_2_416::NiDX9Renderer *renderer, int Width, int Height, int Flags, D3DFORMAT Format, enum SurfaceIDs SurfaceTypeID);
 };
 
-#ifndef	OBGE_NOSHADER
 void (__thiscall Anonymous::* CombinerPass)(int)/* =
 	(void (__thiscall TES::*)(int, int))0040C830*/;
+#ifndef	OBGE_NOSHADER
 void (__thiscall Anonymous::* ReflectionCull)(int)/* =
 	(void (__thiscall TES::*)(int, int))0049CBF0*/;
 void (__thiscall Anonymous::* ReflectionPass)(int, int)/* =
@@ -106,9 +106,11 @@ void (__cdecl * IdlePass)(int, int)/* =
 	(void (__thiscall TES::*)(int, int))0x007D71C0*/;
 bool (__cdecl * IsScriptRunning)(int, int)/* =
 	(void (__thiscall TES::*)(int, int))0x004F8DB0*/;
+#endif
 
 void (__thiscall Anonymous::* TrackCombinerPass)(int)/* =
 	(void (__thiscall TES::*)(int, int))0040C830*/;
+#ifndef	OBGE_NOSHADER
 void (__thiscall Anonymous::* TrackReflectionCull)(int)/* =
 	(void (__thiscall TES::*)(int, int))0049CBF0*/;
 void (__thiscall Anonymous::* TrackReflectionPass)(int, int)/* =
@@ -147,19 +149,11 @@ void (__thiscall Anonymous::* TrackMiscPass)(int)/* =
 	(void (__thiscall TES::*)(int, int))0x0057F170*/;
 #endif
 
-#ifndef	OBGE_NOSHADER
-void Anonymous::TrackReflectionCull(int unk1) {
-	*((char *)0x00B07068) = UseWaterReflectionsActors.Get();	// boolUseWaterReflectionsActors
-	*((char *)0x00B07070) = UseWaterReflectionsTrees.Get();		// boolUseWaterReflectionsTrees
-	*((char *)0x00B07078) = UseWaterReflectionsStatics.Get();	// boolUseWaterReflectionsStatics
-	*((char *)0x00B07080) = UseWaterReflectionsMisc.Get();	        // boolUseWaterReflectionsMisc
-
-	(this->*ReflectionCull)(unk1);
-}
-
 void Anonymous::TrackCombinerPass(int unk1) {
+#ifndef	OBGE_NOSHADER
 	enum OBGEPass previousPass = currentPass;
 	currentPass = OBGEPASS_MAIN;
+#endif
 
 	if (frame_log)
 		frame_log->Message("OD3D9: CombinerPass started");
@@ -178,7 +172,19 @@ void Anonymous::TrackCombinerPass(int unk1) {
 //	else
 //		_MESSAGE("OD3D9: CombinerPass finished");
 
+#ifndef	OBGE_NOSHADER
 	currentPass = previousPass;
+#endif
+}
+
+#ifndef	OBGE_NOSHADER
+void Anonymous::TrackReflectionCull(int unk1) {
+	*((char *)0x00B07068) = UseWaterReflectionsActors.Get();	// boolUseWaterReflectionsActors
+	*((char *)0x00B07070) = UseWaterReflectionsTrees.Get();		// boolUseWaterReflectionsTrees
+	*((char *)0x00B07078) = UseWaterReflectionsStatics.Get();	// boolUseWaterReflectionsStatics
+	*((char *)0x00B07080) = UseWaterReflectionsMisc.Get();	        // boolUseWaterReflectionsMisc
+
+	(this->*ReflectionCull)(unk1);
 }
 
 void Anonymous::TrackReflectionPass(int unk1, int unk2) {
@@ -794,9 +800,9 @@ void CreateRenderSurfaceHook(void) {
 	/* combined reflection and water passes: 0049E880 */
 	/* combined hdr related: 0049E880 */
 
+	*((int *)&CombinerPass)          = 0x0040C830;
 #ifndef	OBGE_NOSHADER
 	/* ReflectionPass */
-	*((int *)&CombinerPass)          = 0x0040C830;
 	*((int *)&ReflectionCull)        = 0x0049CBF0;
 	*((int *)&ReflectionPass)        = 0x0049BEF0;
 	*((int *)&WaterSurfaceLoop)      = 0x0049A200;
@@ -818,9 +824,11 @@ void CreateRenderSurfaceHook(void) {
 
 	*((int *)&VideoPass)             = 0x004106C0;
 	*((int *)&MiscPass)              = 0x0057F170;
+#endif
 
 
 	TrackCombinerPass          = &Anonymous::TrackCombinerPass;
+#ifndef	OBGE_NOSHADER
 	TrackReflectionCull        = &Anonymous::TrackReflectionCull;
 	TrackReflectionPass        = &Anonymous::TrackReflectionPass;
 	TrackWaterSurfaceLoop      = &Anonymous::TrackWaterSurfaceLoop;		// ?
@@ -843,7 +851,7 @@ void CreateRenderSurfaceHook(void) {
 	TrackVideoPass             = &Anonymous::TrackVideoPass;
 	TrackMiscPass              = &Anonymous::TrackMiscPass;
 
-	*((int *)&IdlePass) = 0x007D71C0;
+	*((int *)&IdlePass       ) = 0x007D71C0;
 	*((int *)&IsScriptRunning) = 0x004F8DB0;
 #endif
 
@@ -856,8 +864,8 @@ void CreateRenderSurfaceHook(void) {
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
 
-#ifndef	OBGE_NOSHADER
 	DetourAttach(&(PVOID&)CombinerPass,          *((PVOID *)&TrackCombinerPass));
+#ifndef	OBGE_NOSHADER
 	DetourAttach(&(PVOID&)ReflectionCull,        *((PVOID *)&TrackReflectionCull));
 	DetourAttach(&(PVOID&)ReflectionPass,        *((PVOID *)&TrackReflectionPass));
 //	DetourAttach(&(PVOID&)WaterSurfaceLoop,      *((PVOID *)&TrackWaterSurfaceLoop));

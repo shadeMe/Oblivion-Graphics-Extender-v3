@@ -95,6 +95,10 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDToolsSettingsAmplify = new wxMenuItem( SDToolsSettings, wxID_AMPLIFY, wxString( wxT("Angle amplification over mip-maps for NM") ) , wxEmptyString, wxITEM_CHECK );
 	SDToolsSettings->Append( SDToolsSettingsAmplify );
 	
+	wxMenuItem* SDToolsSettingsGamma;
+	SDToolsSettingsGamma = new wxMenuItem( SDToolsSettings, wxID_MIPGAMMA, wxString( wxT("Gamma correction for MIPs") ) , wxEmptyString, wxITEM_CHECK );
+	SDToolsSettings->Append( SDToolsSettingsGamma );
+	
 	SDTools->Append( -1, wxT("Settings"), SDToolsSettings );
 	
 	wxMenuItem* SDConvertQDM;
@@ -138,6 +142,10 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDTweaksAF->Append( SDTweakAF32 );
 	
 	SDTweaks->Append( -1, wxT("Anisotropy"), SDTweaksAF );
+	
+	wxMenuItem* SDTweaksGamma;
+	SDTweaksGamma = new wxMenuItem( SDTweaks, wxID_LINEAR, wxString( wxT("Linear colorspace") ) , wxEmptyString, wxITEM_CHECK );
+	SDTweaks->Append( SDTweaksGamma );
 	
 	SDMenubar->Append( SDTweaks, wxT("Tweaks") ); 
 	
@@ -914,6 +922,7 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	this->Connect( SDTweakAF8->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
 	this->Connect( SDTweakAF16->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
 	this->Connect( SDTweakAF32->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
+	this->Connect( SDTweaksGamma->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoLinear ) );
 	SDChoicePass->Connect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoRenderpassSwitch ), NULL, this );
 	SDViewSwitch->Connect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxNotebookEventHandler( wxShaderDeveloper::DoViewSwitch ), NULL, this );
 	SDComboShader->Connect( wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderSwitch ), NULL, this );
@@ -986,6 +995,7 @@ wxShaderDeveloper::~wxShaderDeveloper()
 	this->Disconnect( wxID_AF8, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
 	this->Disconnect( wxID_AF16, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
 	this->Disconnect( wxID_AF32, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
+	this->Disconnect( wxID_LINEAR, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoLinear ) );
 	SDChoicePass->Disconnect( wxEVT_COMMAND_CHOICE_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoRenderpassSwitch ), NULL, this );
 	SDViewSwitch->Disconnect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxNotebookEventHandler( wxShaderDeveloper::DoViewSwitch ), NULL, this );
 	SDComboShader->Disconnect( wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoShaderSwitch ), NULL, this );

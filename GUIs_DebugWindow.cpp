@@ -254,7 +254,7 @@ static int POStoRGB(int pos, int max) {
 		  case 3: return RETURN_RGB(m, n, v);
 		  case 4: return RETURN_RGB(n, m, v);
 		  case 5: return RETURN_RGB(v, m, n);
-  } 
+  }
   return 0;
 }
 
@@ -294,6 +294,9 @@ public:
 
     /* start enabling these functions */
     SDButtonEffectNew->Enable();
+
+    SDTweaks->FindChildItem(wxID_LINEAR, NULL)->Enable(true);
+    SDTweaks->FindChildItem(wxID_LINEAR, NULL)->Check(DeGamma && ReGamma);
 
     if (1 > lastOBGEDirect3D9CAPS.MaxAnisotropy)
       SDTweaksAF->FindChildItem(wxID_AF1, NULL)->Enable(false);
@@ -357,12 +360,19 @@ public:
     // create dataset
     vset = new XYDynamicDataset();
     vset->AddRef();
-  
+
     // set line renderer to dataset
     vset->SetRenderer(rndrP);
 
     // add our dataset to plot
     plot->AddDataset(vset);
+
+    // create dataset
+    hist[OBGEPASS_ANY].dset = new XYDynamicDataset();
+    hist[OBGEPASS_ANY].dset->AddRef();
+
+    // set line renderer to dataset
+    hist[OBGEPASS_ANY].dset->SetRenderer(rndrP);
 
     for (int p = OBGEPASS_MAX; p >= OBGEPASS_MIN; p--) {
       // create dataset
@@ -390,7 +400,7 @@ public:
     // link axes and dataset
     plot->LinkDataVerticalAxis(0, 0);
     plot->LinkDataHorizontalAxis(0, 0);
- 
+
     // set legend to plot
     plot->SetLegend(new Legend(wxTOP, wxLEFT));
 
@@ -414,8 +424,8 @@ public:
 #endif
   }
 
-//wxGauge *SDStatusGauge; 
-//wxStaticText *SDStatusText; 
+//wxGauge *SDStatusGauge;
+//wxStaticText *SDStatusText;
 //wxBoxSizer *SDStatusSizerV;
 //wxBoxSizer *SDStatusSizerH;
 
@@ -686,8 +696,20 @@ public:
 	  for (int r = 0; r < desc.Constants; r++) {
 	    D3DXHANDLE handle = c->GetConstant(NULL, r);
 	    c->GetConstantDesc(handle, &cnst, &count);
+	    D3DXREGISTER_SET rs = cnst.RegisterSet;
 
-	    if (cnst.RegisterSet != f)
+//	    switch (cnst.Type) {
+//	      case D3DXPT_BOOL: rs = D3DXRS_BOOL; break;
+//	      case D3DXPT_INT: rs = D3DXRS_INT4; break;
+//	      case D3DXPT_FLOAT: rs = D3DXRS_FLOAT4; break;
+//	      case D3DXPT_SAMPLER:
+//	      case D3DXPT_SAMPLER1D:
+//	      case D3DXPT_SAMPLER2D:
+//	      case D3DXPT_SAMPLER3D:
+//	      case D3DXPT_SAMPLERCUBE: rs = D3DXRS_SAMPLER; break;
+//	    }
+
+	    if (rs != f)
 	      continue;
 
 	    char c = ' ';
@@ -747,8 +769,8 @@ public:
 	  wxColour clr = wxColour("GREY");
 	  for (int x = 0; x < fs[f]; x++) {
 	    assert(x < OBGESAMPLER_NUM);
-	    if (*((int *)&t->values_b[x][0]) != -1) {
-	      sprintf(buf, "%d, %d, %d, %d", t->values_b[x][0], t->values_b[x][1], t->values_b[x][2], t->values_b[x][3]);
+	    if (*((char *)&t->values_b[x]) != -1) {
+	      sprintf(buf, "%d", t->values_b[x]);
 
 	      gt->SetCellTextColour(pos + x, col, clr);
 	      gt->SetCellValue(pos + x, col, wxString(buf));
@@ -939,7 +961,7 @@ public:
   }
 
   void SetEffectConstSetTable(wxGrid *gt, bool prefix, ID3DXEffect *x, int len, int col, int offs) {
-    char buf[256];
+    char buf[1024];
 
     if (gt && x) {
       int pos = offs + 0, d = 0;
@@ -967,16 +989,17 @@ public:
 	      for (int rw = 0; rw < Description.Rows; rw++) {
 		gt->InsertRows(pos + d, 1);
 
+		buf[0] = buf[1023] = '\0';
 		if (Description.Rows > 1)
-		  sprintf(buf, "%s[%d]", Description.Name, rw);
+		  _snprintf(buf, 1023, "%s[%d]", Description.Name, rw);
 		else
-		  sprintf(buf, "%s", Description.Name);
+		  _snprintf(buf, 1023, "%s", Description.Name);
 
 		gt->SetRowLabelValue(pos + d, wxString(buf));
 
-		buf[0] = '\0';
+		buf[0] = buf[1023] = '\0';
 		for (int i = rw * IntData.size; i < (rw + 1) * IntData.size; i++)
-		  sprintf(buf, "%s%d%s", buf, IntData.data[i], i != ((rw + 1) * IntData.size - 1) ? ", " : "");
+		  _snprintf(buf, 1023, "%s%d%s", buf, IntData.data[i], i != ((rw + 1) * IntData.size - 1) ? ", " : "");
 
 		wxColour clr = wxColour("BLUE");
 		gt->SetCellTextColour(pos + d, col + 0, clr);
@@ -1009,16 +1032,17 @@ public:
 	      for (int rw = 0; rw < Description.Rows; rw++) {
 		gt->InsertRows(pos + d, 1);
 
+		buf[0] = buf[1023] = '\0';
 		if (Description.Rows > 1)
-		  sprintf(buf, "%s[%d]", Description.Name, rw);
+		  _snprintf(buf, 1023, "%s[%d]", Description.Name, rw);
 		else
-		  sprintf(buf, "%s", Description.Name);
+		  _snprintf(buf, 1023, "%s", Description.Name);
 
 		gt->SetRowLabelValue(pos + d, wxString(buf));
 
-		buf[0] = '\0';
+		buf[0] = buf[1023] = '\0';
 		for (int i = rw * FloatData.size; i < (rw + 1) * FloatData.size; i++)
-		  sprintf(buf, "%s%f%s", buf, FloatData.data[i], i != ((rw + 1) * FloatData.size - 1) ? ", " : "");
+		  _snprintf(buf, 1023, "%s%f%s", buf, FloatData.data[i], i != ((rw + 1) * FloatData.size - 1) ? ", " : "");
 
 		wxColour clr = wxColour("BLUE");
 		gt->SetCellTextColour(pos + d, col + 0, clr);
@@ -2524,7 +2548,7 @@ public:
 	hist[pass].dset->BeginUpdate();
 
 	/* loop over passes */
-	for (int p = OBGEPASS_NUM; p > OBGEPASS_MIN; p--) {
+	for (int p = OBGEPASS_NUM; p >= OBGEPASS_MIN; p--) {
 	  if (!(serie = hist[pass].series[p])) {
 	    serie = new XYDynamicSerie();
 
@@ -2570,7 +2594,7 @@ public:
 	}
 
 	/* loop over passes */
-	for (int p = OBGEPASS_NUM; p > OBGEPASS_MIN; p--) {
+	for (int p = OBGEPASS_NUM; p >= OBGEPASS_MIN; p--) {
 	  serie = hist[pass].series[p];
 
 	  /* cap the number of resulting data to OBGEFRAME_NUM */
@@ -3200,7 +3224,7 @@ public:
     sm = NULL;
     if ((sm = ShaderManager::GetSingleton())) {
       wxMenuItem *mi;
- 
+
       mi = SDShaderOptions->FindChildItem(wxID_SCOMPILE,  NULL); mi->Check(sm->CompileSources());
       mi = SDShaderOptions->FindChildItem(wxID_SSAVEBIN,  NULL); mi->Check(sm->SaveShaderOverride());
       mi = SDShaderOptions->FindChildItem(wxID_SLEGACY,   NULL); mi->Check(sm->UseLegacyCompiler());
@@ -3498,28 +3522,28 @@ public:
 
 	  switch (Description.Columns) {
 	    case 4:
-	      if (sscanf(newvl, "%g,%g,%g,%g", 
-		    &IntData.data[rw * IntData.size + 0], 
-		    &IntData.data[rw * IntData.size + 1], 
-		    &IntData.data[rw * IntData.size + 2], 
+	      if (sscanf(newvl, "%g,%g,%g,%g",
+		    &IntData.data[rw * IntData.size + 0],
+		    &IntData.data[rw * IntData.size + 1],
+		    &IntData.data[rw * IntData.size + 2],
 		    &IntData.data[rw * IntData.size + 3]
 		  ) == 4)
 		break;
 	    case 3:
-	      if (sscanf(newvl, "%g,%g,%g", 
-		    &IntData.data[rw * IntData.size + 0], 
-		    &IntData.data[rw * IntData.size + 1], 
+	      if (sscanf(newvl, "%g,%g,%g",
+		    &IntData.data[rw * IntData.size + 0],
+		    &IntData.data[rw * IntData.size + 1],
 		    &IntData.data[rw * IntData.size + 2]
 		  ) == 3)
 		break;
 	    case 2:
-	      if (sscanf(newvl, "%g,%g", 
-		    &IntData.data[rw * IntData.size + 0], 
+	      if (sscanf(newvl, "%g,%g",
+		    &IntData.data[rw * IntData.size + 0],
 		    &IntData.data[rw * IntData.size + 1]
 		  ) == 2)
 		break;
 	    case 1:
-	      if (sscanf(newvl, "%g", 
+	      if (sscanf(newvl, "%g",
 		    &IntData.data[rw * IntData.size + 0]
 		  ) == 1)
 		break;
@@ -3541,28 +3565,28 @@ public:
 
 	  switch (Description.Columns) {
 	    case 4:
-	      if (sscanf(newvl, "%g,%g,%g,%g", 
-		    &FloatData.data[rw * FloatData.size + 0], 
-		    &FloatData.data[rw * FloatData.size + 1], 
-		    &FloatData.data[rw * FloatData.size + 2], 
+	      if (sscanf(newvl, "%g,%g,%g,%g",
+		    &FloatData.data[rw * FloatData.size + 0],
+		    &FloatData.data[rw * FloatData.size + 1],
+		    &FloatData.data[rw * FloatData.size + 2],
 		    &FloatData.data[rw * FloatData.size + 3]
 		  ) == 4)
 		break;
 	    case 3:
-	      if (sscanf(newvl, "%g,%g,%g", 
-		    &FloatData.data[rw * FloatData.size + 0], 
-		    &FloatData.data[rw * FloatData.size + 1], 
+	      if (sscanf(newvl, "%g,%g,%g",
+		    &FloatData.data[rw * FloatData.size + 0],
+		    &FloatData.data[rw * FloatData.size + 1],
 		    &FloatData.data[rw * FloatData.size + 2]
 		  ) == 3)
 		break;
 	    case 2:
-	      if (sscanf(newvl, "%g,%g", 
-		&FloatData.data[rw * FloatData.size + 0], 
+	      if (sscanf(newvl, "%g,%g",
+		&FloatData.data[rw * FloatData.size + 0],
 		&FloatData.data[rw * FloatData.size + 1]
 	      ) == 2)
 		break;
 	    case 1:
-	      if (sscanf(newvl, "%g", 
+	      if (sscanf(newvl, "%g",
 		    &FloatData.data[rw * FloatData.size + 0]
 		  ) == 1)
 		break;
@@ -3884,28 +3908,28 @@ public:
 
 	  switch (Description.Columns) {
 	    case 4:
-	      if (sscanf(newvl, "%g,%g,%g,%g", 
-		    &IntData.data[rw * IntData.size + 0], 
-		    &IntData.data[rw * IntData.size + 1], 
-		    &IntData.data[rw * IntData.size + 2], 
+	      if (sscanf(newvl, "%g,%g,%g,%g",
+		    &IntData.data[rw * IntData.size + 0],
+		    &IntData.data[rw * IntData.size + 1],
+		    &IntData.data[rw * IntData.size + 2],
 		    &IntData.data[rw * IntData.size + 3]
 		  ) == 4)
 		break;
 	    case 3:
-	      if (sscanf(newvl, "%g,%g,%g", 
-		    &IntData.data[rw * IntData.size + 0], 
-		    &IntData.data[rw * IntData.size + 1], 
+	      if (sscanf(newvl, "%g,%g,%g",
+		    &IntData.data[rw * IntData.size + 0],
+		    &IntData.data[rw * IntData.size + 1],
 		    &IntData.data[rw * IntData.size + 2]
 		  ) == 3)
 		break;
 	    case 2:
-	      if (sscanf(newvl, "%g,%g", 
-		    &IntData.data[rw * IntData.size + 0], 
+	      if (sscanf(newvl, "%g,%g",
+		    &IntData.data[rw * IntData.size + 0],
 		    &IntData.data[rw * IntData.size + 1]
 		  ) == 2)
 		break;
 	    case 1:
-	      if (sscanf(newvl, "%g", 
+	      if (sscanf(newvl, "%g",
 		    &IntData.data[rw * IntData.size + 0]
 		  ) == 1)
 		break;
@@ -3927,28 +3951,28 @@ public:
 
 	  switch (Description.Columns) {
 	    case 4:
-	      if (sscanf(newvl, "%g,%g,%g,%g", 
-		    &FloatData.data[rw * FloatData.size + 0], 
-		    &FloatData.data[rw * FloatData.size + 1], 
-		    &FloatData.data[rw * FloatData.size + 2], 
+	      if (sscanf(newvl, "%g,%g,%g,%g",
+		    &FloatData.data[rw * FloatData.size + 0],
+		    &FloatData.data[rw * FloatData.size + 1],
+		    &FloatData.data[rw * FloatData.size + 2],
 		    &FloatData.data[rw * FloatData.size + 3]
 		  ) == 4)
 		break;
 	    case 3:
-	      if (sscanf(newvl, "%g,%g,%g", 
-		    &FloatData.data[rw * FloatData.size + 0], 
-		    &FloatData.data[rw * FloatData.size + 1], 
+	      if (sscanf(newvl, "%g,%g,%g",
+		    &FloatData.data[rw * FloatData.size + 0],
+		    &FloatData.data[rw * FloatData.size + 1],
 		    &FloatData.data[rw * FloatData.size + 2]
 		  ) == 3)
 		break;
 	    case 2:
-	      if (sscanf(newvl, "%g,%g", 
-		    &FloatData.data[rw * FloatData.size + 0], 
+	      if (sscanf(newvl, "%g,%g",
+		    &FloatData.data[rw * FloatData.size + 0],
 		    &FloatData.data[rw * FloatData.size + 1]
 		  ) == 2)
 		break;
 	    case 1:
-	      if (sscanf(newvl, "%g", 
+	      if (sscanf(newvl, "%g",
 		    &FloatData.data[rw * FloatData.size + 0]
 		  ) == 1)
 		break;
@@ -4524,6 +4548,19 @@ public:
   /* --------------------------------------------------------------
    */
 
+  virtual void DoLinear(wxCommandEvent& event) {
+    TextureManager *em = TextureManager::GetSingleton();
+    wxMenuItem *mi;
+
+    mi = SDTweaks->FindChildItem(wxID_LINEAR, NULL);
+    em->DoDeGamma(mi->IsChecked());
+    em->DoReGamma(mi->IsChecked());
+//  event.Skip();wxID_LINEAR
+  }
+
+  /* --------------------------------------------------------------
+   */
+
   void SetProgress(int a, int amax, int b, int bmax) {
     char buf[256];
 
@@ -4656,7 +4693,7 @@ void DebugWindow::Exit() {
 void DebugWindow::SetProgress(int a, int amax, int b, int bmax) {
 	GUIs_ShaderDeveloper *
 	sdev = (GUIs_ShaderDeveloper *)this->sdev;
-	
+
 	sdev->SetProgress(a, amax, b, bmax);
 }
 

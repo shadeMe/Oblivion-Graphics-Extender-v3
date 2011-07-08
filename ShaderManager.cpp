@@ -695,6 +695,9 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	  const char *mg = strstr(buf, "MAGFILTER");
 	  const char *bc = strstr(buf, "Bordercolor");
 	  const char *af = strstr(buf, "MaxAnisotropy");
+#if	defined(OBGE_GAMMACORRECTION)
+	  const char *dg = strstr(buf, "sRGBTexture");
+#endif
 
 	  if (au) {
 	    char *end = (char *)strchr(au, ';'); if (end) *end = '\0';
@@ -763,6 +766,18 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	    *States++ = D3DSAMP_MAXANISOTROPY;
 	    *States++ = *((DWORD *)&col);
 	  }
+#if	defined(OBGE_GAMMACORRECTION)
+	  if (dg) {
+	    char *end = (char *)strchr(dg, ';'); if (end) *end = '\0';
+
+	    /* currently fixed */
+	    bool sRGB = false;
+	    if (strstr(dg, "true"))
+	      sRGB = true;
+	    *States++ = D3DSAMP_SRGBTEXTURE;
+	    *States++ = *((DWORD *)&sRGB);
+	  }
+#endif
 	}
       }
     }
@@ -1331,7 +1346,7 @@ void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect
 	if (StateDevice->CreateTexture(
 		CurrD.Width, CurrD.Height, 1,
 		D3DUSAGE_RENDERTARGET /*CurrD.Usage*/,
-		(BufferZDepthNumBits.Get() != 16
+		(BufferZDepthNumBits.Get() > 16
 		? D3DFMT_R32F
 		: D3DFMT_R16F) /*CurrD.Format*/,
 		CurrD.Pool, &pTextDS, NULL) == D3D_OK) {
@@ -1495,17 +1510,29 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
       for (int c = 0; c < desc.Constants; c++) {
 	D3DXHANDLE handle = CoTa->GetConstant(NULL, c);
 	CoTa->GetConstantDesc(handle, &cnst, &count);
+	D3DXREGISTER_SET rs = cnst.RegisterSet;
 
-	if (cnst.RegisterSet <= 4) {
+//	switch (cnst.Type) {
+//	  case D3DXPT_BOOL: rs = D3DXRS_BOOL; break;
+//	  case D3DXPT_INT: rs = D3DXRS_INT4; break;
+//	  case D3DXPT_FLOAT: rs = D3DXRS_FLOAT4; break;
+//	  case D3DXPT_SAMPLER:
+//	  case D3DXPT_SAMPLER1D:
+//	  case D3DXPT_SAMPLER2D:
+//	  case D3DXPT_SAMPLER3D:
+//	  case D3DXPT_SAMPLERCUBE: rs = D3DXRS_SAMPLER; break;
+//	}
+
+	if (rs <= 4) {
 	  if ((cnst.Name == strstr(cnst.Name, "cust_")) ||
 	      (cnst.Name == strstr(cnst.Name, "glob_")) ||
 	      (cnst.Name == strstr(cnst.Name, "oblv_")))
-	    lcls[cnst.RegisterSet] += cnst.RegisterCount;
+	    lcls[rs] += cnst.RegisterCount;
 	  if ((cnst.Name == strstr(cnst.Name, "obge_")) ||
 	      (cnst.Name == strstr(cnst.Name, "oblv_")) ||
 	      (cnst.Name == strstr(cnst.Name, "glob_")) ||
 	      (cnst.Name == strstr(cnst.Name, "cust_")))
-	    nums[cnst.RegisterSet] += 1;
+	    nums[rs] += 1;
 	}
       }
 
@@ -1552,8 +1579,20 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
       for (int c = 0; c < desc.Constants; c++) {
 	D3DXHANDLE handle = CoTa->GetConstant(NULL, c);
 	CoTa->GetConstantDesc(handle, &cnst, &count);
+	D3DXREGISTER_SET rs = cnst.RegisterSet;
 
-	if (cnst.RegisterSet > 4)
+//	switch (cnst.Type) {
+//	  case D3DXPT_BOOL: rs = D3DXRS_BOOL; break;
+//	  case D3DXPT_INT: rs = D3DXRS_INT4; break;
+//	  case D3DXPT_FLOAT: rs = D3DXRS_FLOAT4; break;
+//	  case D3DXPT_SAMPLER:
+//	  case D3DXPT_SAMPLER1D:
+//	  case D3DXPT_SAMPLER2D:
+//	  case D3DXPT_SAMPLER3D:
+//	  case D3DXPT_SAMPLERCUBE: rs = D3DXRS_SAMPLER; break;
+//	}
+
+	if (rs > 4)
 	  continue;
 	if ((cnst.Name != strstr(cnst.Name, "obge_")) &&
 	    (cnst.Name != strstr(cnst.Name, "oblv_")) &&
@@ -1561,7 +1600,7 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	    (cnst.Name != strstr(cnst.Name, "cust_")))
 	  continue;
 
-	switch (cnst.RegisterSet) {
+	switch (rs) {
 	  case D3DXRS_BOOL:
 	    /**/ if (cnst.Name == strstr(cnst.Name, "obge_"))
 	      break;
@@ -1571,7 +1610,7 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	      break;
 	    else if (cnst.Name == strstr(cnst.Name, "cust_")) {
 	      if (cnst.DefaultValue)
-		pBool[cnts[D3DXRS_BOOL]].vals.condition = *((bool *)cnst.DefaultValue);
+		pBool[cnts[D3DXRS_BOOL]].vals.condition = (bool *)cnst.DefaultValue;
 	    }
 
 	    pBool[cnts[D3DXRS_BOOL]].offset = cnst.RegisterIndex;
@@ -1601,6 +1640,8 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	    /**/ if (cnst.Name == strstr(cnst.Name, "obge_")) {
 	      /**/ if (cnst.Name == strstr(cnst.Name, "obge_Tick"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.fTikTiming;
+	      else if (cnst.Name == strstr(cnst.Name, "obge_Gamma"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.Gamma;
 	      else
 		break;
 	    }
@@ -1845,7 +1886,7 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
       /* set the constant arrays */
       if ((rV = pBool))
 	do {
-	  StateDevice->SetVertexShaderConstantB(rV->offset, (const BOOL *)&rV->vals.condition, rV->length);
+	  StateDevice->SetVertexShaderConstantB(rV->offset, (const BOOL *)rV->vals.condition, rV->length);
 	} while ((++rV)->length);
       if ((rV = pInt4))
 	do {
@@ -1879,7 +1920,7 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
       /* set the constant arrays */
       if ((rV = pBool))
 	do {
-	  StateDevice->SetPixelShaderConstantB(rV->offset, (const BOOL *)&rV->vals.condition, rV->length);
+	  StateDevice->SetPixelShaderConstantB(rV->offset, (const BOOL *)rV->vals.condition, rV->length);
 	} while ((++rV)->length);
       if ((rV = pInt4))
 	do {
@@ -1898,7 +1939,7 @@ bool RuntimeShaderRecord::SetShaderConstantB(const char *name, bool value) {
   if ((rV = pBool))
     do {
       if (!stricmp(rV->name, name)) {
-      	rV->vals.condition = value;
+      	*(rV->vals.condition) = value;
       	return true;
       }
     } while ((++rV)->length);

@@ -89,37 +89,25 @@ inline int rint(float n) {
  */
 
 template<int mode>
-void AccuRGBH(long *bs, long *br, ULONG b, int level, int l) {
+void AccuRGBH(long *bs, ULONG b, int level, int l) {
   /* seperate the channels and build the sum */
   bs[0] += (b >> 24) & 0xFF; /*h*/
   bs[1] += (b >> 16) & 0xFF; /*b*/
   bs[2] += (b >>  8) & 0xFF; /*g*/
   bs[3] += (b >>  0) & 0xFF; /*r*/
-
-  /* collect magnitudes */
-  br[0] = max(bs[0], br[1]); /*h*/
-  br[1] = max(bs[1], br[1]); /*b*/
-  br[2] = max(bs[2], br[2]); /*g*/
-  br[3] = max(bs[3], br[3]); /*r*/
 }
 
 template<int mode>
-void AccuRGBH(float *bs, float *br, ULONG b, int level, int l) {
+void AccuRGBH(float *bs, ULONG b, int level, int l) {
   /* seperate the channels and build the sum */
   bs[0] += (b >> 24) & 0xFF; /*h*/
   bs[1] += (b >> 16) & 0xFF; /*b*/
   bs[2] += (b >>  8) & 0xFF; /*g*/
   bs[3] += (b >>  0) & 0xFF; /*r*/
-
-  /* collect magnitudes */
-  br[0] = max(bs[0], br[1]); /*h*/
-  br[1] = max(bs[1], br[1]); /*b*/
-  br[2] = max(bs[2], br[2]); /*g*/
-  br[3] = max(bs[3], br[3]); /*r*/
 }
 
 template<int mode>
-void AccuXYZD(long *ns, long *nr, ULONG n, int level, int l) {
+void AccuXYZD(long *ns, ULONG n, int level, int l) {
   long vec[4];
 
   vec[0] = ((n >> 24) & 0xFF) - 0x00; /*d[ 0,1]*/
@@ -133,11 +121,6 @@ void AccuXYZD(long *ns, long *nr, ULONG n, int level, int l) {
     vec[1] /= (level * NORMALS_SCALEBYLEVEL);
   }
 
-  /* collect magnitudes */
-  nr[1] = max(abs(vec[1]), nr[1]); /*z[-1,1]*/
-  nr[2] = max(abs(vec[2]), nr[2]); /*y[-1,1]*/
-  nr[3] = max(abs(vec[3]), nr[3]); /*x[-1,1]*/
-
   ns[0] += vec[0];
   ns[1] += vec[1];
   ns[2] += vec[2];
@@ -145,7 +128,7 @@ void AccuXYZD(long *ns, long *nr, ULONG n, int level, int l) {
 }
 
 template<int mode>
-void AccuXYZD(float *nn, float *nr, ULONG n, int level, int l) {
+void AccuXYZD(float *nn, ULONG n, int level, int l) {
   float vec[4], len;
 
   vec[0] = ((n >> 24) & 0xFF);
@@ -157,28 +140,6 @@ void AccuXYZD(float *nn, float *nr, ULONG n, int level, int l) {
     /* lower z (heighten the virtual displacement) every level */
     vec[1] *= (level * NORMALS_SCALEBYLEVEL) - l;
     vec[1] /= (level * NORMALS_SCALEBYLEVEL);
-  }
-
-  if ((mode & TRGTMODE_CODING) == TRGTMODE_CODING_DXDYDZt) {
-    /* calculate maximum partial derivative */
-    float rel = (
-      max(
-	fabs(vec[2]),
-	fabs(vec[3])
-      )
-      / fabs(vec[1])
-    );
-
-    /* collect magnitudes */
-    nr[1] = max(     rel    , nr[1]); /*r[ 0,inf]*/
-    nr[2] = max(fabs(vec[2]), nr[2]); /*y[-1,1]*/
-    nr[3] = max(fabs(vec[3]), nr[3]); /*x[-1,1]*/
-  }
-  else if ((mode & TRGTMODE_CODING) != TRGTMODE_CODING_XYZ) {
-    /* collect magnitudes */
-    nr[1] = max(fabs(vec[1]), nr[1]); /*z[-1,1]*/
-    nr[2] = max(fabs(vec[2]), nr[2]); /*y[-1,1]*/
-    nr[3] = max(fabs(vec[3]), nr[3]); /*x[-1,1]*/
   }
 
   len = sqrt(vec[1] * vec[1] + vec[2] * vec[2] + vec[3] * vec[3]);
@@ -197,53 +158,148 @@ void AccuXYZD(float *nn, float *nr, ULONG n, int level, int l) {
  */
 
 template<int mode>
-ULONG NormRGBH(long *bs, long *br, int av) {
+void NormRGBH(long *obs, long *bs, int av) {
+  /* build average of each channel an join */
+  obs[0] = bs[0] / av; /*h*/
+  obs[1] = bs[1] / av; /*b*/
+  obs[2] = bs[2] / av; /*g*/
+  obs[3] = bs[3] / av; /*r*/
+}
+
+template<int mode>
+void NormRGBH(float *obs, float *bs, int av) {
+  /* build average of each channel an join */
+  obs[0] = bs[0] / av; /*d[ 0,1]*/
+  obs[1] = bs[1] / av; /*z[-1,1]*/
+  obs[2] = bs[2] / av; /*y[-1,1]*/
+  obs[3] = bs[3] / av; /*x[-1,1]*/
+}
+
+template<int mode>
+void NormXYZD(long *ons, long *ns, int av) {
+  ons[0] = ns[0] / av; /*d[ 0,1]*/
+  ons[1] = ns[1] / av; /*z[-1,1]*/
+  ons[2] = ns[2] / av; /*y[-1,1]*/
+  ons[3] = ns[3] / av; /*x[-1,1]*/
+}
+
+template<int mode>
+void NormXYZD(float *onn, float *nn, int av) {
+  float len;
+
+  len = sqrt(nn[1] * nn[1] + nn[2] * nn[2] + nn[3] * nn[3]);
+
+  onn[0] = nn[0] / av;
+  onn[1] = nn[1] / len;
+  onn[2] = nn[2] / len;
+  onn[3] = nn[3] / len;
+}
+
+/* ####################################################################################
+ */
+
+template<int mode>
+void LookRGBH(long *bs, long *br) {
+  /* collect magnitudes */
+  br[0] = max(bs[0], br[1]); /*h*/
+  br[1] = max(bs[1], br[1]); /*b*/
+  br[2] = max(bs[2], br[2]); /*g*/
+  br[3] = max(bs[3], br[3]); /*r*/
+}
+
+template<int mode>
+void LookRGBH(float *bs, float *br) {
+  /* collect magnitudes */
+  br[0] = max(bs[0], br[1]); /*h*/
+  br[1] = max(bs[1], br[1]); /*b*/
+  br[2] = max(bs[2], br[2]); /*g*/
+  br[3] = max(bs[3], br[3]); /*r*/
+}
+
+template<int mode>
+void LookXYZD(long *ns, long *nr) {
+  /* collect magnitudes */
+  nr[1] = max(abs(ns[1]), nr[1]); /*z[-1,1]*/
+  nr[2] = max(abs(ns[2]), nr[2]); /*y[-1,1]*/
+  nr[3] = max(abs(ns[3]), nr[3]); /*x[-1,1]*/
+}
+
+template<int mode>
+void LookXYZD(float *nn, float *nr) {
+  if ((mode & TRGTMODE_CODING) == TRGTMODE_CODING_DXDYDZt) {
+    /* calculate maximum partial derivative */
+    float rel = (
+      max(
+	fabs(nn[2]),
+	fabs(nn[3])
+      )
+      / fabs(nn[1])
+    );
+
+    /* collect magnitudes */
+    nr[1] = max(     rel   , nr[1]); /*r[ 0,inf]*/
+    nr[2] = max(fabs(nn[2]), nr[2]); /*y[-1,1]*/
+    nr[3] = max(fabs(nn[3]), nr[3]); /*x[-1,1]*/
+  }
+  else if ((mode & TRGTMODE_CODING) != TRGTMODE_CODING_XYZ) {
+    /* collect magnitudes */
+    nr[1] = max(fabs(nn[1]), nr[1]); /*z[-1,1]*/
+    nr[2] = max(fabs(nn[2]), nr[2]); /*y[-1,1]*/
+    nr[3] = max(fabs(nn[3]), nr[3]); /*x[-1,1]*/
+  }
+}
+
+/* ####################################################################################
+ */
+
+template<int mode>
+ULONG JoinRGBH(long *bs, long *br) {
   ULONG b = 0;
 
   /* build average of each channel an join */
-  b |= ((bs[0] / av) << 24); /*h*/
-  b |= ((bs[1] / av) << 16); /*b*/
-  b |= ((bs[2] / av) <<  8); /*g*/
-  b |= ((bs[3] / av) <<  0); /*r*/
+  b |= (bs[0] << 24); /*h*/
+  b |= (bs[1] << 16); /*b*/
+  b |= (bs[2] <<  8); /*g*/
+  b |= (bs[3] <<  0); /*r*/
 
   return b;
 }
 
 template<int mode>
-ULONG NormRGBH(float *bs, float *br, int av) {
+ULONG JoinRGBH(float *bs, float *br) {
   ULONG b = 0;
 
   /* build average of each channel an join */
-  b |= (rint(bs[0] / av) << 24); /*d[ 0,1]*/
-  b |= (rint(bs[1] / av) << 16); /*z[-1,1]*/
-  b |= (rint(bs[2] / av) <<  8); /*y[-1,1]*/
-  b |= (rint(bs[3] / av) <<  0); /*x[-1,1]*/
+  b |= (rint(bs[0]) << 24); /*d[ 0,1]*/
+  b |= (rint(bs[1]) << 16); /*z[-1,1]*/
+  b |= (rint(bs[2]) <<  8); /*y[-1,1]*/
+  b |= (rint(bs[3]) <<  0); /*x[-1,1]*/
 
   return b;
 }
 
 template<int mode>
-ULONG NormXYZD(long *ns, long *nr, int av) {
+ULONG JoinXYZD(long *ns, long *nr) {
   ULONG n = 0;
 
-  n |= ((ns[0] + 0x00) / av) << 24; /*d[ 0,1]*/
-  n |= ((ns[1] / av) << 16) + 0x80; /*z[-1,1]*/
-  n |= ((ns[2] / av) <<  8) + 0x80; /*y[-1,1]*/
-  n |= ((ns[3] / av) <<  0) + 0x80; /*x[-1,1]*/
+  n |= ((ns[0] + 0x00)) << 24; /*d[ 0,1]*/
+  n |= ((ns[1]) << 16) + 0x80; /*z[-1,1]*/
+  n |= ((ns[2]) <<  8) + 0x80; /*y[-1,1]*/
+  n |= ((ns[3]) <<  0) + 0x80; /*x[-1,1]*/
 
   return n;
 }
 
 template<int mode>
-ULONG NormXYZD(float *nn, float *nr, int av) {
+ULONG JoinXYZD(float *nn, float *nr) {
   ULONG n = 0;
   float vec[4], len;
   float derivb = NORMALS_FLOAT_DXDY_TANGENTSPACE;	// [0.5,1.0]
 
-  vec[0] = nn[0] / av;
-  vec[1] = nn[1] / av;
-  vec[2] = nn[2] / av;
-  vec[3] = nn[3] / av;
+  vec[0] = nn[0];
+  vec[1] = nn[1];
+  vec[2] = nn[2];
+  vec[3] = nn[3];
 
   /* ################################################################# */
   if (((mode & TRGTMODE_CODING) == TRGTMODE_CODING_DXDYt) ||
@@ -267,6 +323,7 @@ ULONG NormXYZD(float *nn, float *nr, int av) {
 	derivb = 1.0;
     }
 
+#if 0
     vec[1] =
       max(
 	fabs(vec[1]),
@@ -274,6 +331,19 @@ ULONG NormXYZD(float *nn, float *nr, int av) {
 	fabs(vec[2]) * derivb,
 	fabs(vec[3]) * derivb
       ));
+#else
+    float up = derivb *
+      max(
+	fabs(vec[2]),
+	fabs(vec[3])
+      )
+      / fabs(vec[1]);
+
+    if (up > 1.0) {
+      vec[2] /= up;
+      vec[3] /= up;
+    }
+#endif
   }
   else if ((mode & TRGTMODE_CODING) != TRGTMODE_CODING_XYZ) {
     vec[1] = max(0.0, vec[1]);
@@ -370,6 +440,9 @@ ULONG NormXYZD(float *nn, float *nr, int av) {
       vec[1] /= len; vec[1] *= 0.5; vec[1] += 0.5; vec[1] *= 0xFF;
       vec[2] /= len; vec[2] *= 0.5; vec[2] += 0.5; vec[2] *= 0xFF;
       vec[3] /= len; vec[3] *= 0.5; vec[3] += 0.5; vec[3] *= 0xFF;
+		     derivb *= 0.5; derivb += 0.5; derivb *= 0xFF;
+
+      assert(fabs(vec[1] - derivb) < 0.001);
     }
   }
   /* ################################################################# */
@@ -503,15 +576,18 @@ bool TextureCompress(LPDIRECT3DTEXTURE9 *tex) {
 #ifdef	OBGE_DEVLING
       if (dw) dw->SetProgress(l, level, y, texd.Height);
 #endif
- 
+
     for (int x = 0; x < texd.Width; x += 4) {
       UTYPE bTex[2][4*4];
+      type  fTex[2][4*4][4];
 
       /* generate this level's 4x4-block from the original surface */
       for (int ly = 0; ly < 4; ly += 1)
       for (int lx = 0; lx < 4; lx += 1) {
-	type ts[4] = {0}; int yl = ((y + ly) << l);
-	type tr[4] = {0}; int xl = ((x + lx) << l);
+	int yl = ((y + ly) << l);
+	int xl = ((x + lx) << l);
+
+	type ts[4] = {0};
 
 	/* access all pixels this level's 4x4-block represents in
 	 * the full dimension original surface (high quality mip-mapping)
@@ -532,18 +608,39 @@ bool TextureCompress(LPDIRECT3DTEXTURE9 *tex) {
 	    | (((t >>  0) & 0xFF) << 16 /*t*/);
 
 	  if (format == TCOMPRESS_RGBH)
-	    AccuRGBH<ACCUMODE_LINEAR>(ts, tr, t, level, l);
+	    AccuRGBH<ACCUMODE_LINEAR>(ts, t, level, l);
 	  else if (format == TCOMPRESS_XYZD)
-	    AccuXYZD<ACCUMODE_SCALE>(ts, tr, t, level, l);
+	    AccuXYZD<ACCUMODE_SCALE >(ts, t, level, l);
 	}
 
+	/* build average of each channel */
+	if (format == TCOMPRESS_RGBH)
+	  NormRGBH<TRGTMODE_CODING_RGB    >(fTex[0][(ly * 4) + lx], ts, av);
+	else if (format == TCOMPRESS_XYZD)
+	  NormXYZD<TRGTMODE_CODING_DXDYDZt>(fTex[0][(ly * 4) + lx], ts, av);
+      }
+
+      type tr[4] = {0};
+
+      /* analyze this level's 4x4-block */
+      for (int ly = 0; ly < 4; ly += 1)
+      for (int lx = 0; lx < 4; lx += 1) {
+	if (format == TCOMPRESS_RGBH)
+	  LookRGBH<TRGTMODE_CODING_RGB    >(fTex[0][(ly * 4) + lx], tr);
+	else if (format == TCOMPRESS_XYZD)
+	  LookXYZD<TRGTMODE_CODING_DXDYDZt>(fTex[0][(ly * 4) + lx], tr);
+      }
+
+      /* generate this level's 4x4-block from the original surface */
+      for (int ly = 0; ly < 4; ly += 1)
+      for (int lx = 0; lx < 4; lx += 1) {
 	/* build average of each channel an join */
 	ULONG t;
 
 	if (format == TCOMPRESS_RGBH)
-	  t = NormRGBH<TRGTMODE_CODING_RGB>(ts, tr, av);
+	  t = JoinRGBH<TRGTMODE_CODING_RGB    >(fTex[0][(ly * 4) + lx], tr);
 	else if (format == TCOMPRESS_XYZD)
-	  t = NormXYZD<TRGTMODE_CODING_DXDYDZt>(ts, tr, av);
+	  t = JoinXYZD<TRGTMODE_CODING_DXDYDZt>(fTex[0][(ly * 4) + lx], tr);
 
 	/* write the result ABGR */
 	bTex[0][(ly * 4) + lx] = t;
@@ -595,7 +692,7 @@ bool TextureCompressT(LPDIRECT3DTEXTURE9 *base) {
 bool TextureCompressNM(LPDIRECT3DTEXTURE9 *norm) {
   bool res = true;
 
-  res = res && TextureCompress<float, float, TCOMPRESS_XYZD>(norm);
+  res = res && TextureCompress<ULONG, float, TCOMPRESS_XYZD>(norm);
 
   return res;
 }
@@ -604,7 +701,7 @@ bool TextureCompressPM(LPDIRECT3DTEXTURE9 *base, LPDIRECT3DTEXTURE9 *norm) {
   bool res = true;
 
   res = res && TextureCompress<ULONG, long , TCOMPRESS_RGBH>(base);
-  res = res && TextureCompress<float, float, TCOMPRESS_XYZD>(norm);
+  res = res && TextureCompress<ULONG, float, TCOMPRESS_XYZD>(norm);
 
   return res;
 }
@@ -696,16 +793,15 @@ bool TextureCompressQDM(LPDIRECT3DTEXTURE9 *base, LPDIRECT3DTEXTURE9 *norm) {
     for (int x = 0; x < based.Width; x += 4) {
       ULONG bBase[2][4*4];
       ULONG bNorm[2][4*4];
+      long  fBase[2][4*4][4];
+      float fNorm[2][4*4][4];
 
       /* generate this level's 4x4-block from the original surface */
       for (int ly = 0; ly < 4; ly += 1)
       for (int lx = 0; lx < 4; lx += 1) {
-	long bs[4] = {0}; int yl = ((y + ly) << l);
-	long br[4] = {0};
-	long ns[4] = {0}; int xl = ((x + lx) << l);
-	long nr[4] = {0};
+	long  bs[4] = {0}; int yl = ((y + ly) << l);
+	long  ns[4] = {0}; int xl = ((x + lx) << l);
 	float nn[4] = {0.0};
-	float rn[4] = {0.0};
 
 	/* access all pixels this level's 4x4-block represents in
 	 * the full dimension original surface (high quality mip-mapping)
@@ -732,22 +828,49 @@ bool TextureCompressQDM(LPDIRECT3DTEXTURE9 *base, LPDIRECT3DTEXTURE9 *norm) {
 	    | (((n >>  8) & 0xFF) <<  8 /*y*/)
 	    | (((n >>  0) & 0xFF) << 16 /*z*/);
 
-	  AccuRGBH<ACCUMODE_LINEAR>(bs, br, b, level, l);
+	  AccuRGBH<ACCUMODE_LINEAR>(bs, b, level, l);
 #if	defined(NORMALS_INTEGER)
-	  AccuXYZD<ACCUMODE_SCALE>(ns, nr, n, level, l);
+	  AccuXYZD<ACCUMODE_SCALE >(ns, n, level, l);
 #else
-	  AccuXYZD<ACCUMODE_SCALE>(nn, rn, n, level, l);
+	  AccuXYZD<ACCUMODE_SCALE >(nn, n, level, l);
 #endif
 	}
 
+	/* build average of each channel */
+	NormRGBH<TRGTMODE_CODING_RGB                       >(fBase[0][(ly * 4) + lx], bs, av);
+#if	defined(NORMALS_INTEGER)
+	NormXYZD<TRGTMODE_CODING_DXDYt | NORMMODE_CUBESPACE>(fNorm[0][(ly * 4) + lx], ns, av);
+#else
+	NormXYZD<TRGTMODE_CODING_DXDYt | NORMMODE_CUBESPACE>(fNorm[0][(ly * 4) + lx], nn, av);
+#endif
+      }
+
+      long  br[4] = {0};
+      long  nr[4] = {0};
+      float rn[4] = {0.0};
+
+      /* analyze this level's 4x4-block */
+      for (int ly = 0; ly < 4; ly += 1)
+      for (int lx = 0; lx < 4; lx += 1) {
+	LookRGBH<TRGTMODE_CODING_RGB                       >(fBase[0][(ly * 4) + lx], br);
+#if	defined(NORMALS_INTEGER)
+	LookXYZD<TRGTMODE_CODING_DXDYt | NORMMODE_CUBESPACE>(fNorm[0][(ly * 4) + lx], nr);
+#else
+	LookXYZD<TRGTMODE_CODING_DXDYt | NORMMODE_CUBESPACE>(fNorm[0][(ly * 4) + lx], rn);
+#endif
+      }
+
+      /* generate this level's 4x4-block from the original surface */
+      for (int ly = 0; ly < 4; ly += 1)
+      for (int lx = 0; lx < 4; lx += 1) {
 	/* build average of each channel an join */
 	ULONG b, n;
 
-	b = NormRGBH<TRGTMODE_CODING_RGB>(bs, br, av);
+	b = JoinRGBH<TRGTMODE_CODING_RGB                       >(fBase[0][(ly * 4) + lx], br);
 #if	defined(NORMALS_INTEGER)
-	n = NormXYZD<TRGTMODE_CODING_DXDYt | NORMMODE_CUBESPACE>(ns, nr, av);
+	n = JoinXYZD<TRGTMODE_CODING_DXDYt | NORMMODE_CUBESPACE>(fNorm[0][(ly * 4) + lx], nr);
 #else
-	n = NormXYZD<TRGTMODE_CODING_DXDYt | NORMMODE_CUBESPACE>(nn, rn, av);
+	n = JoinXYZD<TRGTMODE_CODING_DXDYt | NORMMODE_CUBESPACE>(fNorm[0][(ly * 4) + lx], rn);
 #endif
 
 	/* write the result ABGR */

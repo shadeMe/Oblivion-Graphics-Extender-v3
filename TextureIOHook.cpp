@@ -1,4 +1,3 @@
-#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING)
 #include <assert.h>
 
 #include "TextureManager.h"
@@ -8,14 +7,19 @@
 #include "GlobalSettings.h"
 
 #include "D3D9.hpp"
+#include "D3D9Device.hpp"
+#include "D3D9Identifiers.hpp"
 
 #include "Hooking/detours/detours.h"
 #include "Hooking/D3DX.hpp"
+
+#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING) || defined(OBGE_GAMMACORRECTION)
 
 std::map<std::string, IDirect3DBaseTexture9 *> textureFiles;
 
 /* ------------------------------------------------------------------------------------------------- */
 
+#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING)
 const char *findTexture(IDirect3DBaseTexture9 *tex) {
   static char buf[256];
   buf[0] = '\0';
@@ -43,6 +47,7 @@ const char *findTexture(IDirect3DBaseTexture9 *tex) {
 
   return "unknown";
 }
+#endif
 
 /* ------------------------------------------------------------------------------------------------- */
 
@@ -62,7 +67,20 @@ bool Anonymous::TrackLoadTextureFile(char *texture, void *renderer, void *flags)
 	bool r = (this->*LoadTextureFile)(texture, renderer, flags);
 
 	if (r && lastOBGEDirect3DBaseTexture9) {
-		textureFiles[texture] = lastOBGEDirect3DBaseTexture9;
+	  textureFiles[texture] = lastOBGEDirect3DBaseTexture9;
+
+#ifdef OBGE_GAMMACORRECTION
+	  /* remember DeGamma for this kind of texture */
+//	  if (DeGamma) {
+	    if (!strchr(texture, '_'))
+	    if (!strstr(texture, "Menu") &&
+		!strstr(texture, "menu")) {
+	      static const bool PotDeGamma = true;
+
+	      lastOBGEDirect3DBaseTexture9->SetPrivateData(GammaGUID, &PotDeGamma, sizeof(PotDeGamma), 0);
+//	    }
+	  }
+#endif
 	}
 
 //	_MESSAGE("Texture load: %s", texture);

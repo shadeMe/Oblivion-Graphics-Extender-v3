@@ -20,7 +20,7 @@ static std::vector<OBGEDirect3D9 *> OBGEDrivers;
 
 OBGEDirect3D9::OBGEDirect3D9(IDirect3D9 *d3d) : m_d3d(d3d) {
   _MESSAGE("OD3D9: Driver 0x%08x constructed from 0x%08x (%d drivers available)", this, _ReturnAddress(), OBGEDrivers.size() + 1);
-
+ 
   /* --------------------------------------------------- */
   D3DDISPLAYMODE d3ddm;
   if (m_d3d->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm) == D3D_OK) {
