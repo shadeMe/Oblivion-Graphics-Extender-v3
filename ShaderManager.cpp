@@ -1722,7 +1722,7 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 		assert(sts < 16);
 
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].vals.state = tvs; tvs += sts + 1;
-		pSampler[cnts[D3DXRS_SAMPLER + 1]].offset = cnst.RegisterIndex;
+		pSampler[cnts[D3DXRS_SAMPLER + 1]].offset = cnst.RegisterIndex + (this->iType == SHADER_VERTEX ? D3DVERTEXTEXTURESAMPLER0 : 0);
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].length = cnst.RegisterCount;
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].name = cnst.Name;
 		cnts[D3DXRS_SAMPLER + 1]++;
@@ -1754,7 +1754,7 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 		assert(sts < 16);
 
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].vals.state = tvs; tvs += sts + 1;
-		pSampler[cnts[D3DXRS_SAMPLER + 1]].offset = cnst.RegisterIndex;
+		pSampler[cnts[D3DXRS_SAMPLER + 1]].offset = cnst.RegisterIndex + (this->iType == SHADER_VERTEX ? D3DVERTEXTEXTURESAMPLER0 : 0);
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].length = cnst.RegisterCount;
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].name = cnst.Name;
 			 cnts[D3DXRS_SAMPLER + 1]++;
@@ -1869,6 +1869,7 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
       /* do the textures first, texture-data may be requested */
       if ((rV = pTexture))
 	do {
+	  // Do we have to bias with D3DDMAPSAMPLER
 	  StateDevice->SetTexture(rV->offset, rV->vals.texture);
 	} while ((++rV)->length);
       if ((rV = pSampler)) {

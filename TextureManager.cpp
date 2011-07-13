@@ -13,8 +13,8 @@
 #include "D3D9Device.hpp"
 
 static global<bool> PurgeOnNewGame(false, NULL, "Textures", "bPurgeOnNewGame");
-static global<bool> DoDeGamma(true, NULL, "Textures", "bSamplerDeGamma");
-static global<bool> DoReGamma(true, NULL, "Textures", "bSamplerReGamma");
+static global<bool> DoDeGamma(false, NULL, "Textures", "bSamplerDeGamma");
+static global<bool> DoReGamma(false, NULL, "Textures", "bSamplerReGamma");
 static global<int> SetAnisotropy(1, NULL, "Textures", "iSamplerAnisotropy");
 static global<float> SetLODBias(0.0, NULL, "Textures", "fSamplerLODBias");
 

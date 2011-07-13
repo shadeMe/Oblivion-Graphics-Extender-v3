@@ -16,6 +16,7 @@
 #if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING) || defined(OBGE_GAMMACORRECTION)
 
 std::map<std::string, IDirect3DBaseTexture9 *> textureFiles;
+CRITICAL_SECTION textureLock;
 
 /* ------------------------------------------------------------------------------------------------- */
 
@@ -56,12 +57,16 @@ public:
 	bool TrackLoadTextureFile(char *texture, void *renderer, void *flags);
 };
 
+/* 00760DA0 == NiDX9SourceTextureData_LoadTextureFile */
+
 bool (__thiscall Anonymous::* LoadTextureFile)(char *, void *, void *)/* =
 	(void * (__stdcall *)(char *))00760DA0*/;
 bool (__thiscall Anonymous::* TrackLoadTextureFile)(char *, void *, void *)/* =
 	(void * (__stdcall *)(char *))00760DA0*/;
 
 bool Anonymous::TrackLoadTextureFile(char *texture, void *renderer, void *flags) {
+	EnterCriticalSection(&textureLock);
+
 	lastOBGEDirect3DBaseTexture9 = NULL;
 
 	bool r = (this->*LoadTextureFile)(texture, renderer, flags);
@@ -83,8 +88,9 @@ bool Anonymous::TrackLoadTextureFile(char *texture, void *renderer, void *flags)
 #endif
 	}
 
-//	_MESSAGE("Texture load: %s", texture);
+	_DMESSAGE("Texture load: %s (%s)", texture, r ? "success" : "failed");
 
+	LeaveCriticalSection(&textureLock);
 	return r;
 }
 
@@ -106,6 +112,8 @@ void CreateTextureIOHook(void) {
         else {
 		_MESSAGE("Detoured LoadTextureFile(); failed");
         }
+
+	InitializeCriticalSection(&textureLock);
 
 	return;
 }
