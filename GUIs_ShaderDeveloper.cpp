@@ -101,17 +101,41 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	
 	SDTools->Append( -1, wxT("Settings"), SDToolsSettings );
 	
-	wxMenuItem* SDConvertQDM;
-	SDConvertQDM = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert PM to QDM") ) , wxEmptyString, wxITEM_NORMAL );
-	SDTools->Append( SDConvertQDM );
+	wxMenuItem* SDConvertQDMy;
+	SDConvertQDMy = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert PM to QDM (destroy specular)") ) , wxEmptyString, wxITEM_NORMAL );
+	SDTools->Append( SDConvertQDMy );
 	
-	wxMenuItem* SDConvertCLR;
-	SDConvertCLR = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip color-map") ) , wxEmptyString, wxITEM_NORMAL );
-	SDTools->Append( SDConvertCLR );
+	wxMenuItem* SDConvertQDMn;
+	SDConvertQDMn = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert PM to QDM (preserve specular)") ) , wxEmptyString, wxITEM_NORMAL );
+	SDTools->Append( SDConvertQDMn );
 	
-	wxMenuItem* SDConvertNM;
-	SDConvertNM = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip normal-map") ) , wxEmptyString, wxITEM_NORMAL );
-	SDTools->Append( SDConvertNM );
+	wxMenuItem* SDConvertRGBH;
+	SDConvertRGBH = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip color+height-map [rgbh]") ) , wxEmptyString, wxITEM_NORMAL );
+	SDTools->Append( SDConvertRGBH );
+	
+	wxMenuItem* SDConvertRGB;
+	SDConvertRGB = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip color-map [rgb-]") ) , wxEmptyString, wxITEM_NORMAL );
+	SDTools->Append( SDConvertRGB );
+	
+	wxMenuItem* SDConvertLA;
+	SDConvertLA = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip luminance+alpha-map [--la]") ) , wxEmptyString, wxITEM_NORMAL );
+	SDTools->Append( SDConvertLA );
+	
+	wxMenuItem* SDConvertA;
+	SDConvertA = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip alpha-map [---a]") ) , wxEmptyString, wxITEM_NORMAL );
+	SDTools->Append( SDConvertA );
+	
+	wxMenuItem* SDConvertXYZD;
+	SDConvertXYZD = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip normal+specular-map [xyzs]") ) , wxEmptyString, wxITEM_NORMAL );
+	SDTools->Append( SDConvertXYZD );
+	
+	wxMenuItem* SDConvertXY_Z;
+	SDConvertXY_Z = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip normal-map [xy+z-]") ) , wxEmptyString, wxITEM_NORMAL );
+	SDTools->Append( SDConvertXY_Z );
+	
+	wxMenuItem* SDConvertXY;
+	SDConvertXY = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip normal-map [xy--]") ) , wxEmptyString, wxITEM_NORMAL );
+	SDTools->Append( SDConvertXY );
 	
 	SDMenubar->Append( SDTools, wxT("Tools") ); 
 	
@@ -913,9 +937,15 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	this->Connect( SDEffectOptimize->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
 	this->Connect( SDProfileGPU->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
 	this->Connect( SDProfileTex->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
-	this->Connect( SDConvertQDM->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDM ) );
-	this->Connect( SDConvertCLR->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipCLR ) );
-	this->Connect( SDConvertNM->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipNM ) );
+	this->Connect( SDConvertQDMy->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDMy ) );
+	this->Connect( SDConvertQDMn->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDMn ) );
+	this->Connect( SDConvertRGBH->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipRGBH ) );
+	this->Connect( SDConvertRGB->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipRGB ) );
+	this->Connect( SDConvertLA->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipLA ) );
+	this->Connect( SDConvertA->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipA ) );
+	this->Connect( SDConvertXYZD->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipXYZD ) );
+	this->Connect( SDConvertXY_Z->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipXY_Z ) );
+	this->Connect( SDConvertXY->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipXY ) );
 	this->Connect( SDTweakAF1->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
 	this->Connect( SDTweakAF2->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
 	this->Connect( SDTweakAF4->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
@@ -986,9 +1016,15 @@ wxShaderDeveloper::~wxShaderDeveloper()
 	this->Disconnect( wxID_EOPTIMIZE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
 	this->Disconnect( wxID_PROFILE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
 	this->Disconnect( wxID_KILLTEX, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
-	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDM ) );
-	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipCLR ) );
-	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipNM ) );
+	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDMy ) );
+	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDMn ) );
+	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipRGBH ) );
+	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipRGB ) );
+	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipLA ) );
+	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipA ) );
+	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipXYZD ) );
+	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipXY_Z ) );
+	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipXY ) );
 	this->Disconnect( wxID_AF1, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
 	this->Disconnect( wxID_AF2, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
 	this->Disconnect( wxID_AF4, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );

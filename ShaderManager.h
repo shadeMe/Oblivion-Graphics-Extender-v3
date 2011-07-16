@@ -68,10 +68,12 @@ public:
 	UINT						asmblyLen;
 
 	bool						bHLSL;
+	LPD3DXBUFFER					pSrcPrcReplaced;
 	LPSTR 						pSourceReplaced;
 	UINT						sourceLen;
 
 	bool						bRT;
+	LPD3DXBUFFER					pSrcPrcRuntime;
 	LPSTR 						pSourceRuntime;
 	UINT						runtimeLen;
 

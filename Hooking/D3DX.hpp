@@ -8,6 +8,20 @@
 extern IDirect3DBaseTexture9 *lastOBGEDirect3DBaseTexture9;
 
 // Function pointer types.
+typedef HRESULT (FAR WINAPI *D3DXSaveTextureToFileA_t)(LPCTSTR pDestFile,
+							D3DXIMAGE_FILEFORMAT DestFormat,
+							LPDIRECT3DBASETEXTURE9 pSrcTexture,
+							const PALETTEENTRY *pSrcPalette);
+
+// Function prototypes.
+HRESULT FAR WINAPI OBGESaveTextureToFileA(LPCTSTR pDestFile,
+					  D3DXIMAGE_FILEFORMAT DestFormat,
+					  LPDIRECT3DBASETEXTURE9 pSrcTexture,
+					  const PALETTEENTRY *pSrcPalette);
+
+/* ----------------------------------------------------------------------------- */
+
+// Function pointer types.
 typedef HRESULT (FAR WINAPI *D3DXCreateTextureFromFileA_t)(LPDIRECT3DDEVICE9 pDevice,
 							   LPCTSTR pSrcFile,
 							   LPDIRECT3DTEXTURE9 *ppTexture);

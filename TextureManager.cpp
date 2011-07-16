@@ -32,9 +32,10 @@ TextureRecord::~TextureRecord() {
 }
 
 bool TextureRecord::LoadTexture(TextureRecordType type, const char *fp, bool NONPOW2, bool Private) {
+  HRESULT res;
+
   if (type == TR_PLANAR) {
     IDirect3DTexture9 *tex = NULL;
-    HRESULT res;
 
     if (!NONPOW2 || FAILED(res = D3DXCreateTextureFromFileEx(
                  lastOBGEDirect3DDevice9,
@@ -61,7 +62,6 @@ bool TextureRecord::LoadTexture(TextureRecordType type, const char *fp, bool NON
   }
   else if (type == TR_CUBIC) {
     IDirect3DCubeTexture9 *tex = NULL;
-    HRESULT res;
 
     if (!NONPOW2 || FAILED(res = D3DXCreateCubeTextureFromFileEx(
                  lastOBGEDirect3DDevice9,
@@ -84,7 +84,6 @@ bool TextureRecord::LoadTexture(TextureRecordType type, const char *fp, bool NON
   }
   else if (type == TR_VOLUMETRIC) {
     IDirect3DVolumeTexture9 *tex = NULL;
-    HRESULT res;
 
     if (!NONPOW2 || FAILED(res = D3DXCreateVolumeTextureFromFileEx(
                  lastOBGEDirect3DDevice9,
@@ -101,55 +100,9 @@ bool TextureRecord::LoadTexture(TextureRecordType type, const char *fp, bool NON
                  0,
                  0,
                  0,
-		 &tex)) || !tex) {
-      if (FAILED(res = D3DXCreateVolumeTextureFromFile(
-                   lastOBGEDirect3DDevice9,
-                   fp,
-		   &tex)) || !tex) {
-
-#if 0
-	struct stat vf; FILE *f; void *data;
-	if (!stat((const char *)fp, &vf)) {
-	  if ((data = malloc(vf.st_size))) {
-	    if (!fopen_s(&f, fp, "rb")) {
-	      fread(data, 1, vf.st_size, f);
-	      fclose(f);
-
-	      if (!NONPOW2 || FAILED(res = D3DXCreateVolumeTextureFromFileInMemoryEx(
-		lastOBGEDirect3DDevice9,
-		data,
-		vf.st_size,
-		D3DX_DEFAULT_NONPOW2,
-		D3DX_DEFAULT_NONPOW2,
-		D3DX_DEFAULT_NONPOW2,
-		D3DX_FROM_FILE,
-		0,
-		D3DFMT_UNKNOWN,
-		D3DPOOL_MANAGED,
-		D3DX_DEFAULT,
-		D3DX_DEFAULT,
-		0,
-		0,
-		0,
-		&tex)) || !tex) {
-		  if (FAILED(res = D3DXCreateVolumeTextureFromFileInMemory(
-		    lastOBGEDirect3DDevice9,
-		    data,
-		    vf.st_size,
-		    &tex)) || !tex) {
-		  }
-	      }
-	    }
-
-	    free(data);
-	  }
-	}
-#endif
-
-	if (FAILED(res))
-	  return false;
-      }
-    }
+		 &tex)) || !tex)
+      if (FAILED(res = D3DXCreateVolumeTextureFromFile(lastOBGEDirect3DDevice9, fp, &tex)) || !tex)
+	return false;
 
     SetTexture(tex, fp, NONPOW2, Private);
   }
@@ -326,6 +279,8 @@ TextureManager::TextureManager() {
       Anisotropy = lastOBGEDirect3D9CAPS.MaxAnisotropy;
   }
 
+  if (Anisotropy <= 1)
+    Anisotropy = 1;
   if (Anisotropy <= 1)
     AFilters = 0;
 #endif

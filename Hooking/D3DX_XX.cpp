@@ -4,14 +4,35 @@ extern SDLLHook D3XHook;
 /* ----------------------------------------------------------------------------- */
 
 // Hook function.
+HRESULT FAR WINAPI OBGESaveTextureToFileA(LPCTSTR pDestFile,
+					  D3DXIMAGE_FILEFORMAT DestFormat,
+					  LPDIRECT3DBASETEXTURE9 pSrcTexture,
+					  const PALETTEENTRY *pSrcPalette)
+{
+  D3DXSaveTextureToFileA_t old_func = (D3DXSaveTextureToFileA_t) D3XHook.Functions[D3XFN_SaveTextureToFileA].OrigFn;
+//_MESSAGE("OD3DX: SaveTextureToFile(\"%s\") queried from 0x%08x", pDestFile, _ReturnAddress());
+  HRESULT res = old_func(pDestFile, DestFormat, pSrcTexture, pSrcPalette);
+
+  if (res != D3D_OK)
+    res = OBGESaveBC45TextureToFile(pDestFile, DestFormat, pSrcTexture, pSrcPalette);
+
+  return res;
+}
+
+/* ----------------------------------------------------------------------------- */
+
+// Hook function.
 HRESULT FAR WINAPI OBGECreateTextureFromFileA(LPDIRECT3DDEVICE9 pDevice,
 					      LPCTSTR pSrcFile,
 					      LPDIRECT3DTEXTURE9 *ppTexture)
 {
   D3DXCreateTextureFromFileA_t old_func = (D3DXCreateTextureFromFileA_t) D3XHook.Functions[D3XFN_CreateTextureFromFileA].OrigFn;
+//_MESSAGE("OD3DX: CreateTextureFromFile(\"%s\") queried from 0x%08x", pSrcFile, _ReturnAddress());
   HRESULT res = old_func(pDevice, pSrcFile, ppTexture);
 
-//_MESSAGE("OD3DX: CreateTextureFromFile(\"%s\") queried from 0x%08x", pSrcFile, _ReturnAddress());
+  if (res != D3D_OK)
+    res = OBGECreateBC45TextureFromFile(pDevice, pSrcFile, ppTexture);
+
   lastOBGEDirect3DBaseTexture9 = *ppTexture;
 
   return res;
@@ -34,9 +55,12 @@ HRESULT FAR WINAPI OBGECreateTextureFromFileExA(LPDIRECT3DDEVICE9 pDevice,
 						LPDIRECT3DTEXTURE9 *ppTexture)
 {
   D3DXCreateTextureFromFileExA_t old_func = (D3DXCreateTextureFromFileExA_t) D3XHook.Functions[D3XFN_CreateTextureFromFileExA].OrigFn;
+//_MESSAGE("OD3DX: CreateTextureFromFileEx(\"%s\") queried from 0x%08x", pSrcFile, _ReturnAddress());
   HRESULT res = old_func(pDevice, pSrcFile, Width, Height, MipLevels, Usage, Format, Pool, Filter, MipFilter, ColorKey, pSrcInfo, pPalette, ppTexture);
 
-//_MESSAGE("OD3DX: CreateTextureFromFileEx(\"%s\") queried from 0x%08x", pSrcFile, _ReturnAddress());
+  if (res != D3D_OK)
+    res = OBGECreateBC45TextureFromFileEx(pDevice, pSrcFile, Width, Height, MipLevels, Usage, Format, Pool, Filter, MipFilter, ColorKey, pSrcInfo, pPalette, ppTexture);
+
   lastOBGEDirect3DBaseTexture9 = *ppTexture;
 
   return res;
@@ -49,9 +73,12 @@ HRESULT FAR WINAPI OBGECreateTextureFromFileInMemory(LPDIRECT3DDEVICE9 pDevice,
 						      LPDIRECT3DTEXTURE9 *ppTexture)
 {
   D3DXCreateTextureFromFileInMemory_t old_func = (D3DXCreateTextureFromFileInMemory_t) D3XHook.Functions[D3XFN_CreateTextureFromFileInMemory].OrigFn;
+//_MESSAGE("OD3DX: CreateTextureFromFileInMemory(\"%d\") queried from 0x%08x", SrcDataSize, _ReturnAddress());
   HRESULT res = old_func(pDevice, pSrcData, SrcDataSize, ppTexture);
 
-//_MESSAGE("OD3DX: CreateTextureFromFileInMemory(\"%d\") queried from 0x%08x", SrcDataSize, _ReturnAddress());
+  if (res != D3D_OK)
+    res = OBGECreateBC45TextureFromFileInMemory(pDevice, pSrcData, SrcDataSize, ppTexture);
+
   lastOBGEDirect3DBaseTexture9 = *ppTexture;
 
   return res;
@@ -75,9 +102,12 @@ HRESULT FAR WINAPI OBGECreateTextureFromFileInMemoryEx(LPDIRECT3DDEVICE9 pDevice
 							LPDIRECT3DTEXTURE9 *ppTexture)
 {
   D3DXCreateTextureFromFileInMemoryEx_t old_func = (D3DXCreateTextureFromFileInMemoryEx_t) D3XHook.Functions[D3XFN_CreateTextureFromFileInMemoryEx].OrigFn;
+//_MESSAGE("OD3DX: CreateTextureFromFileInMemoryEx(\"%d\") queried from 0x%08x", SrcDataSize, _ReturnAddress());
   HRESULT res = old_func(pDevice, pSrcData, SrcDataSize, Width, Height, MipLevels, Usage, Format, Pool, Filter, MipFilter, ColorKey, pSrcInfo, pPalette, ppTexture);
 
-//_MESSAGE("OD3DX: CreateTextureFromFileInMemoryEx(\"%d\") queried from 0x%08x", SrcDataSize, _ReturnAddress());
+  if (res != D3D_OK)
+    res = OBGECreateBC45TextureFromFileInMemoryEx(pDevice, pSrcData, SrcDataSize, Width, Height, MipLevels, Usage, Format, Pool, Filter, MipFilter, ColorKey, pSrcInfo, pPalette, ppTexture);
+
   lastOBGEDirect3DBaseTexture9 = *ppTexture;
 
   return res;
@@ -272,6 +302,8 @@ SDLLHook D3XHook =
 //  { "D3DXCreateVolumeTextureFromFileExW", OBGECreateVolumeTextureFromFileExW},
     { "D3DXCreateVolumeTextureFromFileInMemory", OBGECreateVolumeTextureFromFileInMemory},
     { "D3DXCreateVolumeTextureFromFileInMemoryEx", OBGECreateVolumeTextureFromFileInMemoryEx},
+    { "D3DXSaveTextureToFileA", OBGESaveTextureToFileA},
+//  { "D3DXSaveTextureToFileW", OBGESaveTextureToFileW},
     { NULL, NULL }
   }
 };
@@ -281,6 +313,8 @@ SDLLHook D3XHook =
 #undef	D3XHook
 #undef	D3XHookDLL
 
+#undef	OBGESaveTextureToFileA
+#undef	OBGESaveTextureToFileW
 #undef	OBGECreateTextureFromFileA
 #undef	OBGECreateTextureFromFileW
 #undef	OBGECreateTextureFromFileExA

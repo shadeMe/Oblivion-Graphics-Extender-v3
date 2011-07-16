@@ -101,11 +101,21 @@ typedef struct _myD3DXMACRO
 } myD3DXMACRO;
 
 static char IN_RAWZ[] = "0";
+static char *FILTER_LINEAR = "LINEAR";
+static char *FILTER_ANISO  = "ANISOTROPIC";
+static char  LEVEL_ANISO[4] = "1";
 
 #define	DEFS_INRAWZ	0
+#define	DEFS_MIP	1
+#define	DEFS_MIN	2
+#define	DEFS_MAG	3
 
 static myD3DXMACRO defs[] = {
   {"IN_RAWZ"	        , IN_RAWZ},
+  {"MIPDEF"	        , FILTER_LINEAR},
+  {"MINDEF"	        , FILTER_LINEAR},
+  {"MAGDEF"	        , FILTER_LINEAR},
+  {"ANISODEF"	        , LEVEL_ANISO},
 
   {"FUSED"		, stringify(FUSED  )},
   {"OFF"		, stringify(OFF	   )},
@@ -182,10 +192,12 @@ ShaderRecord::ShaderRecord() {
   pProfile = NULL;
   pSourceReplaced = NULL; sourceLen = 0; hlslStamp = 0;
   pAsmblyReplaced = NULL; asmblyLen = 0;
+  pSrcPrcReplaced = NULL;
   pShaderReplaced = NULL;
   pConstsReplaced = NULL;
 
   pSourceRuntime = NULL; runtimeLen = 0;
+  pSrcPrcRuntime = NULL;
   pShaderRuntime = NULL;
   pConstsRuntime = NULL;
 
@@ -208,10 +220,12 @@ ShaderRecord::~ShaderRecord() {
 
   if (pSourceReplaced) delete[] pSourceReplaced;
   if (pAsmblyReplaced) delete[] pAsmblyReplaced;
+  if (pSrcPrcReplaced) pSrcPrcReplaced->Release();
   if (pShaderReplaced) pShaderReplaced->Release();
   if (pConstsReplaced) pConstsReplaced->Release();
 
   if (pSourceRuntime) delete[] pSourceRuntime;
+  if (pSrcPrcRuntime) pSrcPrcRuntime->Release();
   if (pShaderRuntime) pShaderRuntime->Release();
   if (pConstsRuntime) pConstsRuntime->Release();
 
@@ -398,9 +412,11 @@ bool ShaderRecord::LoadShader(const char *Filename) {
     /* if the assembler source is newer than the binary, attempt to recompile
      */
     if (pAsmblyReplaced && (sa.st_mtime > sb.st_mtime)) {
+      if (pSrcPrcReplaced) pSrcPrcReplaced->Release();
       if (pShaderReplaced) pShaderReplaced->Release();
       if (pConstsReplaced) pConstsReplaced->Release();
 
+      pSrcPrcReplaced = NULL;
       pShaderReplaced = NULL;
       pConstsReplaced = NULL;
 
@@ -441,9 +457,11 @@ bool ShaderRecord::LoadShader(const char *Filename) {
     /* if the HLSL source is newer than the binary, attempt to recompile
      */
     if (pSourceReplaced && (sh.st_mtime > sb.st_mtime)) {
+      if (pSrcPrcReplaced) pSrcPrcReplaced->Release();
       if (pShaderReplaced) pShaderReplaced->Release();
       if (pConstsReplaced) pConstsReplaced->Release();
 
+      pSrcPrcReplaced = NULL;
       pShaderReplaced = NULL;
       pConstsReplaced = NULL;
     }
@@ -467,17 +485,32 @@ bool ShaderRecord::LoadShader(const char *Filename) {
       pProfile = strdup(D3DXGetPixelShaderProfile(lastOBGEDirect3DDevice9));
   }
 
+  /* get the stripped source
+   */
+  if (pSourceReplaced) {
+    D3DXPreprocessShader(
+	pSourceReplaced,
+	sourceLen,
+	(D3DXMACRO *)::defs,
+	&incl,
+	&pSrcPrcReplaced,
+	&pErrorMsgs
+    );
+  }
+
   return true;
 }
 
 bool ShaderRecord::RuntimeFlush() {
   /* release all runtime resources (for example for recompilation) */
+  if (pSrcPrcRuntime) pSrcPrcRuntime->Release();
   if (pShaderRuntime) pShaderRuntime->Release();
   if (pConstsRuntime) pConstsRuntime->Release();
 
   if (pErrorMsgs) pErrorMsgs->Release();
   if (pDisasmbly) pDisasmbly->Release();
 
+  pSrcPrcRuntime = NULL;
   pShaderRuntime = NULL;
   pConstsRuntime = NULL;
 
@@ -596,15 +629,15 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
   const char *src = NULL;
 
   /**/ if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_RUNTIME))
-    src = pSourceRuntime;
+    src = (const char *)pSrcPrcRuntime->GetBufferPointer();
   else if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_REPLACED))
-    src = pSourceReplaced;
+    src = (const char *)pSrcPrcReplaced->GetBufferPointer();
   else if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_ORIGINAL))
     src = NULL;
   else if (pShaderRuntime  && (pOblivionBinary == (const DWORD *)pShaderRuntime->GetBufferPointer()))
-    src = pSourceRuntime;
+    src = (const char *)pSrcPrcRuntime->GetBufferPointer();
   else if (pShaderReplaced && (pOblivionBinary == (const DWORD *)pShaderReplaced->GetBufferPointer()))
-    src = pSourceReplaced;
+    src = (const char *)pSrcPrcReplaced->GetBufferPointer();
   else if (pShaderOriginal && (pOblivionBinary == (const DWORD *)pShaderOriginal->GetBufferPointer()))
     src = NULL;
 
@@ -790,15 +823,15 @@ DWORD *ShaderRecord::GetDX9RenderStates(DWORD *States) {
   const char *src = NULL, *main;
 
   /**/ if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_RUNTIME))
-    src = pSourceRuntime;
+    src = (const char *)pSrcPrcRuntime->GetBufferPointer();
   else if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_REPLACED))
-    src = pSourceReplaced;
+    src = (const char *)pSrcPrcReplaced->GetBufferPointer();
   else if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_ORIGINAL))
     src = NULL;
   else if (pShaderRuntime  && (pOblivionBinary == (const DWORD *)pShaderRuntime->GetBufferPointer()))
-    src = pSourceRuntime;
+    src = (const char *)pSrcPrcRuntime->GetBufferPointer();
   else if (pShaderReplaced && (pOblivionBinary == (const DWORD *)pShaderReplaced->GetBufferPointer()))
-    src = pSourceReplaced;
+    src = (const char *)pSrcPrcReplaced->GetBufferPointer();
   else if (pShaderOriginal && (pOblivionBinary == (const DWORD *)pShaderOriginal->GetBufferPointer()))
     src = NULL;
 
@@ -985,6 +1018,7 @@ bool ShaderRecord::CompileShader(bool forced) {
   D3DXMACRO *defs = (D3DXMACRO *)::defs;
   LPSTR src = NULL; int len;
   LPD3DXBUFFER p = NULL;
+  LPD3DXBUFFER s = NULL;
   LPD3DXCONSTANTTABLE c = NULL;
   bool save = false;
 
@@ -993,6 +1027,7 @@ bool ShaderRecord::CompileShader(bool forced) {
     src = pSourceRuntime;
     len = runtimeLen;
 
+    s = pSrcPrcRuntime;
     p = pShaderRuntime;
     c = pConstsRuntime;
   }
@@ -1000,6 +1035,7 @@ bool ShaderRecord::CompileShader(bool forced) {
     src = pSourceReplaced;
     len = sourceLen;
 
+    s = pSrcPrcReplaced;
     p = pShaderReplaced;
     c = pConstsReplaced;
   }
@@ -1009,6 +1045,15 @@ bool ShaderRecord::CompileShader(bool forced) {
     if (pErrorMsgs)
     pErrorMsgs->Release();
     pErrorMsgs = NULL;
+
+    D3DXPreprocessShader(
+	src,
+	len,
+	defs,
+	&incl,
+	&s,
+	&pErrorMsgs
+    );
 
     D3DXCompileShader(
 	src,
@@ -1058,10 +1103,12 @@ bool ShaderRecord::CompileShader(bool forced) {
 
   /* cascade, the highest possible is selected */
   if (pSourceRuntime) {
+    pSrcPrcRuntime = s;
     pShaderRuntime = p;
     pConstsRuntime = c;
   }
   else if (pSourceReplaced) {
+    pSrcPrcReplaced = s;
     pShaderReplaced = p;
     pConstsReplaced = c;
   }
@@ -1070,8 +1117,8 @@ bool ShaderRecord::CompileShader(bool forced) {
   if (save)
     SaveShader();
 
-  return (pSourceRuntime  && (pShaderRuntime  != NULL)) ||
-	 (pSourceReplaced && (pShaderReplaced != NULL));
+  return (pSourceRuntime  && (pSrcPrcRuntime  != NULL) && (pShaderRuntime  != NULL)) ||
+	 (pSourceReplaced && (pSrcPrcReplaced != NULL) && (pShaderReplaced != NULL));
 }
 
 bool ShaderRecord::DisassembleShader(bool forced) {
@@ -2113,6 +2160,12 @@ ShaderManager::ShaderManager() {
   QueryPerformanceFrequency(&freq);
 
   Constants.fTikTiming.w = (freq.QuadPart);
+
+  /* stitic on compile, has to recompile if changed */
+  if (TextureManager::GetSingleton()->SetAnisotropy()) {
+    defs[DEFS_MIN].Definition = (AFilters ? FILTER_ANISO : FILTER_LINEAR);
+    sprintf(LEVEL_ANISO, "%d", Anisotropy);
+  }
 
 #ifdef	OBGE_DEVLING
   Clear();

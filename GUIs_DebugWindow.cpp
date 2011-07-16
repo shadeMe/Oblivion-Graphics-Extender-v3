@@ -295,6 +295,9 @@ public:
     /* start enabling these functions */
     SDButtonEffectNew->Enable();
 
+    SDToolsSettings->FindChildItem(wxID_MIPGAMMA, NULL)->Check(true);
+    SDToolsSettings->FindChildItem(wxID_AMPLIFY, NULL)->Check(true);
+
     SDTweaks->FindChildItem(wxID_LINEAR, NULL)->Enable(true);
     SDTweaks->FindChildItem(wxID_LINEAR, NULL)->Check(DeGamma && ReGamma);
 
@@ -4298,7 +4301,19 @@ public:
 //  event.Skip();
   }
 
-  virtual void DoToolPMtoQDM(wxCommandEvent& event) {
+  virtual void DoToolPMtoQDMy(wxCommandEvent& event) {
+    DoToolPMtoQDM(true);
+//  event.Skip();
+  }
+
+  virtual void DoToolPMtoQDMn(wxCommandEvent& event) {
+    DoToolPMtoQDM(false);
+//  event.Skip();
+  }
+
+  void DoToolPMtoQDM(bool LODed) {
+    wxMenuItem *mi = SDToolsSettings->FindChildItem(wxID_MIPGAMMA, NULL);
+    bool gamma = mi->IsChecked();
 
     /* ------------------------------------------------ */
     wxFileDialog dlg1(
@@ -4352,7 +4367,7 @@ public:
 
     if (base && norm) {
 //    if (TextureCompressPM(&base, &norm))
-      if (TextureCompressQDM(&base, &norm)) {
+      if (TextureCompressQDM(&base, &norm, gamma, LODed)) {
 	wxFileDialog dlg1(
 	  this,
 	  _T("Select base-texture (RGB+Height)"),
@@ -4389,8 +4404,8 @@ public:
 	wxString m_norm_filename = dlg2.GetFilename();
 	wxString m_norm_filepath = dlg2.GetPath();
 
-	D3DXSaveTextureToFile(m_base_filepath, D3DXIFF_DDS, base, NULL);
-	D3DXSaveTextureToFile(m_norm_filepath, D3DXIFF_DDS, norm, NULL);
+	HRESULT resb = D3DXSaveTextureToFile(m_base_filepath, D3DXIFF_DDS, base, NULL);
+	HRESULT resn = D3DXSaveTextureToFile(m_norm_filepath, D3DXIFF_DDS, norm, NULL);
 
 	base->Release();
 	norm->Release();
@@ -4398,13 +4413,11 @@ public:
     }
 
     SDStatusBar->SetStatusText(wxT("Ready"), 0);
-//  event.Skip();
   }
 
-//  bool TextureCompressT(LPDIRECT3DTEXTURE9 *base);
-//  bool TextureCompressNM(LPDIRECT3DTEXTURE9 *norm);
-
-  virtual void DoToolRemipCLR(wxCommandEvent& event) {
+  virtual void DoToolRemipRGBH(wxCommandEvent& event) {
+    wxMenuItem *mi = SDToolsSettings->FindChildItem(wxID_MIPGAMMA, NULL);
+    bool gamma = mi->IsChecked();
 
     /* ------------------------------------------------ */
     wxFileDialog dlg1(
@@ -4434,7 +4447,7 @@ public:
     D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_base_filepath, &base);
 
     if (base) {
-      if (TextureCompressT(&base)) {
+      if (TextureCompressRGBH(&base, gamma)) {
 	wxFileDialog dlg1(
 	  this,
 	  _T("Select base-texture (RGB+Height)"),
@@ -4453,7 +4466,7 @@ public:
 	wxString m_base_filename = dlg1.GetFilename();
 	wxString m_base_filepath = dlg1.GetPath();
 
-	D3DXSaveTextureToFile(m_base_filepath, D3DXIFF_DDS, base, NULL);
+	HRESULT res = D3DXSaveTextureToFile(m_base_filepath, D3DXIFF_DDS, base, NULL);
 
 	base->Release();
       }
@@ -4463,12 +4476,191 @@ public:
 //  event.Skip();
   }
 
-  virtual void DoToolRemipNM(wxCommandEvent& event) {
+  virtual void DoToolRemipRGB(wxCommandEvent& event) {
+    wxMenuItem *mi = SDToolsSettings->FindChildItem(wxID_MIPGAMMA, NULL);
+    bool gamma = mi->IsChecked();
+
+    /* ------------------------------------------------ */
+    wxFileDialog dlg1(
+      this,
+      _T("Select base-texture (RGB)"),
+      wxT(em->EffectDirectory()),
+      wxEmptyString,
+      _T(
+      "Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+      "PNG images (*.png)|*.png|"
+      "JPEG images (*.jpg)|*.jpg|"
+      "Windows images (*.bmp)|*.bmp|"
+      "DirextX images (*.dds)|*.dds"
+      ),
+      wxFD_OPEN | wxFD_FILE_MUST_EXIST
+    );
+
+    if (dlg1.ShowModal() != wxID_OK)
+      return;
+
+    // get filename
+    wxString m_base_filename = dlg1.GetFilename();
+    wxString m_base_filepath = dlg1.GetPath();
+
+    LPDIRECT3DTEXTURE9 base = NULL;
+
+    D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_base_filepath, &base);
+
+    if (base) {
+      if (TextureCompressRGB(&base, gamma)) {
+	wxFileDialog dlg1(
+	  this,
+	  _T("Select base-texture (RGB)"),
+	  wxT(em->EffectDirectory()),
+	  wxEmptyString,
+	  _T(
+	  "DirextX images (*.dds)|*.dds"
+	  ),
+	  wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+	);
+
+	if (dlg1.ShowModal() != wxID_OK)
+	  return;
+
+	// get filename
+	wxString m_base_filename = dlg1.GetFilename();
+	wxString m_base_filepath = dlg1.GetPath();
+
+	HRESULT res = D3DXSaveTextureToFile(m_base_filepath, D3DXIFF_DDS, base, NULL);
+
+	base->Release();
+      }
+    }
+
+    SDStatusBar->SetStatusText(wxT("Ready"), 0);
+//  event.Skip();
+  }
+
+  virtual void DoToolRemipLA(wxCommandEvent& event) {
+
+    /* ------------------------------------------------ */
+    wxFileDialog dlg1(
+      this,
+      _T("Select base-texture (--L+alpha)"),
+      wxT(em->EffectDirectory()),
+      wxEmptyString,
+      _T(
+      "Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+      "PNG images (*.png)|*.png|"
+      "JPEG images (*.jpg)|*.jpg|"
+      "Windows images (*.bmp)|*.bmp|"
+      "DirextX images (*.dds)|*.dds"
+      ),
+      wxFD_OPEN | wxFD_FILE_MUST_EXIST
+    );
+
+    if (dlg1.ShowModal() != wxID_OK)
+      return;
+
+    // get filename
+    wxString m_base_filename = dlg1.GetFilename();
+    wxString m_base_filepath = dlg1.GetPath();
+
+    LPDIRECT3DTEXTURE9 base = NULL;
+
+    D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_base_filepath, &base);
+
+    if (base) {
+      if (TextureCompressLA(&base)) {
+	wxFileDialog dlg1(
+	  this,
+	  _T("Select base-texture (L+alpha)"),
+	  wxT(em->EffectDirectory()),
+	  wxEmptyString,
+	  _T(
+	  "DirextX images (*.dds)|*.dds"
+	  ),
+	  wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+	);
+
+	if (dlg1.ShowModal() != wxID_OK)
+	  return;
+
+	// get filename
+	wxString m_base_filename = dlg1.GetFilename();
+	wxString m_base_filepath = dlg1.GetPath();
+
+	HRESULT res = D3DXSaveTextureToFile(m_base_filepath, D3DXIFF_DDS, base, NULL);
+
+	base->Release();
+      }
+    }
+
+    SDStatusBar->SetStatusText(wxT("Ready"), 0);
+//  event.Skip();
+  }
+
+  virtual void DoToolRemipA(wxCommandEvent& event) {
+
+    /* ------------------------------------------------ */
+    wxFileDialog dlg1(
+      this,
+      _T("Select alpha-texture (RGB+alpha)"),
+      wxT(em->EffectDirectory()),
+      wxEmptyString,
+      _T(
+      "Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+      "PNG images (*.png)|*.png|"
+      "JPEG images (*.jpg)|*.jpg|"
+      "Windows images (*.bmp)|*.bmp|"
+      "DirextX images (*.dds)|*.dds"
+      ),
+      wxFD_OPEN | wxFD_FILE_MUST_EXIST
+    );
+
+    if (dlg1.ShowModal() != wxID_OK)
+      return;
+
+    // get filename
+    wxString m_base_filename = dlg1.GetFilename();
+    wxString m_base_filepath = dlg1.GetPath();
+
+    LPDIRECT3DTEXTURE9 base = NULL;
+
+    D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_base_filepath, &base);
+
+    if (base) {
+      if (TextureCompressA(&base)) {
+	wxFileDialog dlg1(
+	  this,
+	  _T("Select alpha-texture (alpha)"),
+	  wxT(em->EffectDirectory()),
+	  wxEmptyString,
+	  _T(
+	  "DirextX images (*.dds)|*.dds"
+	  ),
+	  wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+	);
+
+	if (dlg1.ShowModal() != wxID_OK)
+	  return;
+
+	// get filename
+	wxString m_base_filename = dlg1.GetFilename();
+	wxString m_base_filepath = dlg1.GetPath();
+
+	HRESULT res = D3DXSaveTextureToFile(m_base_filepath, D3DXIFF_DDS, base, NULL);
+
+	base->Release();
+      }
+    }
+
+    SDStatusBar->SetStatusText(wxT("Ready"), 0);
+//  event.Skip();
+  }
+
+  virtual void DoToolRemipXYZD(wxCommandEvent& event) {
 
     /* ------------------------------------------------ */
     wxFileDialog dlg2(
       this,
-      _T("Select normal-texture (XYZ+Diffuse)"),
+      _T("Select normal-texture (XYZ+Specular)"),
       wxT(em->EffectDirectory()),
       wxEmptyString,
       _T(
@@ -4493,10 +4685,10 @@ public:
     D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_norm_filepath, &norm);
 
     if (norm) {
-      if (TextureCompressNM(&norm)) {
+      if (TextureCompressXYZD(&norm)) {
 	wxFileDialog dlg2(
 	  this,
-	  _T("Select normal-texture (XYZ+Diffuse)"),
+	  _T("Select normal-texture (XYZ+Specular)"),
 	  wxT(em->EffectDirectory()),
 	  wxEmptyString,
 	  _T(
@@ -4512,7 +4704,145 @@ public:
 	wxString m_norm_filename = dlg2.GetFilename();
 	wxString m_norm_filepath = dlg2.GetPath();
 
-	D3DXSaveTextureToFile(m_norm_filepath, D3DXIFF_DDS, norm, NULL);
+	HRESULT res = D3DXSaveTextureToFile(m_norm_filepath, D3DXIFF_DDS, norm, NULL);
+
+	norm->Release();
+      }
+    }
+
+    SDStatusBar->SetStatusText(wxT("Ready"), 0);
+//  event.Skip();
+  }
+
+  virtual void DoToolRemipXY_Z(wxCommandEvent& event) {
+
+    /* ------------------------------------------------ */
+    wxFileDialog dlg2(
+      this,
+      _T("Select normal-texture (XYZ+Specular)"),
+      wxT(em->EffectDirectory()),
+      wxEmptyString,
+      _T(
+      "Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+      "PNG images (*.png)|*.png|"
+      "JPEG images (*.jpg)|*.jpg|"
+      "Windows images (*.bmp)|*.bmp|"
+      "DirextX images (*.dds)|*.dds"
+      ),
+      wxFD_OPEN | wxFD_FILE_MUST_EXIST
+    );
+
+    if (dlg2.ShowModal() != wxID_OK)
+      return;
+
+    // get filename
+    wxString m_norm_filename = dlg2.GetFilename();
+    wxString m_norm_filepath = dlg2.GetPath();
+
+    LPDIRECT3DTEXTURE9 norm = NULL, z = NULL;
+
+    D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_norm_filepath, &norm);
+
+    if (norm) {
+      if (TextureCompressXY_Z(&norm, &z)) {
+	wxFileDialog dlg1(
+	  this,
+	  _T("Select normal-texture (XY)"),
+	  wxT(em->EffectDirectory()),
+	  wxEmptyString,
+	  _T(
+	  "DirextX images (*.dds)|*.dds"
+	  ),
+	  wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+	);
+
+	if (dlg1.ShowModal() != wxID_OK)
+	  return;
+
+	// get filename
+	wxString m_norm1_filename = dlg1.GetFilename();
+	wxString m_norm1_filepath = dlg1.GetPath();
+
+	wxFileDialog dlg2(
+	  this,
+	  _T("Select normal-texture (Z)"),
+	  wxT(em->EffectDirectory()),
+	  wxEmptyString,
+	  _T(
+	  "DirextX images (*.dds)|*.dds"
+	  ),
+	  wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+	);
+
+	if (dlg2.ShowModal() != wxID_OK)
+	  return;
+
+	// get filename
+	wxString m_norm2_filename = dlg2.GetFilename();
+	wxString m_norm2_filepath = dlg2.GetPath();
+
+	HRESULT res1 = D3DXSaveTextureToFile(m_norm1_filepath, D3DXIFF_DDS, norm, NULL);
+	HRESULT res2 = D3DXSaveTextureToFile(m_norm2_filepath, D3DXIFF_DDS,   z , NULL);
+
+	norm->Release();
+	z->Release();
+      }
+    }
+
+    SDStatusBar->SetStatusText(wxT("Ready"), 0);
+//  event.Skip();
+  }
+
+  virtual void DoToolRemipXY(wxCommandEvent& event) {
+
+    /* ------------------------------------------------ */
+    wxFileDialog dlg2(
+      this,
+      _T("Select normal-texture (XYZ)"),
+      wxT(em->EffectDirectory()),
+      wxEmptyString,
+      _T(
+      "Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+      "PNG images (*.png)|*.png|"
+      "JPEG images (*.jpg)|*.jpg|"
+      "Windows images (*.bmp)|*.bmp|"
+      "DirextX images (*.dds)|*.dds"
+      ),
+      wxFD_OPEN | wxFD_FILE_MUST_EXIST
+    );
+
+    if (dlg2.ShowModal() != wxID_OK)
+      return;
+
+    // get filename
+    wxString m_norm_filename = dlg2.GetFilename();
+    wxString m_norm_filepath = dlg2.GetPath();
+
+    LPDIRECT3DTEXTURE9 norm = NULL;
+
+    D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_norm_filepath, &norm);
+
+    if (norm) {
+      if (TextureCompressXY(&norm)) {
+	wxFileDialog dlg2(
+	  this,
+	  _T("Select normal-texture (XYZ)"),
+	  wxT(em->EffectDirectory()),
+	  wxEmptyString,
+	  _T(
+	  "DirextX images (*.dds)|*.dds"
+	  ),
+	  wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+	);
+
+	if (dlg2.ShowModal() != wxID_OK)
+	  return;
+
+	// get filename
+	wxString m_norm_filename = dlg2.GetFilename();
+	wxString m_norm_filepath = dlg2.GetPath();
+
+	HRESULT res = D3DXSaveTextureToFile(m_norm_filepath, D3DXIFF_DDS, norm, NULL);
 
 	norm->Release();
       }

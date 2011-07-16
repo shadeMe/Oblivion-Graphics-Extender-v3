@@ -176,9 +176,15 @@ class wxShaderDeveloper : public wxFrame
 		virtual void DoShaderOptions( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoEffectOptions( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoProfileOptions( wxCommandEvent& event ) { event.Skip(); }
-		virtual void DoToolPMtoQDM( wxCommandEvent& event ) { event.Skip(); }
-		virtual void DoToolRemipCLR( wxCommandEvent& event ) { event.Skip(); }
-		virtual void DoToolRemipNM( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoToolPMtoQDMy( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoToolPMtoQDMn( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoToolRemipRGBH( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoToolRemipRGB( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoToolRemipLA( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoToolRemipA( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoToolRemipXYZD( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoToolRemipXY_Z( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoToolRemipXY( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoAF( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoLinear( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoRenderpassSwitch( wxCommandEvent& event ) { event.Skip(); }
