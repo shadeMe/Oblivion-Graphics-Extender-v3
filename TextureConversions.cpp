@@ -11,13 +11,15 @@
 #include "TextureConversions-stb_dxt_104.h"
 #include "TextureConversions-squish.h"
 
-inline int rint(float n) {
-  return max(min((int)floor(n + 0.5), 255), 0);
+#define	fabs(x)	((x) >= 0 ? (x) : -(x))
 
-  //if (n >= 0.0)
-  //  return max((int)floor(n + 0.5), 255);
-  //if (n <= 0.0)
-  //  return min((int) ceil(n - 0.5),   0);
+inline int rint(float n) {
+  return max(min((int)floor(n + 0.5f), 255.0f), 0.0f);
+
+  //if (n >= 0.0f)
+  //  return max((int)floor(n + 0.5f), 255);
+  //if (n <= 0.0f)
+  //  return min((int) ceil(n - 0.5f),   0);
 }
 
 /* AWSOME:
@@ -37,7 +39,7 @@ inline int rint(float n) {
 #undef	NORMALS_FLOAT_XYZ
 #undef	NORMALS_FLOAT_XYZ_TANGENTSPACE
 #undef	NORMALS_FLOAT_XY_TANGENTSPACE
-#define	NORMALS_FLOAT_DXDY_TANGENTSPACE	0.5
+#define	NORMALS_FLOAT_DXDY_TANGENTSPACE	0.5f
 /* http://diaryofagraphicsprogrammer.blogspot.com/2009/01/partial-derivative-normal-maps.html
  *
  * The idea is to store the paritial derivate of the normal in two channels of the map like this
@@ -59,19 +61,19 @@ inline int rint(float n) {
 /* http://www.gamedev.net/topic/535230-storing-normals-as-spherical-coordinates/
  *
  * Encode:
- *  return (float2(atan2(nrmNorm.y, nrmNorm.x) / M_PI, nrmNorm.z) + 1.0) * 0.5;
+ *  return (float2(atan2(nrmNorm.y, nrmNorm.x) / M_PI, nrmNorm.z) + 1.0f) * 0.5f;
  *
  * Decode:
- *  float2 spGPUAngles = spherical.xy * 2.0 - 1.0;
+ *  float2 spGPUAngles = spherical.xy * 2.0f - 1.0f;
  *  float2 sincosTheta; sincos(spGPUAngles.x * M_PI, sincosTheta.x, sincosTheta.y);
- *  float2 sincosPhi = float2(sqrt(1.0 - spGPUAngles.y * spGPUAngles.y), spGPUAngles.y);
+ *  float2 sincosPhi = float2(sqrt(1.0f - spGPUAngles.y * spGPUAngles.y), spGPUAngles.y);
  *
  * return float3(sincosTheta.y * sincosPhi.x, sincosTheta.x * sincosPhi.x, sincosPhi.y);
  *
  * Storing z instead of acos(z) just saves some ops the decoding, you still need sin(phi) and cos(phi) to reconstruct XY. You just happen to already have cos(acos(z)), and the trig identity: '1 - sin(x)^2 = cos(x)^2' does the rest.
  *
  * Edit:
- *  Didn't answer the question I guess. You are seeing odd results because the conversion back from spherical is missing a step. You are computing sincos(theta) but not sincos(phi). The reason why I say store just normal.z and not acos(normal.z) is because the length of the vector is 1.0 (did I mention this method of encode/decode only works on normalized vectors) and so doing acos(normal.z/1) and then recovering cos(acos(normal.z/1)) is a very silly thing to do. Instead I store normal.z, and then compute sin(phi) by using the law of sines.
+ *  Didn't answer the question I guess. You are seeing odd results because the conversion back from spherical is missing a step. You are computing sincos(theta) but not sincos(phi). The reason why I say store just normal.z and not acos(normal.z) is because the length of the vector is 1.0f (did I mention this method of encode/decode only works on normalized vectors) and so doing acos(normal.z/1) and then recovering cos(acos(normal.z/1)) is a very silly thing to do. Instead I store normal.z, and then compute sin(phi) by using the law of sines.
  */
 
 #define ACCUMODE_LINEAR		( 0 << 0)	// RGBH
@@ -118,20 +120,20 @@ static void AccuRGBM(long *bs, ULONG b, int level, int l) {
 template<int mode>
 static void AccuRGBH(float *bs, ULONG b, int level, int l) {
   /* seperate the channels and build the sum */
-  bs[0] +=      (b >> 24) & 0xFF      ; /*h*/
-  bs[1] += powf((b >> 16) & 0xFF, 2.2); /*b*/
-  bs[2] += powf((b >>  8) & 0xFF, 2.2); /*g*/
-  bs[3] += powf((b >>  0) & 0xFF, 2.2); /*r*/
+  bs[0] +=             ((b >> 24) & 0xFF)              ; /*h*/
+  bs[1] += powf((float)((b >> 16) & 0xFF) / 0xFF, 2.2f); /*b*/
+  bs[2] += powf((float)((b >>  8) & 0xFF) / 0xFF, 2.2f); /*g*/
+  bs[3] += powf((float)((b >>  0) & 0xFF) / 0xFF, 2.2f); /*r*/
 }
 
 template<int mode>
 static void AccuRGBM(float *bs, ULONG b, int level, int l) {
   /* seperate the channels and build the sum */
   bs[0]  = max(bs[0],
-                (b >> 24) & 0xFF     ); /*h*/
-  bs[1] += powf((b >> 16) & 0xFF, 2.2); /*b*/
-  bs[2] += powf((b >>  8) & 0xFF, 2.2); /*g*/
-  bs[3] += powf((b >>  0) & 0xFF, 2.2); /*r*/
+                       ((b >> 24) & 0xFF)             ); /*h*/
+  bs[1] += powf((float)((b >> 16) & 0xFF) / 0xFF, 2.2f); /*b*/
+  bs[2] += powf((float)((b >>  8) & 0xFF) / 0xFF, 2.2f); /*g*/
+  bs[3] += powf((float)((b >>  0) & 0xFF) / 0xFF, 2.2f); /*r*/
 }
 
 template<int mode>
@@ -160,9 +162,9 @@ static void AccuXYZD(float *nn, ULONG n, int level, int l) {
   float vec[4], len;
 
   vec[0] = ((n >> 24) & 0xFF);
-  vec[1] = ((n >> 16) & 0xFF); vec[1] /= 0xFF; vec[1] -= 0.5; vec[1] /= 0.5;
-  vec[2] = ((n >>  8) & 0xFF); vec[2] /= 0xFF; vec[2] -= 0.5; vec[2] /= 0.5;
-  vec[3] = ((n >>  0) & 0xFF); vec[3] /= 0xFF; vec[3] -= 0.5; vec[3] /= 0.5;
+  vec[1] = ((n >> 16) & 0xFF); vec[1] /= 0xFF; vec[1] -= 0.5f; vec[1] /= 0.5f;
+  vec[2] = ((n >>  8) & 0xFF); vec[2] /= 0xFF; vec[2] -= 0.5f; vec[2] /= 0.5f;
+  vec[3] = ((n >>  0) & 0xFF); vec[3] /= 0xFF; vec[3] -= 0.5f; vec[3] /= 0.5f;
 
   if (mode & ACCUMODE_SCALE) {
     /* lower z (heighten the virtual displacement) every level */
@@ -193,9 +195,9 @@ static void AccuXYCD(float *nn, ULONG n, int level, int l) {
 
   vec[0] = ((n >> 24) & 0xFF);
   vec[1] = ((n >> 16) & 0xFF);
-  vec[2] = ((n >>  8) & 0xFF); vec[2] /= 0xFF; vec[2] -= 0.5; vec[2] /= 0.5;
-  vec[3] = ((n >>  0) & 0xFF); vec[3] /= 0xFF; vec[3] -= 0.5; vec[3] /= 0.5;
-  vec[4] = sqrt(1.0 - min(1.0, vec[2] * vec[2] + vec[3] * vec[3]));
+  vec[2] = ((n >>  8) & 0xFF); vec[2] /= 0xFF; vec[2] -= 0.5f; vec[2] /= 0.5f;
+  vec[3] = ((n >>  0) & 0xFF); vec[3] /= 0xFF; vec[3] -= 0.5f; vec[3] /= 0.5f;
+  vec[4] = sqrt(1.0f - min(1.0f, vec[2] * vec[2] + vec[3] * vec[3]));
 
   if (mode & ACCUMODE_SCALE) {
     /* lower z (heighten the virtual displacement) every level */
@@ -240,19 +242,19 @@ static void NormRGBM(long *obs, long *bs, int av) {
 template<int mode>
 static void NormRGBH(float *obs, float *bs, int av) {
   /* build average of each channel an join */
-  obs[0] = powf(bs[0] / av, 1.0 / 2.2); /*d[ 0,1]*/
-  obs[1] = powf(bs[1] / av, 1.0 / 2.2); /*z[-1,1]*/
-  obs[2] = powf(bs[2] / av, 1.0 / 2.2); /*y[-1,1]*/
-  obs[3] = powf(bs[3] / av, 1.0 / 2.2); /*x[-1,1]*/
+  obs[0] =     (bs[0] / av             )       ; /*d[ 0,1]*/
+  obs[1] = powf(bs[1] / av, 1.0f / 2.2f) * 0xFF; /*z[-1,1]*/
+  obs[2] = powf(bs[2] / av, 1.0f / 2.2f) * 0xFF; /*y[-1,1]*/
+  obs[3] = powf(bs[3] / av, 1.0f / 2.2f) * 0xFF; /*x[-1,1]*/
 }
 
 template<int mode>
 static void NormRGBM(float *obs, float *bs, int av) {
   /* build average of each channel an join */
-  obs[0] =      bs[0]                 ; /*h*/
-  obs[1] = powf(bs[1] / av, 1.0 / 2.2); /*b*/
-  obs[2] = powf(bs[2] / av, 1.0 / 2.2); /*g*/
-  obs[3] = powf(bs[3] / av, 1.0 / 2.2); /*r*/
+  obs[0] =      bs[0]                          ; /*h*/
+  obs[1] = powf(bs[1] / av, 1.0f / 2.2f) * 0xFF; /*b*/
+  obs[2] = powf(bs[2] / av, 1.0f / 2.2f) * 0xFF; /*g*/
+  obs[3] = powf(bs[3] / av, 1.0f / 2.2f) * 0xFF; /*r*/
 }
 
 template<int mode>
@@ -404,7 +406,7 @@ template<int mode>
 static ULONG JoinXYZD(float *nn, float *nr) {
   ULONG n = 0;
   float vec[4], len;
-  float derivb = NORMALS_FLOAT_DXDY_TANGENTSPACE;		// [0.5,1.0]
+  float derivb = NORMALS_FLOAT_DXDY_TANGENTSPACE;		// [0.5f,1.0f]
 
   vec[0] = nn[0];
   vec[1] = nn[1];
@@ -426,11 +428,11 @@ static ULONG JoinXYZD(float *nn, float *nr) {
        *  y / z * multiplier;
        *  z / z * multiplier;
        */
-      float derivx = 1.0 / nr[1];				// [...,1.0]
+      float derivx = 1.0f / nr[1];				// [...,1.0f]
       if (derivb < derivx)
 	derivb = derivx;
-      if (derivb > 1.0)
-	derivb = 1.0;
+      if (derivb > 1.0f)
+	derivb = 1.0f;
     }
 
 #if 0
@@ -449,14 +451,14 @@ static ULONG JoinXYZD(float *nn, float *nr) {
       )
       / fabs(vec[1]);
 
-    if (up > 1.0) {
+    if (up > 1.0f) {
       vec[2] /= up;
       vec[3] /= up;
     }
 #endif
   }
   else if ((mode & TRGTMODE_CODING) != TRGTMODE_CODING_XYZ) {
-    vec[1] = max(0.0, vec[1]);
+    vec[1] = max(0.0f, vec[1]);
   }
 
   /* ################################################################# */
@@ -466,9 +468,9 @@ static ULONG JoinXYZD(float *nn, float *nr) {
     else
       len = sqrt(vec[1] * vec[1] + vec[2] * vec[2] + vec[3] * vec[3]);
 
-    vec[1] /= len; vec[1] *= 0.5; vec[1] += 0.5; vec[1] *= 0xFF;
-    vec[2] /= len; vec[2] *= 0.5; vec[2] += 0.5; vec[2] *= 0xFF;
-    vec[3] /= len; vec[3] *= 0.5; vec[3] += 0.5; vec[3] *= 0xFF;
+    vec[1] /= len; vec[1] *= 0.5f; vec[1] += 0.5f; vec[1] *= 0xFF;
+    vec[2] /= len; vec[2] *= 0.5f; vec[2] += 0.5f; vec[2] *= 0xFF;
+    vec[3] /= len; vec[3] *= 0.5f; vec[3] += 0.5f; vec[3] *= 0xFF;
   }
   /* ################################################################# */
   else if ((mode & TRGTMODE_CODING) == TRGTMODE_CODING_XYZt) {
@@ -477,9 +479,9 @@ static ULONG JoinXYZD(float *nn, float *nr) {
     else
       len = sqrt(vec[1] * vec[1] + vec[2] * vec[2] + vec[3] * vec[3]);
 
-    vec[1] /= len; vec[1] *= 1.0; vec[1] += 0.0; vec[1] *= 0xFF;
-    vec[2] /= len; vec[2] *= 0.5; vec[2] += 0.5; vec[2] *= 0xFF;
-    vec[3] /= len; vec[3] *= 0.5; vec[3] += 0.5; vec[3] *= 0xFF;
+    vec[1] /= len; vec[1] *= 1.0f; vec[1] += 0.0f; vec[1] *= 0xFF;
+    vec[2] /= len; vec[2] *= 0.5f; vec[2] += 0.5f; vec[2] *= 0xFF;
+    vec[3] /= len; vec[3] *= 0.5f; vec[3] += 0.5f; vec[3] *= 0xFF;
   }
   /* ################################################################# */
   else if ((mode & TRGTMODE_CODING) == TRGTMODE_CODING_XYt) {
@@ -489,18 +491,18 @@ static ULONG JoinXYZD(float *nn, float *nr) {
       len = sqrt(vec[1] * vec[1] + vec[2] * vec[2] + vec[3] * vec[3]);
       lnn = sqrt(vec[2] * vec[2] + vec[3] * vec[3]);
 
-      float factor = (2.0 - max(vec[2] / lnn, vec[3] / lnn)) / len;
+      float factor = (2.0f - max(vec[2] / lnn, vec[3] / lnn)) / len;
 
-      vec[1]  = 1.0;
-      vec[2] *= factor; vec[2] *= 0.5; vec[2] += 0.5; vec[2] *= 0xFF;
-      vec[3] *= factor; vec[3] *= 0.5; vec[3] += 0.5; vec[3] *= 0xFF;
+      vec[1]  = 1.0f;
+      vec[2] *= factor; vec[2] *= 0.5f; vec[2] += 0.5f; vec[2] *= 0xFF;
+      vec[3] *= factor; vec[3] *= 0.5f; vec[3] += 0.5f; vec[3] *= 0xFF;
     }
     else {
       len = sqrt(vec[1] * vec[1] + vec[2] * vec[2] + vec[3] * vec[3]);
 
-      vec[1]  = 1.0;
-      vec[2] /= len; vec[2] *= 0.5; vec[2] += 0.5; vec[2] *= 0xFF;
-      vec[3] /= len; vec[3] *= 0.5; vec[3] += 0.5; vec[3] *= 0xFF;
+      vec[1]  = 1.0f;
+      vec[2] /= len; vec[2] *= 0.5f; vec[2] += 0.5f; vec[2] *= 0xFF;
+      vec[3] /= len; vec[3] *= 0.5f; vec[3] += 0.5f; vec[3] *= 0xFF;
     }
   }
   /* ################################################################# */
@@ -511,25 +513,25 @@ static ULONG JoinXYZD(float *nn, float *nr) {
       len = vec[1] / derivb;
 
       float lnn = sqrt(vec[2] * vec[2] + vec[3] * vec[3]);
-      float factor = (2.0 - max(vec[2] / lnn, vec[3] / lnn)) / len;
+      float factor = (2.0f - max(vec[2] / lnn, vec[3] / lnn)) / len;
 
-      vec[1] /= len;    vec[1] *= 0.5; vec[1] += 0.5; vec[1] *= 0xFF;
-      vec[2] *= factor; vec[2] *= 0.5; vec[2] += 0.5; vec[2] *= 0xFF;
-      vec[3] *= factor; vec[3] *= 0.5; vec[3] += 0.5; vec[3] *= 0xFF;
-		        derivb *= 0.5; derivb += 0.5; derivb *= 0xFF;
+      vec[1] /= len;    vec[1] *= 0.5f; vec[1] += 0.5f; vec[1] *= 0xFF;
+      vec[2] *= factor; vec[2] *= 0.5f; vec[2] += 0.5f; vec[2] *= 0xFF;
+      vec[3] *= factor; vec[3] *= 0.5f; vec[3] += 0.5f; vec[3] *= 0xFF;
+		        derivb *= 0.5f; derivb += 0.5f; derivb *= 0xFF;
 
 #if 0
       if (1) {
 	float chk[4], cln, fct;
 
-	chk[2] = ((vec[2] / 0xFF) - 0.5) / 0.5;
-	chk[3] = ((vec[3] / 0xFF) - 0.5) / 0.5;
+	chk[2] = ((vec[2] / 0xFF) - 0.5f) / 0.5f;
+	chk[3] = ((vec[3] / 0xFF) - 0.5f) / 0.5f;
 
 	cln = sqrt(chk[2] * chk[2] + chk[3] * chk[3]);
 
-	fct = 2.0 - max(chk[2] / cln, chk[3] / cln);
+	fct = 2.0f - max(chk[2] / cln, chk[3] / cln);
 
-	chk[1]  = 1.0 * derivb;
+	chk[1]  = 1.0f * derivb;
 	chk[2] /= fct;
 	chk[3] /= fct;
 
@@ -543,18 +545,18 @@ static ULONG JoinXYZD(float *nn, float *nr) {
       }
 #endif
 
-      assert(fabs(vec[1] - derivb) < 0.001);
+      assert(fabs(vec[1] - derivb) < 0.001f);
     }
     else {
       /* this format is fully compatible with the built-in shaders */
       len = vec[1] / derivb;
 
-      vec[1] /= len; vec[1] *= 0.5; vec[1] += 0.5; vec[1] *= 0xFF;
-      vec[2] /= len; vec[2] *= 0.5; vec[2] += 0.5; vec[2] *= 0xFF;
-      vec[3] /= len; vec[3] *= 0.5; vec[3] += 0.5; vec[3] *= 0xFF;
-		     derivb *= 0.5; derivb += 0.5; derivb *= 0xFF;
+      vec[1] /= len; vec[1] *= 0.5f; vec[1] += 0.5f; vec[1] *= 0xFF;
+      vec[2] /= len; vec[2] *= 0.5f; vec[2] += 0.5f; vec[2] *= 0xFF;
+      vec[3] /= len; vec[3] *= 0.5f; vec[3] += 0.5f; vec[3] *= 0xFF;
+		     derivb *= 0.5f; derivb += 0.5f; derivb *= 0xFF;
 
-      assert(fabs(vec[1] - derivb) < 0.001);
+      assert(fabs(vec[1] - derivb) < 0.001f);
     }
   }
   /* ################################################################# */
@@ -564,9 +566,9 @@ static ULONG JoinXYZD(float *nn, float *nr) {
     len = sqrt(vec[1] * vec[1] + vec[2] * vec[2] + vec[3] * vec[3]);
     ang = atan2(vec[2], vec[3]) / M_PI; vec[2] = ang;
 
-    vec[1] *= 1.0; vec[1] += 0.0; vec[1] *= 0xFF;
-    vec[2] *= 0.5; vec[2] += 0.5; vec[3] *= 0xFF;
-    vec[3]  = 1.0;
+    vec[1] *= 1.0f; vec[1] += 0.0f; vec[1] *= 0xFF;
+    vec[2] *= 0.5f; vec[2] += 0.5f; vec[3] *= 0xFF;
+    vec[3]  = 1.0f;
   }
 
   n |= (rint(vec[0]) << 24); /*d[ 0,1]*/
@@ -591,12 +593,12 @@ static ULONG JoinXYCD(float *nn, float *nr) {
   vec[1] = nn[1];
   vec[2] = nn[2];
   vec[3] = nn[3];
-  vec[4] = sqrt(1.0 - min(1.0, vec[2] * vec[2] + vec[3] * vec[3]));
+  vec[4] = sqrt(1.0f - min(1.0f, vec[2] * vec[2] + vec[3] * vec[3]));
   len = sqrt(vec[4] * vec[4] + vec[2] * vec[2] + vec[3] * vec[3]);
 
-  vec[2] /= len; vec[2] *= 0.5; vec[2] += 0.5; vec[2] *= 0xFF;
-  vec[3] /= len; vec[3] *= 0.5; vec[3] += 0.5; vec[3] *= 0xFF;
-  vec[4] /= len; vec[4] *= 0.5; vec[4] += 0.5; vec[4] *= 0xFF;
+  vec[2] /= len; vec[2] *= 0.5f; vec[2] += 0.5f; vec[2] *= 0xFF;
+  vec[3] /= len; vec[3] *= 0.5f; vec[3] += 0.5f; vec[3] *= 0xFF;
+  vec[4] /= len; vec[4] *= 0.5f; vec[4] += 0.5f; vec[4] *= 0xFF;
 
   n |= (rint(vec[0]) << 24); /*d[ 0,1]*/
   n |= (rint(vec[1]) << 16); /*c[-1,1]*/
@@ -971,6 +973,14 @@ bool TextureCompressXY_Z(LPDIRECT3DTEXTURE9 *norm, LPDIRECT3DTEXTURE9 *z) {
   return res;
 }
 
+bool TextureCompressXYZ(LPDIRECT3DTEXTURE9 *norm) {
+  bool res = true;
+
+  res = res && TextureCompressDXT<ULONG, float, TCOMPRESS_XYZ>(norm);
+
+  return res;
+}
+
 bool TextureCompressXY(LPDIRECT3DTEXTURE9 *norm) {
   bool res = true;
 
@@ -1100,7 +1110,7 @@ static bool TextureCompressQDM(LPDIRECT3DTEXTURE9 *base, LPDIRECT3DTEXTURE9 *nor
       for (int lx = 0; lx < 4; lx += 1) {
 	type  bs[8] = {0}; int yl = ((y + ly) << l);
 	long  ns[8] = {0}; int xl = ((x + lx) << l);
-	float nn[8] = {0.0};
+	float nn[8] = {0.0f};
 
 	/* access all pixels this level's 4x4-block represents in
 	 * the full dimension original surface (high quality mip-mapping)
@@ -1150,7 +1160,7 @@ static bool TextureCompressQDM(LPDIRECT3DTEXTURE9 *base, LPDIRECT3DTEXTURE9 *nor
 
       type  br[4] = {0};
       long  nr[4] = {0};
-      float rn[4] = {0.0};
+      float rn[4] = {0.0f};
 
       /* analyze this level's 4x4-block */
       for (int ly = 0; ly < 4; ly += 1)

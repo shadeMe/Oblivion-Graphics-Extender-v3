@@ -11,6 +11,8 @@
 #include "OBGE fork/Sky.h"
 #include "Nodes/NiBillboardNode.h"
 #include "obse/GameObjects.h"
+#include "obse/GameData.h"
+#include "obse/NiProperties.h"
 
 extern struct sConstants
 {
@@ -39,8 +41,12 @@ extern struct sConstants
 	v1_2_416::NiVector4		SunCoEffs;
 	v1_2_416::NiVector4		SunColor;
 
+	v1_2_416::NiVector4		FogRange;
+	v1_2_416::NiVector4		FogColor;
+
 	v1_2_416::NiVector4		PlayerPosition;
 	v1_2_416::NiVector3		EyeForward;
+	v1_2_416::NiVector3		EyePosition;
 
 	/* the four frustum rays in eye-space */
 	D3DXMATRIX			EyeFrustum;
@@ -62,6 +68,20 @@ extern struct sConstants
 
 	inline void UpdateWorld(const D3DXMATRIX &mx) {
 	  wrld = mx;
+
+#define Units2Centimeters	0.1428767293691635
+#define Units2Meters		0.001428767293691635
+
+	  PlayerCharacter *PlayerContainer;
+	  if (PlayerContainer = (*g_thePlayer)) {
+	    EyePosition.x = PlayerContainer->posX + wrld._41;
+	    EyePosition.y = PlayerContainer->posY + wrld._42;
+	    EyePosition.z = PlayerContainer->posZ + wrld._43;
+
+	    PlayerPosition.x = PlayerContainer->posX * Units2Meters;
+	    PlayerPosition.y = PlayerContainer->posY * Units2Meters;
+	    PlayerPosition.z = PlayerContainer->posZ * Units2Meters * 4;
+	  }
 	}
 
 	inline void UpdateView(const D3DXMATRIX &mx) {

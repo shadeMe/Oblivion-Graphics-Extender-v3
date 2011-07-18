@@ -99,6 +99,10 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDToolsSettingsGamma = new wxMenuItem( SDToolsSettings, wxID_MIPGAMMA, wxString( wxT("Gamma correction for MIPs") ) , wxEmptyString, wxITEM_CHECK );
 	SDToolsSettings->Append( SDToolsSettingsGamma );
 	
+	wxMenuItem* SDToolsSettingsBatch;
+	SDToolsSettingsBatch = new wxMenuItem( SDToolsSettings, wxID_BATCH, wxString( wxT("Do batch operations") ) , wxEmptyString, wxITEM_CHECK );
+	SDToolsSettings->Append( SDToolsSettingsBatch );
+	
 	SDTools->Append( -1, wxT("Settings"), SDToolsSettings );
 	
 	wxMenuItem* SDConvertQDMy;
@@ -128,6 +132,10 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	wxMenuItem* SDConvertXYZD;
 	SDConvertXYZD = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip normal+specular-map [xyzs]") ) , wxEmptyString, wxITEM_NORMAL );
 	SDTools->Append( SDConvertXYZD );
+	
+	wxMenuItem* SDConvertXYZ;
+	SDConvertXYZ = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip normal-map [xyz-]") ) , wxEmptyString, wxITEM_NORMAL );
+	SDTools->Append( SDConvertXYZ );
 	
 	wxMenuItem* SDConvertXY_Z;
 	SDConvertXY_Z = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip normal-map [xy+z-]") ) , wxEmptyString, wxITEM_NORMAL );
@@ -944,6 +952,7 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	this->Connect( SDConvertLA->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipLA ) );
 	this->Connect( SDConvertA->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipA ) );
 	this->Connect( SDConvertXYZD->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipXYZD ) );
+	this->Connect( SDConvertXYZ->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipXYZ ) );
 	this->Connect( SDConvertXY_Z->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipXY_Z ) );
 	this->Connect( SDConvertXY->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipXY ) );
 	this->Connect( SDTweakAF1->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );
@@ -1023,6 +1032,7 @@ wxShaderDeveloper::~wxShaderDeveloper()
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipLA ) );
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipA ) );
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipXYZD ) );
+	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipXYZ ) );
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipXY_Z ) );
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipXY ) );
 	this->Disconnect( wxID_AF1, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoAF ) );

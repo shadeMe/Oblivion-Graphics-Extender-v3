@@ -1013,6 +1013,7 @@ inline void EffectRecord::ApplySharedConstants() {
   pEffect->SetIntArray("oblv_GameTime", &Constants.iGameTime.x, 4);
   pEffect->SetIntArray("obge_Tick", &Constants.iTikTiming.x, 4);
 
+  pEffect->SetVector("oblv_FogRange", &Constants.FogRange);
   pEffect->SetVector("oblv_SunDirection", &Constants.SunDir);
   pEffect->SetVector("oblv_SunTiming", &Constants.SunTiming);
 

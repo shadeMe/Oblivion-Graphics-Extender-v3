@@ -48,12 +48,14 @@ void sConstants::Update(v1_2_416::NiDX9Renderer *Renderer) {
   time.y = (int)(gtime / 60) / 60;
 #endif
 
-#define Units2Centimeters	0.1428767293691635
-#define Units2Meters		0.001428767293691635
-  PlayerCharacter *PlayerContainer = (*g_thePlayer);
-  PlayerPosition.x = PlayerContainer->posX * Units2Meters;
-  PlayerPosition.y = PlayerContainer->posY * Units2Meters;
-  PlayerPosition.z = PlayerContainer->posZ * Units2Meters * 4;
+  TES *tes = TES::GetSingleton();
+
+  // farF, nearF, farF - nearF, farF + nearF 
+  FogRange.x = tes->fogProperty->fogEnd;
+  FogRange.y = tes->fogProperty->fogStart;
+  FogRange.z = FogRange.x - FogRange.y;
+  FogRange.w = FogRange.x + FogRange.y;
+
 }
 
 void sConstants::UpdateSun() {

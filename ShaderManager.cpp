@@ -1713,8 +1713,12 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.SunDir;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_SunTiming"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.SunTiming;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_FogRange"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.FogRange;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_PlayerPosition"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.PlayerPosition;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_EyePosition"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.EyePosition;
 	      else if  (cnst.Name == strstr(cnst.Name, "oblv_GameTime"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.fGameTime;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_TexData")) {

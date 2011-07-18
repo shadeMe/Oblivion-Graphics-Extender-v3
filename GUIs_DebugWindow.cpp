@@ -210,7 +210,9 @@ HWND DebugWindow::ControlActiveWindow(HWND org) {
 #include <wx/init.h>
 #include <wx/app.h>
 #include <wx/dialog.h>
+#include <wx/dirdlg.h>
 #include <wx/filedlg.h>
+#include <wx/filename.h>
 #include <wx/string.h>
 #include <wx/gauge.h>
 #include <wx/dcclient.h>
@@ -425,6 +427,8 @@ public:
 
     normed = false;
 #endif
+
+    ProgressSubject = "...";
   }
 
 //wxGauge *SDStatusGauge;
@@ -436,6 +440,7 @@ public:
   EffectManager *em;
   wxImage rt, gt, ds;
   wxMemoryDC crt, grt, cds, sts;
+  wxString ProgressSubject;
 #if defined(OGBE_PROFILE) || 1
   NumberAxis *leftAxis, *bottomAxis;
   XYAreaRenderer *rndrP;
@@ -4312,7 +4317,8 @@ public:
   }
 
   void DoToolPMtoQDM(bool LODed) {
-    wxMenuItem *mi = SDToolsSettings->FindChildItem(wxID_MIPGAMMA, NULL);
+    wxMenuItem *
+    mi = SDToolsSettings->FindChildItem(wxID_MIPGAMMA, NULL);
     bool gamma = mi->IsChecked();
 
     /* ------------------------------------------------ */
@@ -4366,6 +4372,8 @@ public:
     D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_norm_filepath, &norm);
 
     if (base && norm) {
+      ProgressSubject = m_base_filename + " " + m_norm_filename;
+
 //    if (TextureCompressPM(&base, &norm))
       if (TextureCompressQDM(&base, &norm, gamma, LODed)) {
 	wxFileDialog dlg1(
@@ -4413,11 +4421,16 @@ public:
     }
 
     SDStatusBar->SetStatusText(wxT("Ready"), 0);
+    ProgressSubject = "...";
+//  event.Skip();
   }
 
   virtual void DoToolRemipRGBH(wxCommandEvent& event) {
-    wxMenuItem *mi = SDToolsSettings->FindChildItem(wxID_MIPGAMMA, NULL);
+    wxMenuItem *
+    mi = SDToolsSettings->FindChildItem(wxID_MIPGAMMA, NULL);
     bool gamma = mi->IsChecked();
+    mi = SDToolsSettings->FindChildItem(wxID_BATCH, NULL);
+    bool batch = mi->IsChecked();
 
     /* ------------------------------------------------ */
     wxFileDialog dlg1(
@@ -4447,6 +4460,8 @@ public:
     D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_base_filepath, &base);
 
     if (base) {
+      ProgressSubject = m_base_filename;
+
       if (TextureCompressRGBH(&base, gamma)) {
 	wxFileDialog dlg1(
 	  this,
@@ -4473,12 +4488,16 @@ public:
     }
 
     SDStatusBar->SetStatusText(wxT("Ready"), 0);
+    ProgressSubject = "...";
 //  event.Skip();
   }
 
   virtual void DoToolRemipRGB(wxCommandEvent& event) {
-    wxMenuItem *mi = SDToolsSettings->FindChildItem(wxID_MIPGAMMA, NULL);
+    wxMenuItem *
+    mi = SDToolsSettings->FindChildItem(wxID_MIPGAMMA, NULL);
     bool gamma = mi->IsChecked();
+    mi = SDToolsSettings->FindChildItem(wxID_BATCH, NULL);
+    bool batch = mi->IsChecked();
 
     /* ------------------------------------------------ */
     wxFileDialog dlg1(
@@ -4508,6 +4527,8 @@ public:
     D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_base_filepath, &base);
 
     if (base) {
+      ProgressSubject = m_base_filename;
+
       if (TextureCompressRGB(&base, gamma)) {
 	wxFileDialog dlg1(
 	  this,
@@ -4534,10 +4555,14 @@ public:
     }
 
     SDStatusBar->SetStatusText(wxT("Ready"), 0);
+    ProgressSubject = "...";
 //  event.Skip();
   }
 
   virtual void DoToolRemipLA(wxCommandEvent& event) {
+    wxMenuItem *
+    mi = SDToolsSettings->FindChildItem(wxID_BATCH, NULL);
+    bool batch = mi->IsChecked();
 
     /* ------------------------------------------------ */
     wxFileDialog dlg1(
@@ -4567,6 +4592,8 @@ public:
     D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_base_filepath, &base);
 
     if (base) {
+      ProgressSubject = m_base_filename;
+
       if (TextureCompressLA(&base)) {
 	wxFileDialog dlg1(
 	  this,
@@ -4593,10 +4620,14 @@ public:
     }
 
     SDStatusBar->SetStatusText(wxT("Ready"), 0);
+    ProgressSubject = "...";
 //  event.Skip();
   }
 
   virtual void DoToolRemipA(wxCommandEvent& event) {
+    wxMenuItem *
+    mi = SDToolsSettings->FindChildItem(wxID_BATCH, NULL);
+    bool batch = mi->IsChecked();
 
     /* ------------------------------------------------ */
     wxFileDialog dlg1(
@@ -4626,6 +4657,8 @@ public:
     D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_base_filepath, &base);
 
     if (base) {
+      ProgressSubject = m_base_filename;
+
       if (TextureCompressA(&base)) {
 	wxFileDialog dlg1(
 	  this,
@@ -4652,10 +4685,14 @@ public:
     }
 
     SDStatusBar->SetStatusText(wxT("Ready"), 0);
+    ProgressSubject = "...";
 //  event.Skip();
   }
 
   virtual void DoToolRemipXYZD(wxCommandEvent& event) {
+    wxMenuItem *
+    mi = SDToolsSettings->FindChildItem(wxID_BATCH, NULL);
+    bool batch = mi->IsChecked();
 
     /* ------------------------------------------------ */
     wxFileDialog dlg2(
@@ -4664,11 +4701,11 @@ public:
       wxT(em->EffectDirectory()),
       wxEmptyString,
       _T(
-      "Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
-      "PNG images (*.png)|*.png|"
-      "JPEG images (*.jpg)|*.jpg|"
-      "Windows images (*.bmp)|*.bmp|"
-      "DirextX images (*.dds)|*.dds"
+	"Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+	"PNG images (*.png)|*.png|"
+	"JPEG images (*.jpg)|*.jpg|"
+	"Windows images (*.bmp)|*.bmp|"
+	"DirextX images (*.dds)|*.dds"
       ),
       wxFD_OPEN | wxFD_FILE_MUST_EXIST
     );
@@ -4685,6 +4722,8 @@ public:
     D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_norm_filepath, &norm);
 
     if (norm) {
+      ProgressSubject = m_norm_filename;
+
       if (TextureCompressXYZD(&norm)) {
 	wxFileDialog dlg2(
 	  this,
@@ -4711,10 +4750,140 @@ public:
     }
 
     SDStatusBar->SetStatusText(wxT("Ready"), 0);
+    ProgressSubject = "...";
+//  event.Skip();
+  }
+
+  virtual void DoToolRemipXYZ(wxCommandEvent& event) {
+    wxMenuItem *
+    mi = SDToolsSettings->FindChildItem(wxID_BATCH, NULL);
+    bool batch = mi->IsChecked();
+
+    /* ------------------------------------------------ */
+    if (!batch) {
+      wxFileDialog dlg2(
+        this,
+        _T("Select normal-texture (XYZ)"),
+        wxT(em->EffectDirectory()),
+        wxEmptyString,
+        _T(
+	  "Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+	  "PNG images (*.png)|*.png|"
+	  "JPEG images (*.jpg)|*.jpg|"
+	  "Windows images (*.bmp)|*.bmp|"
+	  "DirextX images (*.dds)|*.dds"
+        ),
+        wxFD_OPEN | wxFD_FILE_MUST_EXIST
+      );
+
+      if (dlg2.ShowModal() != wxID_OK)
+        return;
+
+      // get filename
+      wxString m_norm_filename = dlg2.GetFilename();
+      wxString m_norm_filepath = dlg2.GetPath();
+
+      LPDIRECT3DTEXTURE9 norm = NULL;
+      D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_norm_filepath, &norm);
+
+      if (norm) {
+	ProgressSubject = m_norm_filename;
+
+        if (TextureCompressXYZ(&norm)) {
+	  wxFileDialog dlg2(
+	    this,
+	    _T("Select normal-texture (XYZ)"),
+	    wxT(em->EffectDirectory()),
+	    wxEmptyString,
+	    _T(
+	      "DirextX images (*.dds)|*.dds"
+	    ),
+	    wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+	  );
+
+	  if (dlg2.ShowModal() != wxID_OK)
+	    return;
+
+	  // get filename
+	  wxString m_norm_filename = dlg2.GetFilename();
+	  wxString m_norm_filepath = dlg2.GetPath();
+
+	  HRESULT res = D3DXSaveTextureToFile(m_norm_filepath, D3DXIFF_DDS, norm, NULL);
+	  norm->Release();
+        }
+      }
+    }
+    else {
+      wxFileDialog dlg2(
+        this,
+        _T("Select normal-textures (XYZ)"),
+        wxT(em->EffectDirectory()),
+        wxEmptyString,
+        _T(
+	  "Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+	  "PNG images (*.png)|*.png|"
+	  "JPEG images (*.jpg)|*.jpg|"
+	  "Windows images (*.bmp)|*.bmp|"
+	  "DirextX images (*.dds)|*.dds"
+        ),
+        wxFD_OPEN | wxFD_FILE_MUST_EXIST | wxFD_MULTIPLE
+      );
+
+      if (dlg2.ShowModal() != wxID_OK)
+        return;
+
+      wxDirDialog dlg1(
+        this,
+        _T("Select normal-texture (XYZ) destination"),
+        wxT(em->EffectDirectory()),
+        wxDD_DIR_MUST_EXIST
+      );
+
+      if (dlg1.ShowModal() != wxID_OK)
+        return;
+
+      // get filenames
+      wxArrayString m_norm_filenames; dlg2.GetFilenames(m_norm_filenames);
+      wxArrayString m_norm_filepaths; dlg2.GetPaths(m_norm_filepaths);
+      wxString m_norm_filedestn = dlg1.GetPath();
+
+      for (int f = 0; f < m_norm_filepaths.GetCount(); f++) {
+        wxString m_norm_filename = m_norm_filenames[f];
+        wxString m_norm_filepath = m_norm_filepaths[f];
+
+        LPDIRECT3DTEXTURE9 norm = NULL;
+        D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_norm_filepath, &norm);
+
+        if (norm) {
+	  ProgressSubject = m_norm_filename;
+
+          if (TextureCompressXYZ(&norm)) {
+            wxFileName n_norm_filename(m_norm_filename);
+            wxFileName n_norm_filepath(m_norm_filepath);
+            wxFileName n_norm_filedest(m_norm_filedestn, m_norm_filename);
+
+	    // get filename
+	    n_norm_filename.ClearExt(); n_norm_filename.SetExt("dds");
+	    n_norm_filepath.ClearExt(); n_norm_filepath.SetExt("dds");
+	    n_norm_filedest.ClearExt(); n_norm_filedest.SetExt("dds");
+
+	    wxString path = n_norm_filedest.GetFullPath();
+	    HRESULT res = D3DXSaveTextureToFile(path, D3DXIFF_DDS, norm, NULL);
+	    norm->Release();
+          }
+        }
+      }
+    }
+
+    SDStatusBar->SetStatusText(wxT("Ready"), 0);
+    ProgressSubject = "...";
 //  event.Skip();
   }
 
   virtual void DoToolRemipXY_Z(wxCommandEvent& event) {
+    wxMenuItem *
+    mi = SDToolsSettings->FindChildItem(wxID_BATCH, NULL);
+    bool batch = mi->IsChecked();
 
     /* ------------------------------------------------ */
     wxFileDialog dlg2(
@@ -4744,6 +4913,8 @@ public:
     D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_norm_filepath, &norm);
 
     if (norm) {
+      ProgressSubject = m_norm_filename;
+
       if (TextureCompressXY_Z(&norm, &z)) {
 	wxFileDialog dlg1(
 	  this,
@@ -4790,10 +4961,14 @@ public:
     }
 
     SDStatusBar->SetStatusText(wxT("Ready"), 0);
+    ProgressSubject = "...";
 //  event.Skip();
   }
 
   virtual void DoToolRemipXY(wxCommandEvent& event) {
+    wxMenuItem *
+    mi = SDToolsSettings->FindChildItem(wxID_BATCH, NULL);
+    bool batch = mi->IsChecked();
 
     /* ------------------------------------------------ */
     wxFileDialog dlg2(
@@ -4823,6 +4998,8 @@ public:
     D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_norm_filepath, &norm);
 
     if (norm) {
+      ProgressSubject = m_norm_filename;
+
       if (TextureCompressXY(&norm)) {
 	wxFileDialog dlg2(
 	  this,
@@ -4849,6 +5026,7 @@ public:
     }
 
     SDStatusBar->SetStatusText(wxT("Ready"), 0);
+    ProgressSubject = "...";
 //  event.Skip();
   }
 
@@ -4892,14 +5070,14 @@ public:
    */
 
   void SetProgress(int a, int amax, int b, int bmax) {
-    char buf[256];
+    char buf[1024];
 
     if (bmax)
-      sprintf(buf, "Processing ... %.3f%%, %.3f%%", 100.0f * a / amax, 100.0f * b / bmax);
+      sprintf(buf, "Processing %s: %.3f%%, %.3f%%", ProgressSubject.GetData(), 100.0f * a / amax, 100.0f * b / bmax);
     else if (amax)
-      sprintf(buf, "Processing ... %.3f%%", 100.0f * a / amax);
+      sprintf(buf, "Processing %s: %.3f%%", ProgressSubject.GetData(), 100.0f * a / amax);
     else
-      sprintf(buf, "Processing ...");
+      sprintf(buf, "Processing %s", ProgressSubject.GetData());
 
     SDStatusBar->SetStatusText(wxString(buf), 0);
   }
@@ -4929,7 +5107,7 @@ public:
 };
 
 DebugWindow::DebugWindow() {
-//assert(NULL);
+  assert(NULL);
 
   GUIs_ShaderDeveloper *
   sdev = new GUIs_ShaderDeveloper(NULL, wxID_ANY, "OBGE «Shader Developer»", wxPoint(-100, 0), wxSize(630, 704));

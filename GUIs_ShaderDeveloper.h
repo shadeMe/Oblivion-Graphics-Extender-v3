@@ -51,13 +51,14 @@
 #define wxID_KILLTEX 1012
 #define wxID_AMPLIFY 1013
 #define wxID_MIPGAMMA 1014
-#define wxID_AF1 1015
-#define wxID_AF2 1016
-#define wxID_AF4 1017
-#define wxID_AF8 1018
-#define wxID_AF16 1019
-#define wxID_AF32 1020
-#define wxID_LINEAR 1021
+#define wxID_BATCH 1015
+#define wxID_AF1 1016
+#define wxID_AF2 1017
+#define wxID_AF4 1018
+#define wxID_AF8 1019
+#define wxID_AF16 1020
+#define wxID_AF32 1021
+#define wxID_LINEAR 1022
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Class wxShaderDeveloper
@@ -183,6 +184,7 @@ class wxShaderDeveloper : public wxFrame
 		virtual void DoToolRemipLA( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoToolRemipA( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoToolRemipXYZD( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoToolRemipXYZ( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoToolRemipXY_Z( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoToolRemipXY( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoAF( wxCommandEvent& event ) { event.Skip(); }
