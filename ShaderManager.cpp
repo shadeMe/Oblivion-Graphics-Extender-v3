@@ -703,6 +703,7 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	    if (sampleri[7] == 'C') *TexNum = TexMan->LoadDependtTexture(buf, TR_CUBIC);
 	    if (sampleri[7] == '3') *TexNum = TexMan->LoadDependtTexture(buf, TR_VOLUMETRIC);
 	    if (sampleri[7] == '2') *TexNum = TexMan->LoadDependtTexture(buf, TR_PLANAR);
+	    if (sampleri[7] == '1') *TexNum = TexMan->LoadDependtTexture(buf, TR_PLANAR);
 	    if (sampleri[7] == ' ') *TexNum = TexMan->LoadDependtTexture(buf, TR_PLANAR);
 	  }
 	}
@@ -1696,7 +1697,9 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	      /**/ if (cnst.Name == strstr(cnst.Name, "oblv_WorldTransform_CURRENTPASS"))
 	        pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.wrld;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_ViewTransform_CURRENTPASS"))
-	        pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.view;
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.view;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_ViewInverse_CURRENTPASS"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.view_inv;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_ProjectionTransform_CURRENTPASS"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.proj;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_ProjectionDepthRange_CURRENTPASS"))
@@ -2165,9 +2168,11 @@ ShaderManager::ShaderManager() {
 
   Constants.fTikTiming.w = (freq.QuadPart);
 
-  /* stitic on compile, has to recompile if changed */
+  /* static on compile, has to recompile if changed
+   * NOTE: this code is called even before the D3D-device is created!
+   */
   if (TextureManager::GetSingleton()->SetAnisotropy()) {
-    defs[DEFS_MIN].Definition = (AFilters ? FILTER_ANISO : FILTER_LINEAR);
+    defs[DEFS_MIN].Definition = (Anisotropy ? FILTER_ANISO : FILTER_LINEAR);
     sprintf(LEVEL_ANISO, "%d", Anisotropy);
   }
 

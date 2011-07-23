@@ -282,7 +282,7 @@ inline HRESULT EffectBuffer::Initialise(const D3DFORMAT fmt[EBUFRT_NUM]) {
 
   for (int rt = 0; rt < EBUFRT_NUM; rt++) {
     if (!Tex[rt] && (fmt[rt] != D3DFMT_UNKNOWN)) {
-      if ((hr = GetD3DDevice()->CreateTexture(Width, Height, 1, EFFECT_USAGE, fmt[rt], D3DPOOL_DEFAULT, &Tex[0], 0)) == D3D_OK)
+      if ((hr = lastOBGEDirect3DDevice9->CreateTexture(Width, Height, 1, EFFECT_USAGE, fmt[rt], D3DPOOL_DEFAULT, &Tex[0], 0)) == D3D_OK)
 	Tex[rt]->GetSurfaceLevel(0, &Srf[rt]);
 #if	defined(OBGE_AUTOMIPMAP)
       if (Tex[rt] && (AMFilter != D3DTEXF_NONE))
@@ -681,7 +681,7 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
     pErrorMsgs = NULL;
 
     D3DXCreateEffect(
-      GetD3DDevice(),
+      slimOBGEDirect3DDevice9,
       src,
       len,
       pDefine,
@@ -700,7 +700,7 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
       pErrorMsgs = NULL;
 
       D3DXCreateEffect(
-	GetD3DDevice(),
+	slimOBGEDirect3DDevice9,
 	src,
 	len,
 	pDefine,
@@ -1006,16 +1006,17 @@ inline void EffectRecord::ApplySharedConstants() {
 
   pEffect->SetFloatArray("oblv_CameraForward_MAINPASS", &Constants.EyeForward.x, 3);
   pEffect->SetMatrix("oblv_CameraFrustum_MAINPASS", &Constants.EyeFrustum);
+  pEffect->SetVector("oblv_CameraPosition_MAINPASS", &Constants.EyePosition);
 
   pEffect->SetVector("oblv_ProjectionDepthRange_MAINPASS", &Constants.ZRange);
   pEffect->SetVector("oblv_ProjectionFoV_MAINPASS", &Constants.FoV);
 
-  pEffect->SetIntArray("oblv_GameTime", &Constants.iGameTime.x, 4);
-  pEffect->SetIntArray("obge_Tick", &Constants.iTikTiming.x, 4);
-
   pEffect->SetVector("oblv_FogRange", &Constants.FogRange);
   pEffect->SetVector("oblv_SunDirection", &Constants.SunDir);
   pEffect->SetVector("oblv_SunTiming", &Constants.SunTiming);
+
+  pEffect->SetIntArray("oblv_GameTime", &Constants.iGameTime.x, 4);
+  pEffect->SetIntArray("obge_Tick", &Constants.iTikTiming.x, 4);
 
 #ifndef	NO_DEPRECATED
   pEffect->SetVector("f4Time", &Constants.time);
@@ -1847,7 +1848,7 @@ void EffectManager::InitialiseBuffers() {
 
   _MESSAGE("Creating effect vertex buffers.");
 
-  if (GetD3DDevice()->CreateVertexBuffer(4 * sizeof(EffectQuad), D3DUSAGE_WRITEONLY, EFFECTQUADFORMAT, D3DPOOL_DEFAULT, &EffectVertex, 0) != D3D_OK) {
+  if (lastOBGEDirect3DDevice9->CreateVertexBuffer(4 * sizeof(EffectQuad), D3DUSAGE_WRITEONLY, EFFECTQUADFORMAT, D3DPOOL_DEFAULT, &EffectVertex, 0) != D3D_OK) {
     _MESSAGE("ERROR - Unable to create the vertex buffer!");
     exit(0); return;
   }

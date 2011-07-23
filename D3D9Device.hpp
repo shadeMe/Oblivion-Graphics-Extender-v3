@@ -277,6 +277,9 @@ public:
 	STDMETHOD(DumpFrameSurfaces)(THIS);
 
 private:
+	friend class EffectRecord;
+	friend class ShaderRecord;
+
 	IDirect3DDevice9 *m_device;
 	IDirect3D9 *m_d3d;
 
@@ -289,8 +292,10 @@ private:
 #endif
 };
 
+#define slimOBGEDirect3DDevice9	lastOBGEDirect3DDevice9->m_device
 #else
 #define	frame_log ((IDebugLog *)NULL)
 #define lastOBGEDirect3DDevice9	GetD3DDevice()
+#define slimOBGEDirect3DDevice9	GetD3DDevice()
 #endif
 #endif

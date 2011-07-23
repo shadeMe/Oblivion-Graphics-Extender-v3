@@ -229,9 +229,9 @@ HWND DebugWindow::ControlActiveWindow(HWND org) {
 #include <wx/chart.h>
 #include <wx/chartpanel.h>
 #ifndef	NDEBUG
-#pragma comment(lib,"D:/Development/wxWidgets/additions-more/freechart/lib/vc_lib/wxcode_msw28d_freechart")
+#pragma comment(lib,"wxcode_msw28d_freechart")
 #else
-#pragma comment(lib,"D:/Development/wxWidgets/additions-more/freechart/lib/vc_lib/wxcode_msw28_freechart")
+#pragma comment(lib,"wxcode_msw28_freechart")
 #endif
 #endif
 
@@ -540,24 +540,6 @@ public:
     buf[0] = '\0';
 
     if (tex) {
-      /* search render targets */
-      if (sm) {
-	for (int p = OBGEPASS_MIN; p < OBGEPASS_NUM; p++)
-	  for (int s = 0; s < sm->trackd[p].frame_cntr; s++) {
-	    IDirect3DSurface9 *pRenderTarget;
-	    textureSurface *pTextureSurface;
-
-	    if ((pRenderTarget = sm->trackd[p].rt[s]) && ((int)pRenderTarget != -1)) {
-	      if ((pTextureSurface = surfaceTexture[pRenderTarget])) {
-		if (pTextureSurface->tex == tex) {
-		  sprintf(buf, "RT of pass %d, scene %d", p, s);
-		  return buf;
-		}
-	      }
-	    }
-	  }
-      }
-
       /* search alternate render targets */
       if (em) {
 	if (em->OrigRT.IsTexture(tex))
@@ -578,36 +560,54 @@ public:
 	  return "Converted effects-zbuffer";
       }
 
-      /* search shader render-targets */
-      RuntimeShaderList::iterator RS = sm->RuntimeShaders.begin();
-      while (RS != sm->RuntimeShaders.end()) {
-	for (int p = OBGEPASS_MIN; p < OBGEPASS_NUM; p++) {
-	  if ((*RS)->rsb[p].pTextRT == tex) {
-	    if ((*RS)->pAssociate)
-	      sprintf(buf, "%s pass %d rendertarget copy", (*RS)->pAssociate->Name, p);
-	    else
-	      sprintf(buf, "Unknown shader pass %d rendertarget copy", p);
-	    return buf;
+      /* search render targets */
+      if (sm) {
+	for (int p = OBGEPASS_MIN; p < OBGEPASS_NUM; p++)
+	  for (int s = 0; s < sm->trackd[p].frame_cntr; s++) {
+	    IDirect3DSurface9 *pRenderTarget;
+	    textureSurface *pTextureSurface;
+
+	    if ((pRenderTarget = sm->trackd[p].rt[s]) && ((int)pRenderTarget != -1)) {
+	      if ((pTextureSurface = surfaceTexture[pRenderTarget])) {
+		if (pTextureSurface->tex == tex) {
+		  sprintf(buf, "RT of pass %d, scene %d", p, s);
+		  return buf;
+		}
+	      }
+	    }
 	  }
 
-	  if ((*RS)->rsb[p].pTextDS == tex) {
-	    if ((*RS)->pAssociate)
-	      sprintf(buf, "%s pass %d depth-stencil copy", (*RS)->pAssociate->Name, p);
-	    else
-	      sprintf(buf, "Unknown shader pass %d depth-stencil copy", p);
-	    return buf;
+	/* search shader render-targets */
+	RuntimeShaderList::iterator RS = sm->RuntimeShaders.begin();
+	while (RS != sm->RuntimeShaders.end()) {
+	  for (int p = OBGEPASS_MIN; p < OBGEPASS_NUM; p++) {
+	    if ((*RS)->rsb[p].pTextRT == tex) {
+	      if ((*RS)->pAssociate)
+		sprintf(buf, "%s pass %d rendertarget copy", (*RS)->pAssociate->Name, p);
+	      else
+		sprintf(buf, "Unknown shader pass %d rendertarget copy", p);
+	      return buf;
+	    }
+
+	    if ((*RS)->rsb[p].pTextDS == tex) {
+	      if ((*RS)->pAssociate)
+		sprintf(buf, "%s pass %d depth-stencil copy", (*RS)->pAssociate->Name, p);
+	      else
+		sprintf(buf, "Unknown shader pass %d depth-stencil copy", p);
+	      return buf;
+	    }
+
+	    if ((*RS)->rsb[p].pTextDZ == tex) {
+	      if ((*RS)->pAssociate)
+		sprintf(buf, "%s pass %d depth-stencil", (*RS)->pAssociate->Name, p);
+	      else
+		sprintf(buf, "Unknown shader pass %d depth-stencil", p);
+	      return buf;
+	    }
 	  }
 
-	  if ((*RS)->rsb[p].pTextDZ == tex) {
-	    if ((*RS)->pAssociate)
-	      sprintf(buf, "%s pass %d depth-stencil", (*RS)->pAssociate->Name, p);
-	    else
-	      sprintf(buf, "Unknown shader pass %d depth-stencil", p);
-	    return buf;
-	  }
+	  RS++;
 	}
-
-	RS++;
       }
 
       /* search other render-targets */
@@ -4695,57 +4695,120 @@ public:
     bool batch = mi->IsChecked();
 
     /* ------------------------------------------------ */
-    wxFileDialog dlg2(
-      this,
-      _T("Select normal-texture (XYZ+Specular)"),
-      wxT(em->EffectDirectory()),
-      wxEmptyString,
-      _T(
-	"Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
-	"PNG images (*.png)|*.png|"
-	"JPEG images (*.jpg)|*.jpg|"
-	"Windows images (*.bmp)|*.bmp|"
-	"DirextX images (*.dds)|*.dds"
-      ),
-      wxFD_OPEN | wxFD_FILE_MUST_EXIST
-    );
-
-    if (dlg2.ShowModal() != wxID_OK)
-      return;
-
-    // get filename
-    wxString m_norm_filename = dlg2.GetFilename();
-    wxString m_norm_filepath = dlg2.GetPath();
-
-    LPDIRECT3DTEXTURE9 norm = NULL;
-
-    D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_norm_filepath, &norm);
-
-    if (norm) {
-      ProgressSubject = m_norm_filename;
-
-      if (TextureCompressXYZD(&norm)) {
-	wxFileDialog dlg2(
-	  this,
-	  _T("Select normal-texture (XYZ+Specular)"),
-	  wxT(em->EffectDirectory()),
-	  wxEmptyString,
-	  _T(
+    if (!batch) {
+      wxFileDialog dlg2(
+        this,
+        _T("Select normal-texture (XYZ+Specular)"),
+        wxT(em->EffectDirectory()),
+        wxEmptyString,
+        _T(
+	  "Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+	  "PNG images (*.png)|*.png|"
+	  "JPEG images (*.jpg)|*.jpg|"
+	  "Windows images (*.bmp)|*.bmp|"
 	  "DirextX images (*.dds)|*.dds"
-	  ),
-	  wxFD_SAVE | wxFD_OVERWRITE_PROMPT
-	);
+        ),
+        wxFD_OPEN | wxFD_FILE_MUST_EXIST
+      );
 
-	if (dlg2.ShowModal() != wxID_OK)
-	  return;
+      if (dlg2.ShowModal() != wxID_OK)
+        return;
 
-	// get filename
-	wxString m_norm_filename = dlg2.GetFilename();
-	wxString m_norm_filepath = dlg2.GetPath();
+      // get filename
+      wxString m_norm_filename = dlg2.GetFilename();
+      wxString m_norm_filepath = dlg2.GetPath();
 
-	HRESULT res = D3DXSaveTextureToFile(m_norm_filepath, D3DXIFF_DDS, norm, NULL);
+      LPDIRECT3DTEXTURE9 norm = NULL;
 
-	norm->Release();
+      D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_norm_filepath, &norm);
+
+      if (norm) {
+        ProgressSubject = m_norm_filename;
+
+        if (TextureCompressXYZD(&norm)) {
+	  wxFileDialog dlg2(
+	    this,
+	    _T("Select normal-texture (XYZ+Specular)"),
+	    wxT(em->EffectDirectory()),
+	    wxEmptyString,
+	    _T(
+	    "DirextX images (*.dds)|*.dds"
+	    ),
+	    wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+	  );
+
+	  if (dlg2.ShowModal() != wxID_OK)
+	    return;
+
+	  // get filename
+	  wxString m_norm_filename = dlg2.GetFilename();
+	  wxString m_norm_filepath = dlg2.GetPath();
+
+	  HRESULT res = D3DXSaveTextureToFile(m_norm_filepath, D3DXIFF_DDS, norm, NULL);
+
+	  norm->Release();
+        }
+      }
+    }
+    else {
+      wxFileDialog dlg2(
+        this,
+        _T("Select normal-textures (XYZ+Specular)"),
+        wxT(em->EffectDirectory()),
+        wxEmptyString,
+        _T(
+	  "Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+	  "PNG images (*.png)|*.png|"
+	  "JPEG images (*.jpg)|*.jpg|"
+	  "Windows images (*.bmp)|*.bmp|"
+	  "DirextX images (*.dds)|*.dds"
+        ),
+        wxFD_OPEN | wxFD_FILE_MUST_EXIST | wxFD_MULTIPLE
+      );
+
+      if (dlg2.ShowModal() != wxID_OK)
+        return;
+
+      wxDirDialog dlg1(
+        this,
+        _T("Select normal-texture (XYZ+Specular) destination"),
+        wxT(em->EffectDirectory()),
+        wxDD_DIR_MUST_EXIST
+      );
+
+      if (dlg1.ShowModal() != wxID_OK)
+        return;
+
+      // get filenames
+      wxArrayString m_norm_filenames; dlg2.GetFilenames(m_norm_filenames);
+      wxArrayString m_norm_filepaths; dlg2.GetPaths(m_norm_filepaths);
+      wxString m_norm_filedestn = dlg1.GetPath();
+
+      for (int f = 0; f < m_norm_filepaths.GetCount(); f++) {
+        wxString m_norm_filename = m_norm_filenames[f];
+        wxString m_norm_filepath = m_norm_filepaths[f];
+
+        LPDIRECT3DTEXTURE9 norm = NULL;
+        D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_norm_filepath, &norm);
+
+        if (norm) {
+	  ProgressSubject = m_norm_filename;
+
+          if (TextureCompressXYZD(&norm)) {
+            wxFileName n_norm_filename(m_norm_filename);
+            wxFileName n_norm_filepath(m_norm_filepath);
+            wxFileName n_norm_filedest(m_norm_filedestn, m_norm_filename);
+
+	    // get filename
+	    n_norm_filename.ClearExt(); n_norm_filename.SetExt("dds");
+	    n_norm_filepath.ClearExt(); n_norm_filepath.SetExt("dds");
+	    n_norm_filedest.ClearExt(); n_norm_filedest.SetExt("dds");
+
+	    wxString path = n_norm_filedest.GetFullPath();
+	    HRESULT res = D3DXSaveTextureToFile(path, D3DXIFF_DDS, norm, NULL);
+	    norm->Release();
+          }
+        }
       }
     }
 

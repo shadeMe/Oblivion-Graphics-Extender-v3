@@ -274,6 +274,8 @@ TextureManager::TextureManager() {
   Anisotropy = ::SetAnisotropy.Get();
   LODBias = ::SetLODBias.Get();
 
+  /* NOTE: this code is called even before the D3D-device is created!
+   */
   if (lastOBGEDirect3D9) {
     if (Anisotropy > lastOBGEDirect3D9CAPS.MaxAnisotropy)
       Anisotropy = lastOBGEDirect3D9CAPS.MaxAnisotropy;

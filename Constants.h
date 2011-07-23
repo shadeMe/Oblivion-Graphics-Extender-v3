@@ -45,11 +45,11 @@ extern struct sConstants
 	v1_2_416::NiVector4		FogColor;
 
 	v1_2_416::NiVector4		PlayerPosition;
-	v1_2_416::NiVector3		EyeForward;
-	v1_2_416::NiVector3		EyePosition;
 
 	/* the four frustum rays in eye-space */
 	D3DXMATRIX			EyeFrustum;
+	v1_2_416::NiVector3		EyeForward;
+	v1_2_416::NiVector4		EyePosition;
 
 	v1_2_416::NiVector4		fGameTime;
 	v1_2_416::NiVector4		fTikTiming;
@@ -67,25 +67,31 @@ extern struct sConstants
 #endif
 
 	inline void UpdateWorld(const D3DXMATRIX &mx) {
+	  /* the world transform is updated each time the local
+	   * coordinate-system is changed
+	   */
 	  wrld = mx;
-
-#define Units2Centimeters	0.1428767293691635
-#define Units2Meters		0.001428767293691635
-
-	  PlayerCharacter *PlayerContainer;
-	  if (PlayerContainer = (*g_thePlayer)) {
-	    EyePosition.x = PlayerContainer->posX + wrld._41;
-	    EyePosition.y = PlayerContainer->posY + wrld._42;
-	    EyePosition.z = PlayerContainer->posZ + wrld._43;
-
-	    PlayerPosition.x = PlayerContainer->posX * Units2Meters;
-	    PlayerPosition.y = PlayerContainer->posY * Units2Meters;
-	    PlayerPosition.z = PlayerContainer->posZ * Units2Meters * 4;
-	  }
 	}
 
 	inline void UpdateView(const D3DXMATRIX &mx) {
+	  /* the view transform is updated each time the camera
+	   * rotation and position changes
+	   */
 	  view = mx;
+
+	  /* assuming the view transform isn't a merged matrix
+	   * we can extract the neutral eye-position from the
+	   * inverse transform
+	   */
+	  D3DXMatrixInverse(&view_inv, NULL, &view);
+
+	  EyePosition.x = view_inv._41;
+	  EyePosition.y = view_inv._42;
+	  EyePosition.z = view_inv._43;
+
+	  /* TODO: find out the current cameras world-transform and
+	   * adjust eye-position accordingly.
+	   */
 	}
 
 	/* this is very likely constant over the playing-session */
@@ -118,12 +124,15 @@ extern struct sConstants
 	}
 
 	inline void UpdateProducts() {
+	  /* this only works if the world transform has been
+	   * set to be from the main camera, so the inverses
+	   * yield camera-relative world-coordinates
+	   */
 	      viewproj =        view * proj;
 	  wrldviewproj = wrld * view * proj;
 
 	  /* inverse(s) */
 	  D3DXMatrixInverse(&proj_inv        , NULL, &proj        );
-	  D3DXMatrixInverse(&view_inv        , NULL, &view        );
 	  D3DXMatrixInverse(&viewproj_inv    , NULL, &viewproj    );
 	  D3DXMatrixInverse(&wrldviewproj_inv, NULL, &wrldviewproj);
 
