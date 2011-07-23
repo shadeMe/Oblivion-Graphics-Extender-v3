@@ -998,9 +998,11 @@ inline void EffectRecord::ApplySharedConstants() {
   pEffect->SetMatrix("oblv_ProjectionTransform_MAINPASS", &Constants.proj);
   pEffect->SetMatrix("oblv_ProjectionInverse_MAINPASS", &Constants.proj_inv);
 
+  pEffect->SetMatrix("oblv_PastViewProjectionTransform_MAINPASS", &Constants.pastviewproj);
   pEffect->SetMatrix("oblv_ViewProjectionTransform_MAINPASS", &Constants.viewproj);
   pEffect->SetMatrix("oblv_ViewProjectionInverse_MAINPASS", &Constants.viewproj_inv);
 
+  pEffect->SetMatrix("oblv_PastWorldViewProjectionTransform_MAINPASS", &Constants.pastwrldviewproj);
   pEffect->SetMatrix("oblv_WorldViewProjectionTransform_MAINPASS", &Constants.wrldviewproj);
   pEffect->SetMatrix("oblv_WorldViewProjectionInverse_MAINPASS", &Constants.wrldviewproj_inv);
 

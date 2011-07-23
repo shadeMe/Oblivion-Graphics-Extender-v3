@@ -31,6 +31,8 @@ extern struct sConstants
 	D3DXMATRIX			viewproj_inv;
 	D3DXMATRIX			wrldviewproj;
 	D3DXMATRIX			wrldviewproj_inv;
+	D3DXMATRIX			pastviewproj;
+	D3DXMATRIX			pastwrldviewproj;
 
 	v1_2_416::NiVector4		ZRange;
 	v1_2_416::NiVector4		FoV;
@@ -128,7 +130,13 @@ extern struct sConstants
 	   * set to be from the main camera, so the inverses
 	   * yield camera-relative world-coordinates
 	   */
-	      viewproj =        view * proj;
+
+	  /* backup */
+	  pastviewproj     = viewproj;
+	  pastwrldviewproj = wrldviewproj;
+
+	  /* make a new one */
+	  viewproj     =        view * proj;
 	  wrldviewproj = wrld * view * proj;
 
 	  /* inverse(s) */
