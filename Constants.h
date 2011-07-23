@@ -29,8 +29,10 @@ extern struct sConstants
 	D3DXMATRIX			proj_inv;
 	D3DXMATRIX			viewproj;
 	D3DXMATRIX			viewproj_inv;
+	D3DXMATRIX			lastviewproj;
 	D3DXMATRIX			wrldviewproj;
 	D3DXMATRIX			wrldviewproj_inv;
+	D3DXMATRIX			lastwrldviewproj;
 
 	v1_2_416::NiVector4		ZRange;
 	v1_2_416::NiVector4		FoV;
@@ -118,7 +120,9 @@ extern struct sConstants
 	}
 
 	inline void UpdateProducts() {
-	      viewproj =        view * proj;
+	  lastviewproj = viewproj;
+	  lastwrldviewproj = wrldviewproj;
+	  viewproj = view * proj;
 	  wrldviewproj = wrld * view * proj;
 
 	  /* inverse(s) */
