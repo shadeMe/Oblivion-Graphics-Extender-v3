@@ -1973,11 +1973,15 @@ public:
     /* not a runtime-shader (like IDENTIFY, COPYQUAD etc. */
     if (!o->pAssociate) {
       SDShaderEnable->Disable();
+
       SDShaderMark->Disable();
+      SDShaderMark->SetValue(FALSE);
     }
     else {
       SDShaderEnable->Enable();
+
       SDShaderMark->Enable();
+      SDShaderMark->SetValue(o->pAssociate->bMark);
     }
 
     /* prevent flickering */

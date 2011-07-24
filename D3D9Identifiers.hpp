@@ -64,5 +64,6 @@ const char *findSamplerState(D3DSAMPLERSTATETYPE sstate);
 const char *findSamplerStateValue(D3DSAMPLERSTATETYPE sstate, DWORD svalue);
 const char *findRenderState(D3DRENDERSTATETYPE rstate);
 const char *findRenderStateValue(D3DRENDERSTATETYPE rstate, DWORD rvalue);
+const char *findFVF(DWORD FVF);
 
 #endif

@@ -1473,3 +1473,54 @@ const char *findRenderStateValue(D3DRENDERSTATETYPE rstate, DWORD rvalue) {
 
   return buf;
 }
+
+const char *findFVF(DWORD FVF) {
+  static char buf[256] = "";
+
+  if ((FVF & D3DFVF_POSITION_MASK) == D3DFVF_XYZ)
+    strcat(buf, " XYZ");
+  if ((FVF & D3DFVF_POSITION_MASK) == D3DFVF_XYZW)
+    strcat(buf, " XYZW");
+  if ((FVF & D3DFVF_POSITION_MASK) == D3DFVF_XYZRHW)
+    strcat(buf, " XYZRHW");
+  if ((FVF & D3DFVF_POSITION_MASK) == D3DFVF_XYZB1)
+    strcat(buf, " XYZB1");
+  if ((FVF & D3DFVF_POSITION_MASK) == D3DFVF_XYZB2)
+    strcat(buf, " XYZB2");
+  if ((FVF & D3DFVF_POSITION_MASK) == D3DFVF_XYZB3)
+    strcat(buf, " XYZB3");
+  if ((FVF & D3DFVF_POSITION_MASK) == D3DFVF_XYZB4)
+    strcat(buf, " XYZB4");
+  if ((FVF & D3DFVF_POSITION_MASK) == D3DFVF_XYZB5)
+    strcat(buf, " XYZB5");
+
+  if (FVF & D3DFVF_NORMAL)
+    strcat(buf, " NORMAL");
+  if (FVF & D3DFVF_PSIZE)
+    strcat(buf, " PSIZE");
+  if (FVF & D3DFVF_DIFFUSE)
+    strcat(buf, " DIFFUSE");
+  if (FVF & D3DFVF_SPECULAR)
+    strcat(buf, " SPECULAR");
+
+  if ((FVF & D3DFVF_TEXCOUNT_MASK) == D3DFVF_TEX0)
+    strcat(buf, " TEX0");
+  if ((FVF & D3DFVF_TEXCOUNT_MASK) == D3DFVF_TEX1)
+    strcat(buf, " TEX1");
+  if ((FVF & D3DFVF_TEXCOUNT_MASK) == D3DFVF_TEX2)
+    strcat(buf, " TEX2");
+  if ((FVF & D3DFVF_TEXCOUNT_MASK) == D3DFVF_TEX3)
+    strcat(buf, " TEX3");
+  if ((FVF & D3DFVF_TEXCOUNT_MASK) == D3DFVF_TEX4)
+    strcat(buf, " TEX4");
+  if ((FVF & D3DFVF_TEXCOUNT_MASK) == D3DFVF_TEX5)
+    strcat(buf, " TEX5");
+  if ((FVF & D3DFVF_TEXCOUNT_MASK) == D3DFVF_TEX6)
+    strcat(buf, " TEX6");
+  if ((FVF & D3DFVF_TEXCOUNT_MASK) == D3DFVF_TEX7)
+    strcat(buf, " TEX7");
+  if ((FVF & D3DFVF_TEXCOUNT_MASK) == D3DFVF_TEX8)
+    strcat(buf, " TEX8");
+
+  return buf;
+}

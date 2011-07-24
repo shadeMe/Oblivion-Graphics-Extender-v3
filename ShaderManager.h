@@ -246,6 +246,8 @@ struct CameraQuad { float x,y,z, rhw; float u,v; };
 	 * thus we don't track over all of [pass][scene]
 	 */
 	struct trace {
+	  DWORD					vertex_f;
+
 	  DWORD					states_s[OBGESAMPLER_NUM][14];	// sampler states, D3DSAMPLERSTATETYPE 14
 //	  DWORD					states_t[OBGESAMPLER_NUM][33];	// texturesstage states, D3DTEXTURESTAGESTATETYPE 33
 

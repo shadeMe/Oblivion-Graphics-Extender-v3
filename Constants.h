@@ -87,9 +87,11 @@ extern struct sConstants
 	   */
 	  D3DXMatrixInverse(&view_inv, NULL, &view);
 
-	  EyePosition.x = view_inv._41;
-	  EyePosition.y = view_inv._42;
-	  EyePosition.z = view_inv._43;
+	  /* current camera/eye-position is at 0x00B46658 */
+	  EyePosition.x = ((float *)0x00B46658)[0] + view_inv._41;
+	  EyePosition.y = ((float *)0x00B46658)[1] + view_inv._42;
+	  EyePosition.z = ((float *)0x00B46658)[2] + view_inv._43;
+	  EyePosition.w = ((float *)0x00B46658)[3] + view_inv._44;
 
 	  /* TODO: find out the current cameras world-transform and
 	   * adjust eye-position accordingly.

@@ -1515,6 +1515,14 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::GetVertexDec
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetFVF(DWORD FVF) {
+  if (frame_log)
+    frame_log->FormattedMessage("SetFVF:%s", findFVF(FVF));
+
+#if	defined(OBGE_DEVLING)
+//m_shadercv->traced[currentPass].vertex_f = FVF;
+//m_shadercp->traced[currentPass].vertex_f = FVF;
+#endif
+
   return m_device->SetFVF(FVF);
 }
 
