@@ -625,7 +625,7 @@ bool ShaderRecord::ConstructDX9Shader(char which) {
   return (pDX9ShaderClss != NULL);
 }
 
-DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *States) {
+DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, int *SmpNum, DWORD *States) {
   const char *src = NULL;
 
   /**/ if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_RUNTIME))
@@ -697,6 +697,7 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	if (len > 0) {
 	  buf[len] = '\0';
 
+	  /* if adviced try to load this texture from disk */
 	  if (TexNum) {
 	    TextureManager *TexMan = TextureManager::GetSingleton();
 
@@ -721,6 +722,7 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	if (len > 0) {
 	  buf[len] = '\0';
 
+	  const char *tx = strstr(buf, "Texture");
 	  const char *au = strstr(buf, "AddressU");
 	  const char *av = strstr(buf, "AddressV");
 	  const char *aw = strstr(buf, "AddressW");
@@ -784,10 +786,19 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	    else if (strstr(mg, "PYRAMIDALQUAD")) { *States++ = D3DSAMP_MAGFILTER; *States++ = D3DTEXF_PYRAMIDALQUAD; }
 	    else if (strstr(mg, "GAUSSIANQUAD" )) { *States++ = D3DSAMP_MAGFILTER; *States++ = D3DTEXF_GAUSSIANQUAD; }
 	  }
+	  if (tx) {
+	    char *end = (char *)strchr(tx, ';'); if (end) *end = '\0';
+
+	    /* TODO: make it work for vertex-shader samplers */
+	    int col = -1; sscanf(tx, "Texture = <sampler%d>", &col);
+
+	    /* if adviced try to interprete the texture-reference as sampler-alias */
+	    if (SmpNum)
+	      *SmpNum = col;
+	  }
 	  if (bc) {
 	    char *end = (char *)strchr(bc, ';'); if (end) *end = '\0';
 
-	    /* currently fixed */
 	    float col = 0.0; sscanf(bc, "Bordercolor = %f", &col);
 	    *States++ = D3DSAMP_BORDERCOLOR;
 	    *States++ = *((DWORD *)&col);
@@ -795,7 +806,6 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *
 	  if (af) {
 	    char *end = (char *)strchr(af, ';'); if (end) *end = '\0';
 
-	    /* currently fixed */
 	    int col = 0; sscanf(af, "MaxAnisotropy = %d", &col);
 	    *States++ = D3DSAMP_MAXANISOTROPY;
 	    *States++ = *((DWORD *)&col);
@@ -1722,25 +1732,42 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.PlayerPosition;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_EyePosition"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.EyePosition;
-	      else if  (cnst.Name == strstr(cnst.Name, "oblv_GameTime"))
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_GameTime"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.fGameTime;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_TexData")) {
-	        /**/ if (cnst.Name[12] == '0')
-		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[0].vals.texture.data;
+		/**/ if (cnst.Name[12] == '1' && cnst.Name[13] == '0')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[10].vals.texture.data;
+		else if (cnst.Name[12] == '1' && cnst.Name[13] == '1')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[11].vals.texture.data;
+		else if (cnst.Name[12] == '1' && cnst.Name[13] == '2')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[12].vals.texture.data;
+		else if (cnst.Name[12] == '1' && cnst.Name[13] == '3')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[13].vals.texture.data;
+		else if (cnst.Name[12] == '1' && cnst.Name[13] == '4')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[14].vals.texture.data;
+		else if (cnst.Name[12] == '1' && cnst.Name[13] == '5')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[15].vals.texture.data;
+
+	        else if (cnst.Name[12] == '0')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[ 0].vals.texture.data;
 		else if (cnst.Name[12] == '1')
-		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[1].vals.texture.data;
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[ 1].vals.texture.data;
 		else if (cnst.Name[12] == '2')
-		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[2].vals.texture.data;
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[ 2].vals.texture.data;
 		else if (cnst.Name[12] == '3')
-		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[3].vals.texture.data;
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[ 3].vals.texture.data;
 		else if (cnst.Name[12] == '4')
-		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[4].vals.texture.data;
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[ 4].vals.texture.data;
 		else if (cnst.Name[12] == '5')
-		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[5].vals.texture.data;
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[ 5].vals.texture.data;
 		else if (cnst.Name[12] == '6')
-		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[6].vals.texture.data;
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[ 6].vals.texture.data;
 		else if (cnst.Name[12] == '7')
-		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[7].vals.texture.data;
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[ 7].vals.texture.data;
+		else if (cnst.Name[12] == '8')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[ 8].vals.texture.data;
+		else if (cnst.Name[12] == '9')
+		  pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&sm->GlobalConst.pTexture[ 9].vals.texture.data;
 	      }
 	      else
 		break;
@@ -1766,9 +1793,10 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	      pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = unbound;
 
 	      /* read and interprete the source and extract optional information */
+	      int smp = -1;
 	      int sts = (RuntimeVariable::mem::tv *)
 		pAssociate->GetDX9ShaderTexture(cnst.Name,
-		NULL,
+		NULL, (int *)&smp,
 		(DWORD *)tvs) - tvs;
 
 	      /* specific sampler-states have been defined */
@@ -1779,7 +1807,15 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].offset = cnst.RegisterIndex + (this->iType == SHADER_VERTEX ? D3DVERTEXTEXTURESAMPLER0 : 0);
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].length = cnst.RegisterCount;
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].name = cnst.Name;
-		cnts[D3DXRS_SAMPLER + 1]++;
+		         cnts[D3DXRS_SAMPLER + 1]++;
+	      }
+
+	      /* a specific sampler-reference has been given */
+	      if (smp != -1) {
+	      	/* TODO: allow pixel-shaders to reference vertex-shader samplers and vice versa */
+	      //this->iType == SHADER_VERTEX
+
+		pTexture[cnts[D3DXRS_SAMPLER]].vals.texture = (IDirect3DBaseTexture9 *)(smp + 1);//&sm->GlobalConst.pTexture[smp].vals.texture.texture;
 	      }
 
 	      /**/ if (cnst.Name == strstr(cnst.Name, "oblv_CurrRendertarget0_CURRENTPASS"))
@@ -1800,7 +1836,7 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	      int tnm = -1;
 	      int sts = (RuntimeVariable::mem::tv *)
 		pAssociate->GetDX9ShaderTexture(cnst.Name,
-		(int *)&tnm,
+		(int *)&tnm, NULL,
 		(DWORD *)tvs) - tvs;
 
 	      /* specific sampler-states have been defined */
@@ -1923,8 +1959,12 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
       /* do the textures first, texture-data may be requested */
       if ((rV = pTexture))
 	do {
-	  // Do we have to bias with D3DDMAPSAMPLER
-	  StateDevice->SetTexture(rV->offset, rV->vals.texture);
+	  IDirect3DBaseTexture9 *tX;
+	  // 0-D3DDMAPSAMPLER are not valid adresses
+	  // 0 must be reserved for NULL
+	  if ((DWORD)(tX = rV->vals.texture) < (512 + 1))
+	    StateDevice->GetTexture((DWORD)tX - 1, &tX);
+	  StateDevice->SetTexture(rV->offset, tX);
 	} while ((++rV)->length);
       if ((rV = pSampler)) {
 	DWORD bak = AFilters; AFilters = 0;
@@ -1958,7 +1998,12 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
       /* do the textures first, texture-data may be requested */
       if ((rV = pTexture))
 	do {
-	  StateDevice->SetTexture(rV->offset, rV->vals.texture);
+	  IDirect3DBaseTexture9 *tX;
+	  // 0-D3DDMAPSAMPLER are not valid adresses
+	  // 0 must be reserved for NULL
+	  if ((DWORD)(tX = rV->vals.texture) < (512 + 1))
+	    StateDevice->GetTexture((DWORD)tX - 1, &tX);
+	  StateDevice->SetTexture(rV->offset, tX);
 	} while ((++rV)->length);
       if ((rV = pSampler)) {
 	DWORD bak = AFilters; AFilters = 0;

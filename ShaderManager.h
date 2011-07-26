@@ -49,7 +49,7 @@ public:
 	bool						SaveShader();
 
 	bool						ConstructDX9Shader(char which);
-	DWORD *						GetDX9ShaderTexture(const char *sName, int *TexNum, DWORD *States);
+	DWORD *						GetDX9ShaderTexture(const char *sName, int *TexNum, int *SmpNum, DWORD *States);
 	DWORD *						GetDX9RenderStates(DWORD *States);
 	bool						DestroyDX9Shader();
 
@@ -116,7 +116,8 @@ public:
 	};
 };
 
-#define	OBGESAMPLER_NUM	16
+/* 16 pixel-shader sampler, 4 vertex-shader sampler, 1 tesselator sampler */
+#define	OBGESAMPLER_NUM	(16+4+1)
 
 struct RuntimeConstant {
   union mem {
@@ -248,12 +249,12 @@ struct CameraQuad { float x,y,z, rhw; float u,v; };
 	struct trace {
 	  DWORD					vertex_f;
 
-	  DWORD					states_s[OBGESAMPLER_NUM][14];	// sampler states, D3DSAMPLERSTATETYPE 14
-//	  DWORD					states_t[OBGESAMPLER_NUM][33];	// texturesstage states, D3DTEXTURESTAGESTATETYPE 33
+	  DWORD					states_s[OBGESAMPLER_NUM][14];	// sampler states	D3DSAMPLERSTATETYPE	 14
+//	  DWORD					states_t[OBGESAMPLER_NUM][33];	// texturesstage states	D3DTEXTURESTAGESTATETYPE 33
 
-	  IDirect3DBaseTexture9 *		values_s[OBGESAMPLER_NUM];	// ps 16, vs 4
-	  bool					values_b[256];		// ps 16, vs 16
-	  int					values_i[256][4];		// ps 16, vs 16
+	  IDirect3DBaseTexture9 *		values_s[OBGESAMPLER_NUM];	// ps 16, vs 4, ts 1	non-overlapped
+	  bool					values_b[256];			// ps 256, vs 256	overlapped
+	  int					values_i[256][4];		// ps 256, vs 256	overlapped
 	  float					values_c[256][4];
 	} traced[OBGEPASS_NUM];
 #endif
@@ -377,11 +378,11 @@ public:
 	 * ty are set even before SetShader()
 	 */
 	struct trace {
-	  DWORD					states_s[OBGESAMPLER_NUM][14];	// sampler states, D3DSAMPLERSTATETYPE 14
-//	  DWORD					states_t[OBGESAMPLER_NUM][33];	// texturesstage states, D3DTEXTURESTAGESTATETYPE 33
+	  DWORD					states_s[OBGESAMPLER_NUM][14];	// sampler states	D3DSAMPLERSTATETYPE	 14
+//	  DWORD					states_t[OBGESAMPLER_NUM][33];	// texturesstage states	D3DTEXTURESTAGESTATETYPE 33
 
-	  IDirect3DBaseTexture9 *		values_s[OBGESAMPLER_NUM];	// ps 16, vs 4
-	  IDirect3DSurface9 *			target_s[OBGESAMPLER_NUM];	// ps 16, vs 4
+	  IDirect3DBaseTexture9 *		values_s[OBGESAMPLER_NUM];	// ps 16, vs 4, ts 1	non-overlapped
+	  IDirect3DSurface9 *			target_s[OBGESAMPLER_NUM];	// ps 16, vs 4, ts 1	non-overlapped
 	} traced[OBGEPASS_NUM];
 
 #define	OBGESCENE_NUM	256

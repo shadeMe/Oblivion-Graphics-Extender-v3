@@ -729,6 +729,7 @@ public:
 	      case D3DXRS_SAMPLER: c = 's'; clr = wxColour("DARK GREEN"); break;
 	    }
 
+	    /* TODO: fix up vertex-shader sampler positions */
 	    int range = cnst.RegisterIndex + cnst.RegisterCount;
 	    int delta = fs[f];
 	    if (range > fs[f]) {
@@ -776,7 +777,7 @@ public:
 
 	  wxColour clr = wxColour("GREY");
 	  for (int x = 0; x < fs[f]; x++) {
-	    assert(x < OBGESAMPLER_NUM);
+	    assert(x < 256);
 	    if (*((char *)&t->values_b[x]) != -1) {
 	      sprintf(buf, "%d", t->values_b[x]);
 
@@ -808,7 +809,7 @@ public:
 
 	  wxColour clr = wxColour("SIENNA");
 	  for (int x = 0; x < fs[f]; x++) {
-	    assert(x < OBGESAMPLER_NUM);
+	    assert(x < 256);
 	    if (*((int *)&t->values_i[x][0]) != -1) {
 	      sprintf(buf, "%d, %d, %d, %d", t->values_i[x][0], t->values_i[x][1], t->values_i[x][2], t->values_i[x][3]);
 

@@ -64,6 +64,26 @@ std::map <void *, struct depthSurface   *> surfaceDepth;
 std::map <void *, struct textureSurface *> surfaceTexture;
 std::map <void *, struct textureMap     *> textureMaps;
 
+/* -----------------------------------------------------------------------------*/
+
+/* map [0-15,256,257-260] to [0-15,16-19,20] */
+int dx2obgeSampler[512] = {
+  /* pixel shader sampler */
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,		0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 000-031 */
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 032-063 */
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 064-095 */
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 096-127 */
+
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 128-159 */
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 160-191 */
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 192-223 */
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 224-255 */
+  /* tesselator sampler */
+  20,
+  /* vertex shader sampler */
+  16, 17, 18, 19											/* rest 0s */
+};
+
 /* ----------------------------------------------------------------------------- */
 
 #include "GUIs_DebugWindow.hpp"
@@ -1206,25 +1226,29 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTexture(D
   }
 
   if (HasShaderManager) {
+    assert(Sampler < 512);
+    DWORD tSampler = dx2obgeSampler[Sampler];
+    assert(tSampler < OBGESAMPLER_NUM);
+
 #if 1
     /* shaders may like to get some absolute texture information
      * I hope this is quick ...
      */
-    if ((m_shaders->GlobalConst.pTexture[Sampler].vals.texture.texture = pTexture)) {
+    if ((m_shaders->GlobalConst.pTexture[tSampler].vals.texture.texture = pTexture)) {
       D3DSURFACE_DESC desc; int levels =
 
       ((IDirect3DTexture9 *)pTexture)->GetLevelCount();
       ((IDirect3DTexture9 *)pTexture)->GetLevelDesc(0, &desc);
 
-      m_shaders->GlobalConst.pTexture[Sampler].vals.texture.data[0] = desc.Width;
-      m_shaders->GlobalConst.pTexture[Sampler].vals.texture.data[1] = desc.Height;
-      m_shaders->GlobalConst.pTexture[Sampler].vals.texture.data[2] = levels;
-      m_shaders->GlobalConst.pTexture[Sampler].vals.texture.data[3] = 0;
+      m_shaders->GlobalConst.pTexture[tSampler].vals.texture.data[0] = desc.Width;
+      m_shaders->GlobalConst.pTexture[tSampler].vals.texture.data[1] = desc.Height;
+      m_shaders->GlobalConst.pTexture[tSampler].vals.texture.data[2] = levels;
+      m_shaders->GlobalConst.pTexture[tSampler].vals.texture.data[3] = 0;
     }
 #endif
 
 #ifdef	OBGE_DEVLING
-    m_shaders->traced[currentPass].values_s[Sampler] = pTexture;
+    m_shaders->traced[currentPass].values_s[tSampler] = pTexture;
 #endif
   }
 
@@ -1313,10 +1337,15 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetSamplerSt
     frame_log->Outdent();
   }
 
+  if (HasShaderManager) {
+    assert(Sampler < 512);
+    DWORD tSampler = dx2obgeSampler[Sampler];
+    assert(tSampler < OBGESAMPLER_NUM);
+
 #ifdef	OBGE_DEVLING
-  if (HasShaderManager)
-    m_shaders->traced[currentPass].states_s[Sampler][Type] = Value;
+    m_shaders->traced[currentPass].states_s[tSampler][Type] = Value;
 #endif
+  }
 
   HRESULT res = m_device->SetSamplerState(Sampler, Type, Value);
   assert(res == D3D_OK);
