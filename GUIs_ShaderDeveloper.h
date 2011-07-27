@@ -49,16 +49,18 @@
 #define wxID_EOPTIMIZE 1010
 #define wxID_PROFILE 1011
 #define wxID_KILLTEX 1012
-#define wxID_AMPLIFY 1013
-#define wxID_MIPGAMMA 1014
-#define wxID_BATCH 1015
-#define wxID_AF1 1016
-#define wxID_AF2 1017
-#define wxID_AF4 1018
-#define wxID_AF8 1019
-#define wxID_AF16 1020
-#define wxID_AF32 1021
-#define wxID_LINEAR 1022
+#define wxID_WIREFRAME 1013
+#define wxID_TESSELATION 1014
+#define wxID_AMPLIFY 1015
+#define wxID_MIPGAMMA 1016
+#define wxID_BATCH 1017
+#define wxID_AF1 1018
+#define wxID_AF2 1019
+#define wxID_AF4 1020
+#define wxID_AF8 1021
+#define wxID_AF16 1022
+#define wxID_AF32 1023
+#define wxID_LINEAR 1024
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Class wxShaderDeveloper
@@ -177,6 +179,7 @@ class wxShaderDeveloper : public wxFrame
 		virtual void DoShaderOptions( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoEffectOptions( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoProfileOptions( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoModeTesselation( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoToolPMtoQDMy( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoToolPMtoQDMn( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoToolRemipRGBH( wxCommandEvent& event ) { event.Skip(); }

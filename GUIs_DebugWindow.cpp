@@ -228,6 +228,7 @@ HWND DebugWindow::ControlActiveWindow(HWND org) {
 #include <wx/xy/xyarearenderer.h>
 #include <wx/chart.h>
 #include <wx/chartpanel.h>
+
 #ifndef	NDEBUG
 #pragma comment(lib,"wxcode_msw28d_freechart")
 #else
@@ -2970,7 +2971,7 @@ public:
   }
 
   void UpdateFrame() {
-    if (SDViewSwitch->GetSelection() == SDVIEW_SHADER)
+    /**/ if (SDViewSwitch->GetSelection() == SDVIEW_SHADER)
       UpdateFrameShaders();
     else if (SDViewSwitch->GetSelection() == SDVIEW_EFFECT)
       UpdateFrameEffects();
@@ -3264,6 +3265,11 @@ public:
 
       mi = SDProfileOptions->FindChildItem(wxID_PROFILE, NULL); mi->Enable(true);
       mi = SDProfileOptions->FindChildItem(wxID_KILLTEX, NULL); mi->Enable(true);
+
+#if defined(OGBE_TESSELATION) || 1
+      mi = SDProfileOptions->FindChildItem(wxID_WIREFRAME, NULL); mi->Enable(true);
+      mi = SDProfileOptions->FindChildItem(wxID_TESSELATION, NULL); mi->Enable(true);
+#endif
     }
 #endif
 
@@ -4301,12 +4307,24 @@ public:
     /* ------------------------------------------------ */
 //  UpdateProfileOptions();
 
+#if defined(OGBE_PROFILE) || 1
     if (1) {
       wxMenuItem *mi;
 
       mi = SDProfileOptions->FindChildItem(wxID_PROFILE, NULL); frame_prf = mi->IsChecked();
       mi = SDProfileOptions->FindChildItem(wxID_KILLTEX, NULL); frame_ntx = mi->IsChecked();
+
+#if defined(OGBE_TESSELATION) || 1
+      mi = SDProfileOptions->FindChildItem(wxID_WIREFRAME, NULL); frame_wre = mi->IsChecked();
+      mi = SDProfileOptions->FindChildItem(wxID_TESSELATION, NULL); frame_tes = mi->IsChecked();
+
+      if (frame_wre)
+	lastOBGEDirect3DDevice9->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
+      else
+	lastOBGEDirect3DDevice9->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
+#endif
     }
+#endif
 
 //  event.Skip();
   }

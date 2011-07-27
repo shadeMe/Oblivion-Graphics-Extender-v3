@@ -38,16 +38,21 @@ bool ReGamma = false, ReGammaState = false;
 
 #include "D3D9Identifiers.hpp"
 
+bool frame_trk = true;
+
+/* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . */
 #if	defined(OBGE_LOGGING)
 int frame_dmp = 0;
 IDebugLog *frame_log = NULL;
 #endif
 
+/* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . */
 #if	defined(OBGE_DEVLING) || defined(OBGE_LOGGING)
 int frame_num = 0;
 int frame_bge = 0;
 #endif
 
+/* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . */
 #if	defined(OBGE_DEVLING) && defined(OBGE_PROFILE)
 LARGE_INTEGER frame_bgn;
 LARGE_INTEGER frame_end;
@@ -56,7 +61,20 @@ bool frame_prf = false;
 bool frame_ntx = false;
 #endif
 
-bool frame_trk = true;
+/* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . */
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+bool frame_wre = false;
+bool frame_tes = false;
+bool shadr_tes = false;	// next vertex shader has tesselation support
+
+#ifndef	NDEBUG
+#pragma comment(lib,"ATITessellation/Lib/x86/ATITessellationD3D9_MT_d.lib")
+#else
+#pragma comment(lib,"ATITessellation/Lib/x86/ATITessellationD3D9_MT.lib")
+#endif
+#endif
+
+/* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . */
 
 /* these have to be tracked globally, when the device is recreated they may stay alive, but the map wouldn't */
 std::map <void *, struct renderSurface  *> surfaceRender;
@@ -125,6 +143,13 @@ OBGEDirect3DDevice9::OBGEDirect3DDevice9(IDirect3D9 *d3d, IDirect3DDevice9 *devi
   pEvent = NULL;
 #endif
 
+#if	defined(OBGE_DEVLING) || defined(OBGE_TESSELATION)
+  frame_wre = false;
+  frame_tes = false;
+
+  pATITessInterface = IATITessellationD3D9::Create(d3d, device);
+#endif
+
 #define HasShaderManager	1	// m_shaders
   m_shaders = ShaderManager::GetSingleton();
   m_shaders->OnCreateDevice();
@@ -161,6 +186,11 @@ OBGEDirect3DDevice9::~OBGEDirect3DDevice9() {
   while (tM != textureMaps.end()) { if (tM->second) delete tM->second; tM++; }
 
   textureMaps.clear();
+
+#if	defined(OBGE_DEVLING) || defined(OBGE_TESSELATION)
+  if (pATITessInterface)
+    delete pATITessInterface;
+#endif
 
 #if	defined(OBGE_DEVLING)
   /* just for now */
@@ -839,6 +869,12 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::BeginScene(v
   QueryPerformanceCounter(&frame_bgn);
 #endif
 
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  // Set max tessellation level
+  if (pATITessInterface)
+    pATITessInterface->SetMaxLevel(1);
+#endif
+
 #if	defined(OBGE_GAMMACORRECTION) && (OBGE_GAMMACORRECTION > 0)
   /* we have to experiment with this */
   if ((currentPass == OBGEPASS_REFLECTION) ||
@@ -1163,6 +1199,15 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetRenderSta
     frame_log->Outdent();
   }
 
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  if (frame_wre /*&& (State == D3DRS_FILLMODE)*/) {
+    if (currentPass == OBGEPASS_MAIN)
+      m_device->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
+    else
+      m_device->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
+  }
+#endif
+
   return m_device->SetRenderState(State, Value);
 }
 
@@ -1456,7 +1501,27 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawIndexedP
     frame_log->Outdent();
   }
 
-  HRESULT res = m_device->DrawIndexedPrimitive(PrimitiveType, BaseVertexIndex, MinVertexIndex, NumVertices, startIndex, primCount);
+  HRESULT res;
+
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  if (shadr_tes) {
+    TSPrimitiveType TSPrimType = TSPT_TRIANGLELIST;
+
+    switch (PrimitiveType) {
+       case D3DPT_TRIANGLELIST: TSPrimType = TSPT_TRIANGLELIST; break;
+       case D3DPT_TRIANGLESTRIP: TSPrimType = TSPT_TRIANGLESTRIP; break;
+    }
+
+    // Enable tessellation
+    pATITessInterface->SetMode(TSMD_ENABLE_CONTINUOUS);
+    res = pATITessInterface->DrawIndexed(TSPrimType, BaseVertexIndex, MinVertexIndex, NumVertices, startIndex, primCount);
+    pATITessInterface->SetMode(TSMD_DISABLE);
+  }
+  else
+#endif
+
+  res = m_device->DrawIndexedPrimitive(PrimitiveType, BaseVertexIndex, MinVertexIndex, NumVertices, startIndex, primCount);
+
   return res;
 }
 

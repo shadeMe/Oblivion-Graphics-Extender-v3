@@ -190,16 +190,25 @@ ShaderRecord::ShaderRecord() {
 
   /* shader source, binaries and constant tables */
   pProfile = NULL;
+
   pSourceReplaced = NULL; sourceLen = 0; hlslStamp = 0;
   pAsmblyReplaced = NULL; asmblyLen = 0;
   pSrcPrcReplaced = NULL;
-  pShaderReplaced = NULL;
   pConstsReplaced = NULL;
+  pShaderReplaced = NULL;
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  pConsttReplaced = NULL;
+  pTssltrReplaced = NULL;
+#endif
 
   pSourceRuntime = NULL; runtimeLen = 0;
   pSrcPrcRuntime = NULL;
-  pShaderRuntime = NULL;
   pConstsRuntime = NULL;
+  pShaderRuntime = NULL;
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  pConsttRuntime = NULL;
+  pTssltrRuntime = NULL;
+#endif
 
   pShaderOriginal = NULL;
   pConstsOriginal = NULL;
@@ -220,14 +229,24 @@ ShaderRecord::~ShaderRecord() {
 
   if (pSourceReplaced) delete[] pSourceReplaced;
   if (pAsmblyReplaced) delete[] pAsmblyReplaced;
+
   if (pSrcPrcReplaced) pSrcPrcReplaced->Release();
-  if (pShaderReplaced) pShaderReplaced->Release();
   if (pConstsReplaced) pConstsReplaced->Release();
+  if (pShaderReplaced) pShaderReplaced->Release();
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  if (pConsttReplaced) pConsttReplaced->Release();
+  if (pTssltrReplaced) pTssltrReplaced->Release();
+#endif
 
   if (pSourceRuntime) delete[] pSourceRuntime;
+
   if (pSrcPrcRuntime) pSrcPrcRuntime->Release();
-  if (pShaderRuntime) pShaderRuntime->Release();
   if (pConstsRuntime) pConstsRuntime->Release();
+  if (pShaderRuntime) pShaderRuntime->Release();
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  if (pConsttRuntime) pConsttRuntime->Release();
+  if (pTssltrRuntime) pTssltrRuntime->Release();
+#endif
 
   if (pShaderOriginal) pShaderOriginal->Release();
   if (pConstsOriginal) pConstsOriginal->Release();
@@ -413,12 +432,20 @@ bool ShaderRecord::LoadShader(const char *Filename) {
      */
     if (pAsmblyReplaced && (sa.st_mtime > sb.st_mtime)) {
       if (pSrcPrcReplaced) pSrcPrcReplaced->Release();
-      if (pShaderReplaced) pShaderReplaced->Release();
       if (pConstsReplaced) pConstsReplaced->Release();
+      if (pShaderReplaced) pShaderReplaced->Release();
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+      if (pConsttReplaced) pConsttReplaced->Release();
+      if (pTssltrReplaced) pTssltrReplaced->Release();
+#endif
 
       pSrcPrcReplaced = NULL;
-      pShaderReplaced = NULL;
       pConstsReplaced = NULL;
+      pShaderReplaced = NULL;
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+      pConsttReplaced = NULL;
+      pTssltrReplaced = NULL;
+#endif
 
       assert(NULL);
     }
@@ -458,17 +485,25 @@ bool ShaderRecord::LoadShader(const char *Filename) {
      */
     if (pSourceReplaced && (sh.st_mtime > sb.st_mtime)) {
       if (pSrcPrcReplaced) pSrcPrcReplaced->Release();
-      if (pShaderReplaced) pShaderReplaced->Release();
       if (pConstsReplaced) pConstsReplaced->Release();
+      if (pShaderReplaced) pShaderReplaced->Release();
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+      if (pConsttReplaced) pConsttReplaced->Release();
+      if (pTssltrReplaced) pTssltrReplaced->Release();
+#endif
 
       pSrcPrcReplaced = NULL;
-      pShaderReplaced = NULL;
       pConstsReplaced = NULL;
+      pShaderReplaced = NULL;
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+      pConsttReplaced = NULL;
+      pTssltrReplaced = NULL;
+#endif
     }
   }
 
   iType = SHADER_UNKNOWN;
-  if (strstr(Name, ".vso"))
+  /**/ if (strstr(Name, ".vso"))
     iType = SHADER_VERTEX;
   else if (strstr(Name, ".pso"))
     iType = SHADER_PIXEL;
@@ -479,7 +514,7 @@ bool ShaderRecord::LoadShader(const char *Filename) {
     if (pSourceReplaced && ::MaximumSM.Get())
       _DMESSAGE("Upgraded version of %s to max.", Name);
 
-    if (iType == SHADER_VERTEX)
+    /**/ if (iType == SHADER_VERTEX)
       pProfile = strdup(D3DXGetVertexShaderProfile(lastOBGEDirect3DDevice9));
     else if (iType == SHADER_PIXEL)
       pProfile = strdup(D3DXGetPixelShaderProfile(lastOBGEDirect3DDevice9));
@@ -504,15 +539,23 @@ bool ShaderRecord::LoadShader(const char *Filename) {
 bool ShaderRecord::RuntimeFlush() {
   /* release all runtime resources (for example for recompilation) */
   if (pSrcPrcRuntime) pSrcPrcRuntime->Release();
-  if (pShaderRuntime) pShaderRuntime->Release();
   if (pConstsRuntime) pConstsRuntime->Release();
+  if (pShaderRuntime) pShaderRuntime->Release();
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  if (pConsttRuntime) pConsttRuntime->Release();
+  if (pTssltrRuntime) pTssltrRuntime->Release();
+#endif
 
   if (pErrorMsgs) pErrorMsgs->Release();
   if (pDisasmbly) pDisasmbly->Release();
 
   pSrcPrcRuntime = NULL;
-  pShaderRuntime = NULL;
   pConstsRuntime = NULL;
+  pShaderRuntime = NULL;
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  pConsttRuntime = NULL;
+  pTssltrRuntime = NULL;
+#endif
 
   pErrorMsgs = NULL;
   pDisasmbly = NULL;
@@ -521,6 +564,17 @@ bool ShaderRecord::RuntimeFlush() {
 }
 
 bool ShaderRecord::CompareShader(const DWORD *Function) const {
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  /* lookup if the given function is the on-disk shader binary */
+  if (pTssltrReplaced) {
+    const DWORD *f = (const DWORD *)pTssltrReplaced->GetBufferPointer();
+
+    if (f == Function) {
+      return true;
+    }
+  }
+#endif
+
   /* lookup if the given function is the on-disk shader binary */
   if (pShaderReplaced) {
     const DWORD *f = (const DWORD *)pShaderReplaced->GetBufferPointer();
@@ -572,12 +626,26 @@ bool ShaderRecord::ConstructDX9Shader(char which) {
   char choosen = SHADER_UNSET;
 
   /* cascade, the highest possible is selected */
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  /**/ if (pTssltrRuntime  && (which >= SHADER_RUNTIME))
+    p = pTssltrRuntime , ct = pConsttRuntime , choosen = SHADER_RUNTIME;
+  else
+#endif
   /**/ if (pShaderRuntime  && (which >= SHADER_RUNTIME))
     p = pShaderRuntime , ct = pConstsRuntime , choosen = SHADER_RUNTIME;
+
+  /* cascade, the highest possible is selected */
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  else if (pTssltrReplaced && (which >= SHADER_REPLACED))
+    p = pTssltrReplaced, ct = pConsttReplaced, choosen = SHADER_REPLACED;
+#endif
   else if (pShaderReplaced && (which >= SHADER_REPLACED))
     p = pShaderReplaced, ct = pConstsReplaced, choosen = SHADER_REPLACED;
+
+  /* cascade, the highest possible is selected */
   else if (pShaderOriginal && (which >= SHADER_ORIGINAL))
     p = pShaderOriginal, ct = pConstsOriginal, choosen = SHADER_ORIGINAL;
+
   if (p)
     pFunction = (const DWORD *)p->GetBufferPointer();
 
@@ -612,7 +680,7 @@ bool ShaderRecord::ConstructDX9Shader(char which) {
   pDX9ShaderType = choosen;
 
   if (pFunction && lastOBGEDirect3DDevice9) {
-    if (iType == SHADER_VERTEX) {
+    /**/ if (iType == SHADER_VERTEX) {
       if (lastOBGEDirect3DDevice9->CreateVertexShader(pFunction, &pDX9VertexShader) != D3D_OK)
         pDX9ShaderClss = NULL;
     }
@@ -634,6 +702,14 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, int *Sm
     src = (const char *)pSrcPrcReplaced->GetBufferPointer();
   else if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_ORIGINAL))
     src = NULL;
+
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  else if (pTssltrRuntime  && (pOblivionBinary == (const DWORD *)pTssltrRuntime->GetBufferPointer()))
+    src = (const char *)pSrcPrcRuntime->GetBufferPointer();
+  else if (pTssltrReplaced && (pOblivionBinary == (const DWORD *)pTssltrReplaced->GetBufferPointer()))
+    src = (const char *)pSrcPrcReplaced->GetBufferPointer();
+#endif
+
   else if (pShaderRuntime  && (pOblivionBinary == (const DWORD *)pShaderRuntime->GetBufferPointer()))
     src = (const char *)pSrcPrcRuntime->GetBufferPointer();
   else if (pShaderReplaced && (pOblivionBinary == (const DWORD *)pShaderReplaced->GetBufferPointer()))
@@ -839,6 +915,14 @@ DWORD *ShaderRecord::GetDX9RenderStates(DWORD *States) {
     src = (const char *)pSrcPrcReplaced->GetBufferPointer();
   else if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_ORIGINAL))
     src = NULL;
+
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  else if (pTssltrRuntime  && (pOblivionBinary == (const DWORD *)pTssltrRuntime->GetBufferPointer()))
+    src = (const char *)pSrcPrcRuntime->GetBufferPointer();
+  else if (pTssltrReplaced && (pOblivionBinary == (const DWORD *)pTssltrReplaced->GetBufferPointer()))
+    src = (const char *)pSrcPrcReplaced->GetBufferPointer();
+#endif
+
   else if (pShaderRuntime  && (pOblivionBinary == (const DWORD *)pShaderRuntime->GetBufferPointer()))
     src = (const char *)pSrcPrcRuntime->GetBufferPointer();
   else if (pShaderReplaced && (pOblivionBinary == (const DWORD *)pShaderReplaced->GetBufferPointer()))
@@ -931,7 +1015,7 @@ bool ShaderRecord::SaveShader() {
   LPD3DXBUFFER p = NULL;
 
   /* cascade, the highest possible is selected */
-  if (pShaderRuntime)
+  /**/ if (pShaderRuntime)
     p = pShaderRuntime;
   else if (pShaderReplaced)
     p = pShaderReplaced;
@@ -1028,9 +1112,14 @@ bool ShaderRecord::CompileShader(bool forced) {
 
   D3DXMACRO *defs = (D3DXMACRO *)::defs;
   LPSTR src = NULL; int len;
-  LPD3DXBUFFER p = NULL;
   LPD3DXBUFFER s = NULL;
   LPD3DXCONSTANTTABLE c = NULL;
+  LPD3DXBUFFER p = NULL;
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  LPD3DXCONSTANTTABLE d = NULL;
+  LPD3DXBUFFER t = NULL;
+#endif
+
   bool save = false;
 
   /* cascade, the highest possible is selected */
@@ -1039,16 +1128,24 @@ bool ShaderRecord::CompileShader(bool forced) {
     len = runtimeLen;
 
     s = pSrcPrcRuntime;
-    p = pShaderRuntime;
     c = pConstsRuntime;
+    p = pShaderRuntime;
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+    d = pConsttRuntime;
+    t = pTssltrRuntime;
+#endif
   }
   else if (pSourceReplaced) {
     src = pSourceReplaced;
     len = sourceLen;
 
     s = pSrcPrcReplaced;
-    p = pShaderReplaced;
     c = pConstsReplaced;
+    p = pShaderReplaced;
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+    d = pConsttReplaced;
+    t = pTssltrReplaced;
+#endif
   }
 
   /* recompile only, if there is one already, just ignore */
@@ -1112,16 +1209,76 @@ bool ShaderRecord::CompileShader(bool forced) {
       save = true;
   }
 
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  /* recompile only, if there is one already, just ignore */
+  if (!t && src && strstr(src, "tess")) {
+    LPD3DXBUFFER pErrorMsgt = NULL;
+
+    D3DXCompileShader(
+	src,
+	len,
+	defs,
+	&incl,
+	"tess",
+	(pProfile ? pProfile : (iType == SHADER_VERTEX ? "vs_3_0" : "ps_3_0")),
+	D3DXSHADER_DEBUG | (
+	  ::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
+	  ::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
+	&t,
+	&pErrorMsgt,
+	&d
+    );
+
+    /* this didn't go so well, if it's a legacy "error", just try again */
+    if (pErrorMsgt && strstr((char*)pErrorMsgt->GetBufferPointer(), "X3539")) {
+      pErrorMsgt->Release();
+      pErrorMsgt = NULL;
+
+      D3DXCompileShader(
+	  src,
+	  len,
+	  defs,
+	  &incl,
+	  "tess",
+	  (pProfile ? pProfile : (iType == SHADER_VERTEX ? "vs_3_0" : "ps_3_0")),
+	  D3DXSHADER_DEBUG | (
+	    ::UpgradeSM.Get() ? D3DXSHADER_ENABLE_BACKWARDS_COMPATIBILITY : D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
+	  &t,
+	  &pErrorMsgt,
+	  &d
+      );
+    }
+
+    /* this didn't go so well */
+    if (pErrorMsgt) {
+      _MESSAGE("Shader compiling messages occured in %s:", Filepath);
+      _MESSAGE((char *)pErrorMsgt->GetBufferPointer());
+
+//    save = !strstr((char *)pErrorMsgt->GetBufferPointer(), "error");
+    }
+//  else
+//    save = true;
+  }
+#endif
+
   /* cascade, the highest possible is selected */
   if (pSourceRuntime) {
     pSrcPrcRuntime = s;
-    pShaderRuntime = p;
     pConstsRuntime = c;
+    pShaderRuntime = p;
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+    pConsttRuntime = d;
+    pTssltrRuntime = t;
+#endif
   }
   else if (pSourceReplaced) {
     pSrcPrcReplaced = s;
-    pShaderReplaced = p;
     pConstsReplaced = c;
+    pShaderReplaced = p;
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+    pConsttReplaced = d;
+    pTssltrReplaced = t;
+#endif
   }
 
   /* auto-save or not */
@@ -1136,7 +1293,7 @@ bool ShaderRecord::DisassembleShader(bool forced) {
   bool succ = true;
 
   /* trigger an automatic (re)compile if necessary */
-  if (pAsmblyReplaced)
+  /**/ if (pAsmblyReplaced)
     succ = AssembleShader(forced);
   else if (pSourceRuntime || pSourceReplaced)
     succ = CompileShader(forced);
@@ -1147,21 +1304,43 @@ bool ShaderRecord::DisassembleShader(bool forced) {
     pDisasmbly = NULL;
 
     /* cascade, the highest possible is selected */
-    if (pSourceRuntime) { if (pShaderRuntime)
-      D3DXDisassembleShader(
-	(const DWORD *)pShaderRuntime->GetBufferPointer(),
-	FALSE,
-	NULL,
-	&pDisasmbly
-      );
+    if (pSourceRuntime) {
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+      if (pTssltrRuntime)
+        D3DXDisassembleShader(
+	  (const DWORD *)pTssltrRuntime->GetBufferPointer(),
+	  FALSE,
+	  NULL,
+	  &pDisasmbly
+        );
+      else
+#endif
+      if (pShaderRuntime)
+        D3DXDisassembleShader(
+	  (const DWORD *)pShaderRuntime->GetBufferPointer(),
+	  FALSE,
+	  NULL,
+	  &pDisasmbly
+        );
     }
-    else if (pSourceReplaced) { if (pShaderReplaced)
-      D3DXDisassembleShader(
-	(const DWORD *)pShaderReplaced->GetBufferPointer(),
-	FALSE,
-	NULL,
-	&pDisasmbly
-      );
+    else if (pSourceReplaced) {
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+      if (pTssltrReplaced)
+        D3DXDisassembleShader(
+	  (const DWORD *)pTssltrReplaced->GetBufferPointer(),
+	  FALSE,
+	  NULL,
+	  &pDisasmbly
+        );
+      else
+#endif
+      if (pShaderReplaced)
+        D3DXDisassembleShader(
+	  (const DWORD *)pShaderReplaced->GetBufferPointer(),
+	  FALSE,
+	  NULL,
+	  &pDisasmbly
+        );
     }
     else if (pShaderOriginal) {
       D3DXDisassembleShader(
@@ -1202,13 +1381,22 @@ const DWORD *ShaderRecord::GetBinary() {
   bool succ = true;
 
   /* trigger an automatic (re)compile if necessary */
-  if (pAsmblyReplaced)
+  /**/ if (pAsmblyReplaced)
     succ = AssembleShader();
   else if (pSourceReplaced)
     succ = CompileShader();
 
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
   /* cascade, the highest possible is selected */
-  if (pShaderReplaced) {
+  /**/ if (pTssltrReplaced) {
+    pOblivionBinary = (const DWORD *)pTssltrReplaced->GetBufferPointer();
+    pOblivionConTab =                pConsttReplaced;
+  }
+  else
+#endif
+
+  /* cascade, the highest possible is selected */
+  /**/ if (pShaderReplaced) {
     pOblivionBinary = (const DWORD *)pShaderReplaced->GetBufferPointer();
     pOblivionConTab =                pConstsReplaced;
   }
@@ -1216,6 +1404,7 @@ const DWORD *ShaderRecord::GetBinary() {
     pOblivionBinary = (const DWORD *)pShaderOriginal->GetBufferPointer();
     pOblivionConTab =                pConstsOriginal;
   }
+
   else {
     pOblivionBinary = NULL;
     pOblivionConTab = NULL;
@@ -1223,6 +1412,32 @@ const DWORD *ShaderRecord::GetBinary() {
 
   return pOblivionBinary;
 }
+
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+bool ShaderRecord::IsTesselator() const {
+  /* check if the current active shader is a tesselator */
+  /**/ if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_RUNTIME))
+    return (pDX9ShaderCoTa == pConsttRuntime);
+  else if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_REPLACED))
+    return (pDX9ShaderCoTa == pConsttReplaced);
+  else if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_ORIGINAL))
+    return false;
+
+  else if (pTssltrRuntime  && (pOblivionBinary == (const DWORD *)pTssltrRuntime->GetBufferPointer()))
+    return true;
+  else if (pTssltrReplaced && (pOblivionBinary == (const DWORD *)pTssltrReplaced->GetBufferPointer()))
+    return true;
+
+  else if (pShaderRuntime  && (pOblivionBinary == (const DWORD *)pShaderRuntime->GetBufferPointer()))
+    return false;
+  else if (pShaderReplaced && (pOblivionBinary == (const DWORD *)pShaderReplaced->GetBufferPointer()))
+    return false;
+  else if (pShaderOriginal && (pOblivionBinary == (const DWORD *)pShaderOriginal->GetBufferPointer()))
+    return false;
+
+  return false;
+}
+#endif
 
 /* #################################################################################################
  */
@@ -1910,6 +2125,11 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
     }
   }
 
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  /* prepare tesselation (TODO: that information should be in the CoTa) */
+  bTess = (pAssociate && pAssociate->IsTesselator());
+#endif
+
   /* release previous texture */
   std::vector<int>::iterator PTexture = prevTextures.begin();
 
@@ -1929,6 +2149,12 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
     /* well, I don't really know if it was on before ... */
     StateDevice->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
   }
+
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+  /* trigger and untrigger tesselation (every shader passes here) */
+  if (iType == SHADER_VERTEX)
+    shadr_tes = bTess;
+#endif
 
   if (pCustomCT) {
     if (bMask & (1 << currentPass)) {
@@ -2136,8 +2362,10 @@ bool RuntimeShaderRecord::AssignShader(IUnknown *Shader, ShaderRecord *Associate
   if ((pAssociate = Associate)) {
     pAssociate->pAssociate = this;
 
-    /* the same binary Oblivion gets into it's hands */
+    /* some flags */
     iType = pAssociate->iType;
+
+    /* the same binary Oblivion gets into it's hands */
     pFunction = pAssociate->pOblivionBinary;
 
     /* and it's constant-table */

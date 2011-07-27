@@ -1,6 +1,6 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
-// Used by OBGEv3.rc
+// Used by OBGEv2.rc
 //
 #define IDB_BITMAP1                     102
 #define IDB_BITMAP2                     103

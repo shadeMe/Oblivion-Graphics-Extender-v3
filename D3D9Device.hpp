@@ -70,6 +70,8 @@ extern bool ReGamma;
 
 /* ------------------------------------------------------------------------------- */
 
+extern bool frame_trk;
+
 #if	defined(OBGE_LOGGING)
 extern int frame_dmp;
 extern IDebugLog *frame_log;
@@ -93,7 +95,13 @@ extern bool frame_prf;
 extern bool frame_ntx;
 #endif
 
-extern bool frame_trk;
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+extern bool frame_wre;
+extern bool frame_tes;
+extern bool shadr_tes;
+
+#include "ATITessellation\Include\D3D9\IATITessellationD3D9.h"
+#endif
 
 /* ------------------------------------------------------------------------------- */
 
@@ -288,7 +296,10 @@ private:
 	RuntimeShaderRecord *m_shadercp;
 
 #if	defined(OBGE_DEVLING) && defined(OBGE_PROFILE)
-	IDirect3DQuery9* pEvent;
+	IDirect3DQuery9 *pEvent;
+#endif
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+	IATITessellationD3D9 *pATITessInterface;
 #endif
 };
 

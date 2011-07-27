@@ -406,6 +406,40 @@
                         <event name="OnMenuSelection">DoProfileOptions</event>
                         <event name="OnUpdateUI"></event>
                     </object>
+                    <object class="separator" expanded="1">
+                        <property name="name">m_separator111</property>
+                        <property name="permission">none</property>
+                    </object>
+                    <object class="wxMenuItem" expanded="1">
+                        <property name="bitmap"></property>
+                        <property name="checked">0</property>
+                        <property name="enabled">0</property>
+                        <property name="help"></property>
+                        <property name="id">wxID_WIREFRAME</property>
+                        <property name="kind">wxITEM_CHECK</property>
+                        <property name="label">Render wireframe</property>
+                        <property name="name">SDModeWireframe</property>
+                        <property name="permission">none</property>
+                        <property name="shortcut"></property>
+                        <property name="unchecked_bitmap"></property>
+                        <event name="OnMenuSelection">DoProfileOptions</event>
+                        <event name="OnUpdateUI"></event>
+                    </object>
+                    <object class="wxMenuItem" expanded="1">
+                        <property name="bitmap"></property>
+                        <property name="checked">0</property>
+                        <property name="enabled">0</property>
+                        <property name="help"></property>
+                        <property name="id">wxID_TESSELATION</property>
+                        <property name="kind">wxITEM_CHECK</property>
+                        <property name="label">Render tesselations</property>
+                        <property name="name">SDModeTesselation</property>
+                        <property name="permission">none</property>
+                        <property name="shortcut"></property>
+                        <property name="unchecked_bitmap"></property>
+                        <event name="OnMenuSelection">DoModeTesselation</event>
+                        <event name="OnUpdateUI"></event>
+                    </object>
                 </object>
                 <object class="wxMenu" expanded="1">
                     <property name="label">Tools</property>

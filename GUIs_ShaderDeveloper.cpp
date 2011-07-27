@@ -87,6 +87,19 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDProfileOptions->Append( SDProfileTex );
 	SDProfileTex->Enable( false );
 	
+	wxMenuItem* m_separator111;
+	m_separator111 = SDProfileOptions->AppendSeparator();
+	
+	wxMenuItem* SDModeWireframe;
+	SDModeWireframe = new wxMenuItem( SDProfileOptions, wxID_WIREFRAME, wxString( wxT("Render wireframe") ) , wxEmptyString, wxITEM_CHECK );
+	SDProfileOptions->Append( SDModeWireframe );
+	SDModeWireframe->Enable( false );
+	
+	wxMenuItem* SDModeTesselation;
+	SDModeTesselation = new wxMenuItem( SDProfileOptions, wxID_TESSELATION, wxString( wxT("Render tesselations") ) , wxEmptyString, wxITEM_CHECK );
+	SDProfileOptions->Append( SDModeTesselation );
+	SDModeTesselation->Enable( false );
+	
 	SDMenubar->Append( SDProfileOptions, wxT("Profiling") ); 
 	
 	SDTools = new wxMenu();
@@ -945,6 +958,8 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	this->Connect( SDEffectOptimize->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
 	this->Connect( SDProfileGPU->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
 	this->Connect( SDProfileTex->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
+	this->Connect( SDModeWireframe->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
+	this->Connect( SDModeTesselation->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoModeTesselation ) );
 	this->Connect( SDConvertQDMy->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDMy ) );
 	this->Connect( SDConvertQDMn->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDMn ) );
 	this->Connect( SDConvertRGBH->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipRGBH ) );
@@ -1025,6 +1040,8 @@ wxShaderDeveloper::~wxShaderDeveloper()
 	this->Disconnect( wxID_EOPTIMIZE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoEffectOptions ) );
 	this->Disconnect( wxID_PROFILE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
 	this->Disconnect( wxID_KILLTEX, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
+	this->Disconnect( wxID_WIREFRAME, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoProfileOptions ) );
+	this->Disconnect( wxID_TESSELATION, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoModeTesselation ) );
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDMy ) );
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDMn ) );
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipRGBH ) );

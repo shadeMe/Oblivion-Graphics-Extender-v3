@@ -53,6 +53,10 @@ public:
 	DWORD *						GetDX9RenderStates(DWORD *States);
 	bool						DestroyDX9Shader();
 
+#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+	bool						IsTesselator() const;
+#endif
+
 public:
 	RuntimeShaderRecord *				pAssociate;
 	const DWORD *					pOblivionBinary;
@@ -81,9 +85,10 @@ public:
 	LPD3DXBUFFER					pErrorMsgs;
 	LPD3DXBUFFER					pDisasmbly;
 
-#define	SHADER_UNKNOWN	 0
-#define	SHADER_VERTEX	-1
-#define	SHADER_PIXEL	 1
+#define	SHADER_UNKNOWN		 0
+#define	SHADER_VERTEX		-1
+#define	SHADER_TESSELATOR	-2
+#define	SHADER_PIXEL		 1
 
 	/* version and flags */
 	char						iType;
@@ -94,11 +99,15 @@ public:
 	LPD3DXBUFFER					pShaderOriginal;
 	LPD3DXBUFFER					pShaderReplaced;
 	LPD3DXBUFFER					pShaderRuntime;
+	LPD3DXBUFFER					pTssltrReplaced;
+	LPD3DXBUFFER					pTssltrRuntime;
 
 	/* D3DXGetShaderConstantTableEx() */
 	LPD3DXCONSTANTTABLE				pConstsOriginal;
 	LPD3DXCONSTANTTABLE				pConstsReplaced;
 	LPD3DXCONSTANTTABLE				pConstsRuntime;
+	LPD3DXCONSTANTTABLE				pConsttReplaced;
+	LPD3DXCONSTANTTABLE				pConsttRuntime;
 
 #define	SHADER_UNSET	-1
 #define	SHADER_ORIGINAL	 0
@@ -177,7 +186,7 @@ public:
 	ShaderRecord *			pAssociate;
 	bool				bActive, bMark;
 	void *				pCustomCT;
-	bool				bIO;
+	bool				bIO, bTess;
 	unsigned int			bMask;
 
 	/* get a copy of the z-buffer right from before and pass it to the shader */

@@ -17,8 +17,6 @@
 /* these are build-switches from now on */
 //efine	OBGE_LOGGING
 #undef	OBGE_HOOKING
-//efine	OBGE_DEVLING
-//efine	OBGE_PROFILE
 #define	OBGE_STATEBLOCKS	0	// 0 = just hint
 #define	OBGE_CONSTANTPOOLS	0	// 0 = just hint
 #define	OBGE_GAMMACORRECTION	0	// 0 = just hint, 1 = apply globally
@@ -27,6 +25,12 @@
 #define	OBGE_TRACKER		0	// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
 #undef	OBGE_TRACKER_SURFACES		// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
 #undef	OBGE_TRACKER_TEXTURES		// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
+
+//efine	OBGE_DEVLING
+#ifdef	OBGE_DEVLING
+#define	OBGE_PROFILE			// enable profiling of times
+#define	OBGE_TESSELATION		// enable visualizing tesselation
+#endif
 
 enum OBGEPass {
   OBGEPASS_ANY			= 0x0,
