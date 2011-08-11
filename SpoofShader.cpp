@@ -282,7 +282,7 @@ void SpoofShader::ShaderCode(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Ren
   return;
 }
 
-void SpoofShader::InitialiseShader(void) {
+void SpoofShader::InitializeShader(void) {
   return;
 }
 

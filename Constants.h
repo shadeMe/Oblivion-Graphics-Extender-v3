@@ -23,6 +23,7 @@ extern struct sConstants
 
 	// ****** Global shader constants (Updated each scene) ******
 	D3DXMATRIX			wrld;
+//	D3DXMATRIX			wrld_inv;
 	D3DXMATRIX			view;
 	D3DXMATRIX			view_inv;
 	D3DXMATRIX			proj;
@@ -33,6 +34,10 @@ extern struct sConstants
 	D3DXMATRIX			wrldviewproj_inv;
 	D3DXMATRIX			pastviewproj;
 	D3DXMATRIX			pastwrldviewproj;
+
+	D3DXMATRIX			cmra;
+	D3DXMATRIX			cmra_inv;
+	v1_2_416::NiVector3		cmradir, cmraup, cmraright;
 
 	v1_2_416::NiVector4		ZRange;
 	v1_2_416::NiVector4		FoV;
@@ -52,6 +57,7 @@ extern struct sConstants
 	D3DXMATRIX			EyeFrustum;
 	v1_2_416::NiVector3		EyeForward;
 	v1_2_416::NiVector4		EyePosition;
+	v1_2_416::NiVector4		EyeRotation;
 
 	v1_2_416::NiVector4		fGameTime;
 	v1_2_416::NiVector4		fTikTiming;
@@ -68,11 +74,40 @@ extern struct sConstants
 	bool				bHasDepth;
 #endif
 
+	inline void UpdateCamera(float *Loc, float *Dir, float *Up, float *Right) {
+	  /* exact camera-data, nowhere else to be found ...
+	   * had to be hooked as well, runs directly before SetTransform()
+	   */
+	  D3DXVECTOR3 local(0.0f, 0.0f, 0.0f);
+
+	  cmradir.x = Dir[0]; cmraup.x = Up[0]; cmraright.x = Right[0];
+	  cmradir.y = Dir[1]; cmraup.y = Up[1]; cmraright.y = Right[1];
+	  cmradir.z = Dir[2]; cmraup.z = Up[2]; cmraright.z = Right[2];
+
+	  /* make the transform to worldcam-space, not world-space (no translation) */
+	  D3DXMatrixLookAtRH(&cmra,
+	    (const D3DXVECTOR3 *)&local,
+	    (const D3DXVECTOR3 *)Dir,
+	    (const D3DXVECTOR3 *)Up);
+
+	  D3DXMatrixInverse(&cmra_inv, NULL, &cmra);
+
+	  EyePosition.x = Loc[0];
+	  EyePosition.y = Loc[1];
+	  EyePosition.z = Loc[2];
+
+	  EyeForward.x = Dir[0];
+	  EyeForward.y = Dir[1];
+	  EyeForward.z = Dir[2];
+	}
+
 	inline void UpdateWorld(const D3DXMATRIX &mx) {
 	  /* the world transform is updated each time the local
 	   * coordinate-system is changed
 	   */
 	  wrld = mx;
+
+//	  D3DXMatrixInverse(&wrld_inv, NULL, &wrld);
 	}
 
 	inline void UpdateView(const D3DXMATRIX &mx) {
@@ -87,17 +122,97 @@ extern struct sConstants
 	   */
 	  D3DXMatrixInverse(&view_inv, NULL, &view);
 
-	  /* current camera/eye-position is at 0x00B4662C
+	  /* Since a rotation matrix is orthogonal, R^-1 = R^t (transpose). */
+	  D3DXMatrixTranspose(&view_inv, &view);
+
+	  /* make the transform to worldcam-space, not world-space (no translation) */
+
+#if 0
+	  D3DXMatrixDecompose(&scl, &qtn, &trn, &view);
+	  D3DXQuaternionToAxisAngle(&qtn, &axs, &ang);
+
+#if 0
+	  /* current camera/eye-position is at 0x00B3F92C
 	   * for the reflection-pass z is negated
 	   */
-	  EyePosition.x = *((float *)0x00B4662C) + view_inv._41;
-	  EyePosition.y = *((float *)0x00B46630) + view_inv._42;
-	  EyePosition.z = *((float *)0x00B46634) + view_inv._43;
+	  EyePosition.x = *((float *)0x00B3F92C) + view_inv._41;
+	  EyePosition.y = *((float *)0x00B3F930) + view_inv._42;
+	  EyePosition.z = *((float *)0x00B3F934) + view_inv._43;
 	  EyePosition.w = 0.0;
+#endif
+
+	  /*
+	      roll  (rotation around z) :  atan2(xy, xx)
+	      pitch (rotation around y) : -arcsin(xz)
+	      yaw   (rotation around x) :  atan2(yz,zz)
+
+	      where the matrix is defined in the form:
+
+	      [
+		xx, yx, zx, px;
+		xy, yy, zy, py;
+		xz, yz, zz, pz;
+		0, 0, 0, 1
+	      ]
+	  */
+
+	  EyeRotation.y = -asin(view._32);
+	  EyeRotation.x = acos(view._22 / cos(EyeRotation.y));
+	  EyeRotation.z = acos(view._33 / cos(EyeRotation.y));
+	  EyeRotation.w = 0.0;
+
+	  EyeRotation.y = -asin(view._32);
+	  EyeRotation.x = atan2(view._23, view._33);
+	  EyeRotation.z = atan2(view._12, view._11);
+	  EyeRotation.w = 0.0;
+
+#if 0
+	  // Returns the Yaw, Pitch, and Roll components of this
+	  // matrix. This function only works with pure rotation
+	  // matrices.
+
+	  void GetRotation(float *v) const {
+	    // yaw=v[0], pitch=v[1], roll=v[2]
+	    // Note, we use the cosf function rather than sinf
+	    // just in case the angles are greater than [-1,+1]
+	    v[1]  = -asinf(_32);
+	    //pitch
+	    float cp = cosf(v[1]);
+	    //_22 = cr * cp;
+	    float cr = _22 / cp;
+	    v[2] = acosf(cr);
+	    //_33 = cy * cp;
+	    float cy = _33 / cp;
+	    v[0] = acosf(cy);
+	  }
+
+	  // creates a rotation matrix based on euler angles
+	  // Y * P * R in the same order as DirectX.
+	  void Rotate(const float *v) {
+	    //yaw=v[0], pitch=v[1], roll=v[2]
+	    float cy = cosf(v[0]);
+	    float cp = cosf(v[1]);
+	    float cr = cosf(v[2]);
+	    float sp = sinf(v[1]);
+	    float sr = sinf(v[2]);
+	    float sy = sinf(v[0]);
+
+	    _11  = cy * cr+ sr * sp * sy;
+	    _12 = sr * cp;
+	    _13 = cr * -sy + sr * sp * cy;
+	    _21 = -sr * cy + cr * sp * sy;
+	    _22 = cr * cp;
+	    _23 = -sr * -sy + cr * sp * cy;
+	    _31 = cp * sy;
+	    _32 = -sp;
+	    _33 = cy * cp;
+	  }
+#endif
 
 	  /* TODO: find out the current camera's rotation
-	   * and adjust the up/down mis-behaviour
+	   * and adjust the up/down mis-behaviour (precision?)
 	   */
+#endif
 	}
 
 	/* this is very likely constant over the playing-session */

@@ -55,22 +55,22 @@ public:
 
 #define EBUFRT_NUM  1
 #if	EBUFRT_NUM == 4
-	HRESULT				Initialise(const D3DFORMAT rt0,
+	HRESULT				Initialize(const D3DFORMAT rt0,
 						   const D3DFORMAT rt1 = D3DFMT_UNKNOWN,
 						   const D3DFORMAT rt2 = D3DFMT_UNKNOWN,
 						   const D3DFORMAT rt3 = D3DFMT_UNKNOWN) {
-						   const D3DFORMAT fmt[EBUFRT_NUM] = {rt0,rt1,rt2,rt3}; return Initialise(fmt); }
+						   const D3DFORMAT fmt[EBUFRT_NUM] = {rt0,rt1,rt2,rt3}; return Initialize(fmt); }
 #elif	EBUFRT_NUM == 1
-	HRESULT				Initialise(const D3DFORMAT rt0) {
-						   const D3DFORMAT fmt[EBUFRT_NUM] = {rt0}; return Initialise(fmt); }
+	HRESULT				Initialize(const D3DFORMAT rt0) {
+						   const D3DFORMAT fmt[EBUFRT_NUM] = {rt0}; return Initialize(fmt); }
 #endif
 
 	/* initialize the buffer from internal resources */
-	HRESULT				Initialise(IDirect3DTexture9 *text);
+	HRESULT				Initialize(IDirect3DTexture9 *text);
 	/* initialize the buffer from internal resources */
-	HRESULT				Initialise(IDirect3DSurface9 *surf);
+	HRESULT				Initialize(IDirect3DSurface9 *surf);
 	/* initialize the buffer from newly allocated resources */
-	HRESULT				Initialise(const D3DFORMAT fmt[EBUFRT_NUM]);
+	HRESULT				Initialize(const D3DFORMAT fmt[EBUFRT_NUM]);
 	void				Release();
 	bool				IsValid();
 
@@ -248,8 +248,8 @@ public:
 	void						OnResetDevice(void);
 	void						OnReleaseDevice(void);
 
-	void						InitialiseBuffers();
-	void						InitialiseFrameTextures();
+	void						InitializeBuffers();
+	void						InitializeFrameTextures();
 	void						ReleaseBuffers();
 	void						ReleaseFrameTextures();
 

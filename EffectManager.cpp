@@ -231,7 +231,7 @@ EffectBuffer::~EffectBuffer() {
   Release();
 }
 
-inline HRESULT EffectBuffer::Initialise(IDirect3DTexture9 *text) {
+inline HRESULT EffectBuffer::Initialize(IDirect3DTexture9 *text) {
   Release();
 
   Tex[0] = text;
@@ -240,7 +240,7 @@ inline HRESULT EffectBuffer::Initialise(IDirect3DTexture9 *text) {
   return (Srf[0] ? D3D_OK : S_FALSE);
 }
 
-inline HRESULT EffectBuffer::Initialise(IDirect3DSurface9 *surf) {
+inline HRESULT EffectBuffer::Initialize(IDirect3DSurface9 *surf) {
   IDirect3DTexture9 *text = NULL;
 
 #ifndef	OBGE_NOSHADER
@@ -269,7 +269,7 @@ inline HRESULT EffectBuffer::Initialise(IDirect3DSurface9 *surf) {
   return D3D_OK;
 }
 
-inline HRESULT EffectBuffer::Initialise(const D3DFORMAT fmt[EBUFRT_NUM]) {
+inline HRESULT EffectBuffer::Initialize(const D3DFORMAT fmt[EBUFRT_NUM]) {
   UInt32 Width  = v1_2_416::GetRenderer()->SizeWidth;
   UInt32 Height = v1_2_416::GetRenderer()->SizeHeight;
   HRESULT hr;
@@ -288,6 +288,8 @@ inline HRESULT EffectBuffer::Initialise(const D3DFORMAT fmt[EBUFRT_NUM]) {
       if (Tex[rt] && (AMFilter != D3DTEXF_NONE))
 	Tex[rt]->SetAutoGenFilterType(AMFilter);
 #endif
+
+      _DMESSAGE("Creating EffectBuffer surface %s: %s", findFormat(fmt[rt]), Tex[rt] ? "success" : "failed");
     }
   }
 
@@ -303,8 +305,8 @@ inline void EffectBuffer::Release() {
     }
   else
     for (int rt = 0; rt < EBUFRT_NUM; rt++) {
-      Tex[rt] = NULL;
       Srf[rt] = NULL;
+      Tex[rt] = NULL;
     }
 
   mine = false;
@@ -498,8 +500,8 @@ EffectRecord::~EffectRecord() {
 }
 
 void EffectRecord::Kill() {
-  if (pBinary) while (pBinary->Release()) {};
-  if (pEffect) while (pEffect->Release()) {};
+  if (pBinary) pBinary->Release();
+  if (pEffect) pEffect->Release();
   if (pSource) delete[] pSource;
   if (pErrorMsgs) pErrorMsgs->Release();
   if (pDisasmbly) pDisasmbly->Release();
@@ -1589,7 +1591,7 @@ bool EffectManager::SetTransferZ(long MaskZ) {
   return true;
 }
 
-void EffectManager::InitialiseFrameTextures() {
+void EffectManager::InitializeFrameTextures() {
 #ifdef	OLD_QUEUE
   HRESULT hr;
 
@@ -1732,14 +1734,14 @@ void EffectManager::InitialiseFrameTextures() {
     if (IsMultiSampled() && 0)
       RenderBuf |=					 EFFECTBUF_COPY    ;
 
-    if (RenderBuf & EFFECTBUF_ZBUF) OrigDS.Initialise(GetDepthBufferTexture());
-    if (RenderBuf & EFFECTBUF_COPY) CopyRT.Initialise(RenderFmt);
-    if (RenderBuf & EFFECTBUF_PAST) PastRT.Initialise(RenderFmt);
-    if (RenderBuf & EFFECTBUF_PREV) PrevRT.Initialise(RenderFmt);
-				    LastRT.Initialise(RenderFmt);
+    if (RenderBuf & EFFECTBUF_ZBUF) OrigDS.Initialize(GetDepthBufferTexture());
+    if (RenderBuf & EFFECTBUF_COPY) CopyRT.Initialize(RenderFmt);
+    if (RenderBuf & EFFECTBUF_PAST) PastRT.Initialize(RenderFmt);
+    if (RenderBuf & EFFECTBUF_PREV) PrevRT.Initialize(RenderFmt);
+				    LastRT.Initialize(RenderFmt);
 
     if (RenderBuf & EFFECTBUF_ZBUF) if (RenderTransferZ)
-      CurrDS.Initialise(
+      CurrDS.Initialize(
 	RenderTransferZ & EFFECTBUF_EPOS
 	  ? (!bitz || (bitz > 16) ? D3DFMT_A32B32G32R32F : D3DFMT_A16B16G16R16F)  // linear
 	  :
@@ -1748,7 +1750,7 @@ void EffectManager::InitialiseFrameTextures() {
 	  : (!bitz || (bitz > 16) ? D3DFMT_R32F          : D3DFMT_R16F         )	// non-linear
       );
     if (RenderBuf & EFFECTBUF_ENRM) if (RenderTransferZ)
-      CurrNM.Initialise(
+      CurrNM.Initialize(
 //	    (!bitz || (bitz >  8) ? D3DFMT_A16B16G16R16F : D3DFMT_A8B8G8R8     )  // linear
 	    (!bitz || (bitz >  8) ? D3DFMT_A16B16G16R16  : D3DFMT_A8B8G8R8     )  // linear
       );
@@ -1817,7 +1819,7 @@ void EffectManager::ReleaseFrameTextures() {
 #endif
 }
 
-void EffectManager::InitialiseBuffers() {
+void EffectManager::InitializeBuffers() {
   float minx, minu, uadj, vadj;
   void *VertexPointer;
 
@@ -1943,8 +1945,8 @@ void EffectManager::OnResetDevice() {
   ReleaseBuffers();
   ReleaseFrameTextures();
 
-  InitialiseBuffers();
-  InitialiseFrameTextures();
+  InitializeBuffers();
+  InitializeFrameTextures();
 
   ManagedEffectList::iterator SEffect = ManagedEffects.begin();
 
@@ -2029,7 +2031,7 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
    */
   bool resz;
   if ((resz = ResolveDepthBuffer(D3DDevice))) {
-//  OrigDS.Initialise(GetDepthBufferTexture());
+//  OrigDS.Initialize(GetDepthBufferTexture());
 //  FXMan->OrigDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect);
   }
 
@@ -2080,18 +2082,18 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
    * color-buffer is multi-sampled
    */
 #ifndef	OBGE_NOSHADER
-  if ((OrigRT.Initialise(RenderFrom) != D3D_OK))
+  if ((OrigRT.Initialize(RenderFrom) != D3D_OK))
 #endif
   {
-    OrigRT.Initialise(RenderFmt);
+    OrigRT.Initialize(RenderFmt);
     OrigRT.Copy(D3DDevice, RenderFrom);
   }
 
   /* rendertarget without texture, non-HDR & non-Bloom special case
    * this basically is the raw backbuffer I think
    */
-  if ((TrgtRT.Initialise(RenderTo) != D3D_OK)) {
-    CopyRT.Initialise(RenderFmt);
+  if ((TrgtRT.Initialize(RenderTo) != D3D_OK)) {
+    CopyRT.Initialize(RenderFmt);
     RenderBuf |= EFFECTBUF_COPY;
   }
 
@@ -2367,7 +2369,7 @@ void EffectManager::Recalculate() {
   SetTransferZ(RenderBuf);
 
   /* update the buffers */
-  InitialiseFrameTextures();
+  InitializeFrameTextures();
 
   for (ManagedEffectList::iterator e = ManagedEffects.begin(); e != ManagedEffects.end(); e++) {
     if ((*e)->IsEnabled()) {

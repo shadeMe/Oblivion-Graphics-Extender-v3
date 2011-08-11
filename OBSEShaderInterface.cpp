@@ -223,8 +223,8 @@ void OBSEShaderInterface::InitializeEffects(void) {
 
   EffectManager *EffectMan = EffectManager::GetSingleton();
 
-  EffectMan->InitialiseBuffers();
-  EffectMan->InitialiseFrameTextures();
+  EffectMan->InitializeBuffers();
+  EffectMan->InitializeFrameTextures();
   EffectMan->LoadEffectList();
 
 //MemoryDumpString=new TextBuffer(10000);

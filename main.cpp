@@ -387,7 +387,7 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 
 	if (!obse->isEditor)
 	{
-		// Initialise global INI settings.
+		// Initialize global INI settings.
 
 		INIList::GetSingleton()->ReadAllFromINI();
 

@@ -5,6 +5,7 @@
 #include "obse_common/SafeWrite.h"
 #include "GlobalSettings.h"
 #include "OBSEShaderInterface.h"
+#include "Constants.h"
 
 #include "D3D9.hpp"
 #include "D3D9Device.hpp"
@@ -29,6 +30,7 @@ static global<bool> UseWaterHiRes(0, "Oblivion.ini", "Water", "bUseWaterHiRes");
 class Anonymous {
 
 public:
+  void TrackCamera(float *kWorldLoc, float *kWorldDir, float *kWorldUp, float *kWorldRight, void *kFrustum, void *kPort);
   void TrackCombinerPass(int unk1);
 
 #ifndef	OBGE_NOSHADER
@@ -62,6 +64,8 @@ public:
   void *TrackRenderedSurface(v1_2_416::NiDX9Renderer *renderer, int Width, int Height, int Flags, D3DFORMAT Format, enum SurfaceIDs SurfaceTypeID);
 };
 
+void (__thiscall Anonymous::* SetCamera)(float *, float *, float *, float *, void *, void *)/* =
+	(void (__thiscall TES::*)(int, int))00762640*/;
 void (__thiscall Anonymous::* CombinerPass)(int)/* =
 	(void (__thiscall TES::*)(int, int))0040C830*/;
 #ifndef	OBGE_NOSHADER
@@ -108,6 +112,8 @@ bool (__cdecl * IsScriptRunning)(int, int)/* =
 	(void (__thiscall TES::*)(int, int))0x004F8DB0*/;
 #endif
 
+void (__thiscall Anonymous::* TrackCamera)(float *, float *, float *, float *, void *, void *)/* =
+	(void (__thiscall TES::*)(int, int))00762640*/;
 void (__thiscall Anonymous::* TrackCombinerPass)(int)/* =
 	(void (__thiscall TES::*)(int, int))0040C830*/;
 #ifndef	OBGE_NOSHADER
@@ -148,6 +154,13 @@ bool (__thiscall Anonymous::* TrackVideoPass)(int, int)/* =
 void (__thiscall Anonymous::* TrackMiscPass)(int)/* =
 	(void (__thiscall TES::*)(int, int))0x0057F170*/;
 #endif
+
+
+void Anonymous::TrackCamera(float *kWorldLoc, float *kWorldDir, float *kWorldUp, float *kWorldRight, void *kFrustum, void *kPort) {
+	Constants.UpdateCamera(kWorldLoc, kWorldDir, kWorldUp, kWorldRight);
+
+	(this->*SetCamera)(kWorldLoc, kWorldDir, kWorldUp, kWorldRight, kFrustum, kPort);
+}
 
 void Anonymous::TrackCombinerPass(int unk1) {
 #ifndef	OBGE_NOSHADER
@@ -686,6 +699,7 @@ void __stdcall TrackRenderedSurfaceParameters(v1_2_416::NiDX9Renderer *renderer,
 	_DMESSAGE("OD3D9: Intercepted Format: %s", findFormat(*pFormat));
 	_DMESSAGE("OD3D9: Intercepted {W,H} before: {%d,%d}", *pWidth, *pHeight);
 #endif
+
 #if 1
 #ifndef	OBGE_NOSHADER
 	/* enable default automipmapping */
@@ -800,6 +814,7 @@ void CreateRenderSurfaceHook(void) {
 	/* combined reflection and water passes: 0049E880 */
 	/* combined hdr related: 0049E880 */
 
+	*((int *)&SetCamera)             = 0x00762640;
 	*((int *)&CombinerPass)          = 0x0040C830;
 #ifndef	OBGE_NOSHADER
 	/* ReflectionPass */
@@ -827,6 +842,7 @@ void CreateRenderSurfaceHook(void) {
 #endif
 
 
+	TrackCamera                = &Anonymous::TrackCamera;
 	TrackCombinerPass          = &Anonymous::TrackCombinerPass;
 #ifndef	OBGE_NOSHADER
 	TrackReflectionCull        = &Anonymous::TrackReflectionCull;
@@ -864,6 +880,7 @@ void CreateRenderSurfaceHook(void) {
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
 
+	DetourAttach(&(PVOID&)SetCamera,             *((PVOID *)&TrackCamera));
 	DetourAttach(&(PVOID&)CombinerPass,          *((PVOID *)&TrackCombinerPass));
 #ifndef	OBGE_NOSHADER
 	DetourAttach(&(PVOID&)ReflectionCull,        *((PVOID *)&TrackReflectionCull));

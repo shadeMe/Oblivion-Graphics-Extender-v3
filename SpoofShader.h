@@ -94,7 +94,7 @@ public:
 	virtual void			ShaderCode(IDirect3DDevice9	*D3DDevice,IDirect3DSurface9 *RenderTo,IDirect3DSurface9 *RenderFrom, DeviceInfo *Info);
 
 	// Call this function to initialise any internal vars.
-	virtual void			InitialiseShader(void);
+	virtual void			InitializeShader(void);
 
 	// Allows you to assign a name to your shader code. TO DO: Add code to make use of this.
 	virtual void			SetName(char *name);

@@ -48,8 +48,8 @@ IDebugLog *frame_log = NULL;
 
 /* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . */
 #if	defined(OBGE_DEVLING) || defined(OBGE_LOGGING)
-int frame_num = 0;
-int frame_bge = 0;
+int frame_num = 0;	// Present()-counter
+int frame_bge = 0;	// Begin()-counter
 #endif
 
 /* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . */
@@ -82,6 +82,12 @@ std::map <void *, struct depthSurface   *> surfaceDepth;
 std::map <void *, struct textureSurface *> surfaceTexture;
 std::map <void *, struct textureMap     *> textureMaps;
 
+/* we add to the reference counter on several resources to be able to track them */
+std::list <IUnknown *> deferredDeallocations;
+/* deallocation-frequency: every 64 frames (masked) */
+#define deferredFrequency 63
+int frame_daf = 0;
+
 /* -----------------------------------------------------------------------------*/
 
 /* map [0-15,256,257-260] to [0-15,16-19,20] */
@@ -96,7 +102,7 @@ int dx2obgeSampler[512] = {
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 160-191 */
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 192-223 */
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 224-255 */
-  /* tesselator sampler */
+  /* tesselator/displacement sampler */
   20,
   /* vertex shader sampler */
   16, 17, 18, 19											/* rest 0s */
@@ -144,6 +150,7 @@ OBGEDirect3DDevice9::OBGEDirect3DDevice9(IDirect3D9 *d3d, IDirect3DDevice9 *devi
 #endif
 
 #if	defined(OBGE_DEVLING) || defined(OBGE_TESSELATION)
+  /* create the tesselator interface */
   frame_wre = false;
   frame_tes = false;
 
@@ -167,6 +174,7 @@ OBGEDirect3DDevice9::OBGEDirect3DDevice9(IDirect3D9 *d3d, IDirect3DDevice9 *devi
 OBGEDirect3DDevice9::~OBGEDirect3DDevice9() {
   lastOBGEDirect3DDevice9 = NULL;
 
+  /* delete instead of Release() */
   std::map<void *, struct renderSurface *>::iterator sR = surfaceRender.begin();
   while (sR != surfaceRender.end()) { if (sR->second) delete sR->second; sR++; }
 
@@ -188,6 +196,7 @@ OBGEDirect3DDevice9::~OBGEDirect3DDevice9() {
   textureMaps.clear();
 
 #if	defined(OBGE_DEVLING) || defined(OBGE_TESSELATION)
+  /* delete the tesselator interface */
   if (pATITessInterface)
     delete pATITessInterface;
 #endif
@@ -299,10 +308,12 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::Present(CONS
     LARGE_INTEGER moment;
     QueryPerformanceCounter(&moment);
 
+    /* store the final time-delta for profiling */
     m_shaders->trackh[frame_wrp].frame_totl.QuadPart =
     moment.QuadPart - m_shaders->frame_time.QuadPart;
     m_shaders->frame_time.QuadPart = moment.QuadPart;
 
+    /* transfer the captured data into a non-volatile space */
     for (int p = 0; p < OBGEPASS_NUM; p++) {
       m_shaders->trackh[frame_wrp].trackd[p].frame_cntr =
       m_shaders->                  trackd[p].frame_cntr;
@@ -315,6 +326,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::Present(CONS
       );
     }
 
+    /* raise frame-counter */
     m_shaders->frame_capt++;
   }
 #endif
@@ -324,6 +336,30 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::Present(CONS
   frame_num++;
   frame_bge = 0;
 #endif
+
+  /* do all the deferred deallocations (remove our counter) */
+  if (!(++frame_daf & deferredFrequency)) {
+    std::list<IUnknown *>::iterator nx,
+    rs = deferredDeallocations.begin();
+    while (rs != deferredDeallocations.end()) {
+      /* next one */
+      nx = rs; nx++;
+
+      /* the only way to obtain the counter is via AddRef() or Release()
+       *
+       * release _our_ count, if someone else has his fingers 
+       * in the pie, this will be != 0 and we stuff our counter back
+       */
+      ULONG count = (*rs)->Release();
+      if (count > 0)
+	(*rs)->AddRef();
+      else
+	deferredDeallocations.remove(*rs);
+
+      /* assign */
+      rs = nx;
+    }
+  }
 
 #if	defined(OBGE_LOGGING)
   /* count down */
@@ -418,6 +454,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::CreateTextur
         /* apparently the level-address stays constant, so we can track this already from here */
         IDirect3DSurface9 *ppSurfaceLevel = NULL;
 
+	/* this raises the reference-counter ... */
         if (SUCCEEDED((*ppTexture)->GetSurfaceLevel(0, &ppSurfaceLevel))) {
           struct textureSurface *track = new struct textureSurface;
 
@@ -431,6 +468,9 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::CreateTextur
             _DMESSAGE("OD3D9: RT GetSurfaceLevel[0]: 0x%08x", ppSurfaceLevel);
           else if (Usage & D3DUSAGE_DEPTHSTENCIL)
             _DMESSAGE("OD3D9: DS GetSurfaceLevel[0]: 0x%08x", ppSurfaceLevel);
+
+	  /* ... later on we'll remove our count again */
+	  deferredDeallocations.push_back(*ppTexture);
         }
 #endif
       }
@@ -1260,7 +1300,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTexture(D
     /* we have to experiment with this */
     if ((currentPass == OBGEPASS_REFLECTION) ||
 	(currentPass == OBGEPASS_MAIN)) {
-      /* gamma-correction on read */
+      /* gamma-correction on read (the texture-tracker flagged them) */
       bool _DeGamma; DWORD _DGs;
       if (DeGamma && (pTexture->GetPrivateData(GammaGUID, &_DeGamma, &_DGs) == D3D_OK))
         m_device->SetSamplerState(Sampler, D3DSAMP_SRGBTEXTURE, DeGamma);
@@ -1505,7 +1545,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawIndexedP
 
 #if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
   if (shadr_tes) {
-    TSPrimitiveType TSPrimType = TSPT_TRIANGLELIST;
+    TSPrimitiveType TSPrimType = TSPT_TRIANGLESTRIP;
 
     switch (PrimitiveType) {
        case D3DPT_TRIANGLELIST: TSPrimType = TSPT_TRIANGLELIST; break;
@@ -1513,7 +1553,9 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawIndexedP
     }
 
     // Enable tessellation
+//  pATITessInterface->SetMaxLevel(1);
     pATITessInterface->SetMode(TSMD_ENABLE_CONTINUOUS);
+//  pATITessInterface->ToggleIndicesRetrieval(true);
     res = pATITessInterface->DrawIndexed(TSPrimType, BaseVertexIndex, MinVertexIndex, NumVertices, startIndex, primCount);
     pATITessInterface->SetMode(TSMD_DISABLE);
   }

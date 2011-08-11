@@ -532,7 +532,9 @@ void TextureManager::NewGame() {
 }
 
 void TextureManager::SaveGame(OBSESerializationInterface *Interface) {
+#ifdef	NO_DEPRECATED
   int temp;
+#endif
 
   _MESSAGE("TextureManager::SaveGame");
 

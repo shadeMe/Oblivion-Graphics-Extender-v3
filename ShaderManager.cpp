@@ -1551,6 +1551,8 @@ void RuntimeShaderRecord::Buffers::GrabRT(IDirect3DDevice9 *StateDevice, IDirect
       pGrabRT = NULL; pTextRT = NULL;
       if (StateDevice->CreateTexture(CurrD.Width, CurrD.Height, 1, CurrD.Usage, CurrD.Format, CurrD.Pool, &pTextRT, NULL) == D3D_OK)
 	pTextRT->GetSurfaceLevel(0, &pGrabRT);
+
+      _DMESSAGE("Creating GrabRT surface %s: %s", findFormat(CurrD.Format), pTextRT ? "success" : "failed");
     }
 
     if (pGrabRT) {
@@ -1575,6 +1577,8 @@ void RuntimeShaderRecord::Buffers::GrabDS(IDirect3DDevice9 *StateDevice, IDirect
       pGrabDS = NULL; pTextDS = NULL;
       if (StateDevice->CreateTexture(CurrD.Width, CurrD.Height, 1, CurrD.Usage, CurrD.Format, CurrD.Pool, &pTextDS, NULL) == D3D_OK)
 	pTextDS->GetSurfaceLevel(0, &pGrabDS);
+
+      _DMESSAGE("Creating GrabDS surface %s: %s", CurrD.Format, pTextDS ? "success" : "failed");
     }
 
     if (pGrabDS) {
@@ -1945,6 +1949,10 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.FogRange;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_PlayerPosition"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.PlayerPosition;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_EyeTransform_CURRENTPASS"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.cmra;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_EyeInverse_CURRENTPASS"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.cmra_inv;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_EyePosition"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.EyePosition;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_GameTime"))
@@ -2603,6 +2611,9 @@ void ShaderManager::UpdateFrameConstants() {
  */
 
 ShaderRecord *ShaderManager::GetBuiltInShader(const char *Name) {
+  if (!UseShaderOverride())
+    return NULL;
+
   /* search for an entry with the same name, this actually shouldn't
    * really happen (no double shader-allocation)
    */
@@ -2628,6 +2639,9 @@ ShaderRecord *ShaderManager::GetBuiltInShader(const char *Name) {
 }
 
 ShaderRecord *ShaderManager::GetBuiltInShader(const DWORD *Function) {
+  if (!UseShaderOverride())
+    return NULL;
+
   /* search for an entry with the same function
    */
   BuiltInShaderList::iterator BShader = BuiltInShaders.begin();
@@ -2642,6 +2656,9 @@ ShaderRecord *ShaderManager::GetBuiltInShader(const DWORD *Function) {
 }
 
 RuntimeShaderRecord *ShaderManager::SetRuntimeShader(const DWORD *Function, IUnknown *Shader) {
+  if (!UseShaderOverride())
+    return NULL;
+
   /* search for an entry with the same function, this list is constructed on demand and
    * it's faster to search it first
    */
@@ -2674,6 +2691,9 @@ RuntimeShaderRecord *ShaderManager::SetRuntimeShader(const DWORD *Function, IUnk
 }
 
 RuntimeShaderRecord *ShaderManager::GetRuntimeShader(const char *Name) {
+  if (!UseShaderOverride())
+    return NULL;
+
   /* search for an entry with the same name, this actually shouldn't
    * really happen (no double shader-allocation)
    */
