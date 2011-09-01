@@ -1,23 +1,32 @@
-/* This file is part of libdatatypes, a library handling basically any
- * kind of lower- or higher-level structure
- * Copyright (C) 2009 Niels Fröhling
+/* Version: MPL 1.1/LGPL 3.0
  *
- * floatpoint1D.hpp: 1-dimensional floatpoint class (IEEE 754r)
- * Copyright 2009 Niels Fröhling
+ * "The contents of this file are subject to the Mozilla Public License
+ * Version 1.1 (the "License"); you may not use this file except in
+ * compliance with the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Software distributed under the License is distributed on an "AS IS"
+ * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
+ * License for the specific language governing rights and limitations
+ * under the License.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * The Original Code is the Oblivion Graphics Extender, short OBGE.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * The Initial Developer of the Original Code is
+ * Ethatron <niels@paradice-insight.us>. Portions created by The Initial
+ * Developer are Copyright (C) 2009-2011 The Initial Developer.
+ * All Rights Reserved.
+ *
+ * Alternatively, the contents of this file may be used under the terms
+ * of the GNU Library General Public License Version 3 license (the
+ * "LGPL License"), in which case the provisions of LGPL License are
+ * applicable instead of those above. If you wish to allow use of your
+ * version of this file only under the terms of the LGPL License and not
+ * to allow others to use your version of this file under the MPL,
+ * indicate your decision by deleting the provisions above and replace
+ * them with the notice and other provisions required by the LGPL License.
+ * If you do not delete the provisions above, a recipient may use your
+ * version of this file under either the MPL or the LGPL License."
  */
 
 #ifndef	DATATYPES_1D_POSITIONS_FLOAT1D_H

@@ -1,3 +1,39 @@
+/* Version: MPL 1.1/LGPL 3.0
+ *
+ * "The contents of this file are subject to the Mozilla Public License
+ * Version 1.1 (the "License"); you may not use this file except in
+ * compliance with the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS"
+ * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
+ * License for the specific language governing rights and limitations
+ * under the License.
+ *
+ * The Original Code is the Oblivion Graphics Extender, short OBGE.
+ *
+ * The Initial Developer of the Original Code is
+ * Ethatron <niels@paradice-insight.us>. Portions created by The Initial
+ * Developer are Copyright (C) 2011 The Initial Developer.
+ * All Rights Reserved.
+ *
+ * Contributor(s):
+ *  Timeslip (Version 1)
+ *  scanti (Version 2)
+ *  IlmrynAkios (Version 3)
+ *
+ * Alternatively, the contents of this file may be used under the terms
+ * of the GNU Library General Public License Version 3 license (the
+ * "LGPL License"), in which case the provisions of LGPL License are
+ * applicable instead of those above. If you wish to allow use of your
+ * version of this file only under the terms of the LGPL License and not
+ * to allow others to use your version of this file under the MPL,
+ * indicate your decision by deleting the provisions above and replace
+ * them with the notice and other provisions required by the LGPL License.
+ * If you do not delete the provisions above, a recipient may use your
+ * version of this file under either the MPL or the LGPL License."
+ */
+
 #ifndef	OBGE_NOSHADER
 
 #include "D3D9.hpp"
@@ -31,6 +67,7 @@ int Anisotropy = 1;
 float LODBias = 0.0;
 
 GUID GammaGUID = {0};
+GUID LODtxGUID = {1};
 bool DeGamma = false, DeGammaState = false;
 bool ReGamma = false, ReGammaState = false;
 
@@ -85,7 +122,7 @@ std::map <void *, struct textureMap     *> textureMaps;
 /* we add to the reference counter on several resources to be able to track them */
 std::list <IUnknown *> deferredDeallocations;
 /* deallocation-frequency: every 64 frames (masked) */
-#define deferredFrequency 63
+#define deferredFrequency 15
 int frame_daf = 0;
 
 /* -----------------------------------------------------------------------------*/
@@ -347,7 +384,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::Present(CONS
 
       /* the only way to obtain the counter is via AddRef() or Release()
        *
-       * release _our_ count, if someone else has his fingers 
+       * release _our_ count, if someone else has his fingers
        * in the pie, this will be != 0 and we stuff our counter back
        */
       ULONG count = (*rs)->Release();
@@ -1286,6 +1323,13 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTexture(D
 #endif
 
   if (pTexture) {
+#if 0
+    std::string ts = textureClass[pTexture];
+    if (strstr(ts.data(), "landscapelod")) {
+          fprintf(stderr, "check");
+    }
+#endif
+
 #if	defined(OBGE_ANISOTROPY)
     if (currentPass == OBGEPASS_MAIN) {
       // stablelize AF override, SetTexture is called before any SetSamplerState

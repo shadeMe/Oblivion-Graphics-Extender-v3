@@ -1,3 +1,39 @@
+/* Version: MPL 1.1/LGPL 3.0
+ *
+ * "The contents of this file are subject to the Mozilla Public License
+ * Version 1.1 (the "License"); you may not use this file except in
+ * compliance with the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS"
+ * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
+ * License for the specific language governing rights and limitations
+ * under the License.
+ *
+ * The Original Code is the Oblivion Graphics Extender, short OBGE.
+ *
+ * The Initial Developer of the Original Code is
+ * Ethatron <niels@paradice-insight.us>. Portions created by The Initial
+ * Developer are Copyright (C) 2011 The Initial Developer.
+ * All Rights Reserved.
+ *
+ * Contributor(s):
+ *  Timeslip (Version 1)
+ *  scanti (Version 2)
+ *  IlmrynAkios (Version 3)
+ *
+ * Alternatively, the contents of this file may be used under the terms
+ * of the GNU Library General Public License Version 3 license (the
+ * "LGPL License"), in which case the provisions of LGPL License are
+ * applicable instead of those above. If you wish to allow use of your
+ * version of this file only under the terms of the LGPL License and not
+ * to allow others to use your version of this file under the MPL,
+ * indicate your decision by deleting the provisions above and replace
+ * them with the notice and other provisions required by the LGPL License.
+ * If you do not delete the provisions above, a recipient may use your
+ * version of this file under either the MPL or the LGPL License."
+ */
+
 #include <assert.h>
 
 #include "TextureManager.h"
@@ -16,6 +52,7 @@
 #if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING) || defined(OBGE_GAMMACORRECTION)
 
 std::map<std::string, IDirect3DBaseTexture9 *> textureFiles;
+std::map<IDirect3DBaseTexture9 *, std::string> textureClass;
 CRITICAL_SECTION textureLock;
 
 /* ------------------------------------------------------------------------------------------------- */
@@ -54,17 +91,17 @@ const char *findTexture(IDirect3DBaseTexture9 *tex) {
 
 class Anonymous {
 public:
-	bool TrackLoadTextureFile(char *texture, void *renderer, void *flags);
+	bool TrackLoadTextureFile(const char *texture, void *renderer, void *flags);
 };
 
 /* 00760DA0 == NiDX9SourceTextureData_LoadTextureFile */
 
-bool (__thiscall Anonymous::* LoadTextureFile)(char *, void *, void *)/* =
+bool (__thiscall Anonymous::* LoadTextureFile)(const char *, void *, void *)/* =
 	(void * (__stdcall *)(char *))00760DA0*/;
-bool (__thiscall Anonymous::* TrackLoadTextureFile)(char *, void *, void *)/* =
+bool (__thiscall Anonymous::* TrackLoadTextureFile)(const char *, void *, void *)/* =
 	(void * (__stdcall *)(char *))00760DA0*/;
 
-bool Anonymous::TrackLoadTextureFile(char *texture, void *renderer, void *flags) {
+bool Anonymous::TrackLoadTextureFile(const char *texture, void *renderer, void *flags) {
 	EnterCriticalSection(&textureLock);
 
 	lastOBGEDirect3DBaseTexture9 = NULL;
@@ -73,19 +110,44 @@ bool Anonymous::TrackLoadTextureFile(char *texture, void *renderer, void *flags)
 
 	if (r && lastOBGEDirect3DBaseTexture9) {
 	  textureFiles[texture] = lastOBGEDirect3DBaseTexture9;
+	  textureClass[lastOBGEDirect3DBaseTexture9] = texture;
+
+	  const char *textlwr = strlwr(strdup(texture));
+
+	  if (!strchr(textlwr, '_g.'))
+	  if (!strchr(textlwr, '_n.'))
+	  if (!strchr(textlwr, '_d.')) {
 
 #ifdef OBGE_GAMMACORRECTION
-	  /* remember DeGamma for this kind of texture */
-//	  if (DeGamma) {
-	    if (!strchr(texture, '_'))
-	    if (!strstr(texture, "Menu") &&
-		!strstr(texture, "menu")) {
-	      static const bool PotDeGamma = true;
+	    /* remember DeGamma for this kind of texture */
+//	    if (DeGamma) {
+	      if (/* menus are on the backbuffer, no shader there */
+		  !strstr(textlwr, "menus\\") || !strstr(textlwr, "menus/") ||
+		  /* faces contain blend-factors, no colors */
+		  !strstr(textlwr, "faces\\") || !strstr(textlwr, "faces/") ||
+		  /* fires are emitter, no need for gamma */
+		  !strstr(textlwr, "fire\\" ) || !strstr(textlwr, "fire/" )) {
+		static const bool PotDeGamma = true;
 
-	      lastOBGEDirect3DBaseTexture9->SetPrivateData(GammaGUID, &PotDeGamma, sizeof(PotDeGamma), 0);
+		lastOBGEDirect3DBaseTexture9->SetPrivateData(GammaGUID, &PotDeGamma, sizeof(PotDeGamma), 0);
+	      }
 //	    }
-	  }
 #endif
+
+#ifdef OBGE_LODSHADERS
+	    /* remember LOD for this kind of texture */
+//	    if (DoLODReplacement) {
+	      if (!strchr(textlwr, '_'))
+	      if (!strstr(textlwr, "lod")) {
+		static const bool PotLODtext = true;
+
+		lastOBGEDirect3DBaseTexture9->SetPrivateData(LODtxGUID, &PotLODtext, sizeof(PotLODtext), 0);
+	      }
+//	    }
+#endif
+	  }
+
+	  free((void *)textlwr);
 	}
 
 	_DMESSAGE("Texture load: %s (%s)", texture, r ? "success" : "failed");

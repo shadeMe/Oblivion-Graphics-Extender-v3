@@ -1,3 +1,39 @@
+/* Version: MPL 1.1/LGPL 3.0
+ *
+ * "The contents of this file are subject to the Mozilla Public License
+ * Version 1.1 (the "License"); you may not use this file except in
+ * compliance with the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS"
+ * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
+ * License for the specific language governing rights and limitations
+ * under the License.
+ *
+ * The Original Code is the Oblivion Graphics Extender, short OBGE.
+ *
+ * The Initial Developer of the Original Code is
+ * Ethatron <niels@paradice-insight.us>. Portions created by The Initial
+ * Developer are Copyright (C) 2011 The Initial Developer.
+ * All Rights Reserved.
+ *
+ * Contributor(s):
+ *  Timeslip (Version 1)
+ *  scanti (Version 2)
+ *  IlmrynAkios (Version 3)
+ *
+ * Alternatively, the contents of this file may be used under the terms
+ * of the GNU Library General Public License Version 3 license (the
+ * "LGPL License"), in which case the provisions of LGPL License are
+ * applicable instead of those above. If you wish to allow use of your
+ * version of this file only under the terms of the LGPL License and not
+ * to allow others to use your version of this file under the MPL,
+ * indicate your decision by deleting the provisions above and replace
+ * them with the notice and other provisions required by the LGPL License.
+ * If you do not delete the provisions above, a recipient may use your
+ * version of this file under either the MPL or the LGPL License."
+ */
+
 #include <assert.h>
 
 #include "RenderSurfaceParametersHook.hpp"
@@ -108,7 +144,7 @@ void (__thiscall Anonymous::* MiscPass)(int)/* =
 
 void (__cdecl * IdlePass)(int, int)/* =
 	(void (__thiscall TES::*)(int, int))0x007D71C0*/;
-bool (__cdecl * IsScriptRunning)(int, int)/* =
+bool (__cdecl * IsRunning)(int, int)/* =
 	(void (__thiscall TES::*)(int, int))0x004F8DB0*/;
 #endif
 
@@ -555,11 +591,11 @@ void __cdecl TrackIdlePass(int unk1, int unk2) {
 	currentPass = previousPass;
 }
 
-bool __cdecl TrackIsScriptRunning(int unk1, int unk2) {
+bool __cdecl TrackIsRunning(int unk1, int unk2) {
 	bool res = false;
 
 	__try {
-		res = IsScriptRunning(unk1, unk2);
+		res = IsRunning(unk1, unk2);
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER) {
 		res = false;
@@ -868,7 +904,7 @@ void CreateRenderSurfaceHook(void) {
 	TrackMiscPass              = &Anonymous::TrackMiscPass;
 
 	*((int *)&IdlePass       ) = 0x007D71C0;
-	*((int *)&IsScriptRunning) = 0x004F8DB0;
+	*((int *)&IsRunning      ) = 0x004F8DB0;
 #endif
 
 	/* GetRenderedSurfaceParameters */
@@ -906,7 +942,9 @@ void CreateRenderSurfaceHook(void) {
 	DetourAttach(&(PVOID&)MiscPass,              *((PVOID *)&TrackMiscPass));
 
 	DetourAttach(&(PVOID&)IdlePass, TrackIdlePass);
-//	DetourAttach(&(PVOID&)IsScriptRunning, TrackIsScriptRunning);
+#ifndef NDEBUG
+	DetourAttach(&(PVOID&)IsRunning, TrackIsRunning);
+#endif
 #endif
 
 	DetourAttach(&(PVOID&)GetRenderedSurface, *((PVOID *)&TrackRenderedSurface         ));
