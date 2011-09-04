@@ -36,6 +36,8 @@
 
 #include <sys/stat.h>
 
+#include <string>
+#include <map>
 #include <algorithm>
 
 #include "EffectManager.h"
@@ -730,7 +732,7 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
       FXMan ? FXMan->EffectPool : NULL,
       &x,
       &pErrorMsgs
-      );
+    );
 
     /* this didn't go so well, if it's a legacy "error", just try again */
     if (pErrorMsgs && strstr((char*)pErrorMsgs->GetBufferPointer(), "X3539")) {
@@ -748,7 +750,7 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
 	FXMan ? FXMan->EffectPool : NULL,
 	&x,
 	&pErrorMsgs
-	);
+      );
     }
 
     /* this didn't go so well */
@@ -1256,6 +1258,122 @@ inline unsigned long EffectRecord::GetConditions(int pass) const {
 
 inline void EffectRecord::SetPriority(int pri) {
   this->Priority = (this->Priority & (0xFF << 24)) | (pri & ~(0xFF << 24));
+}
+
+bool EffectRecord::GetEffectConstants(std::map<std::string,int> &all) {
+  if (!HasEffect()) return false;
+  all.clear();
+
+  D3DXEFFECT_DESC Description;
+  pEffect->GetDesc(&Description);
+  Parameters = 0;
+
+  /* extract parameter informations */
+  for (int par = 0; par < Description.Parameters; par++) {
+    D3DXHANDLE handle;
+
+    if ((handle = pEffect->GetParameter(NULL, par))) {
+      D3DXPARAMETER_DESC Description;
+      pEffect->GetParameterDesc(handle, &Description);
+      std::string name; name.assign(Name);
+
+      switch (Description.Type) {
+	case D3DXPT_VOID:	  all[name] = 0; break;
+	case D3DXPT_BOOL:	  all[name] = 1; break;
+	case D3DXPT_INT:	  all[name] = 2; break;
+	case D3DXPT_FLOAT:	  all[name] = 3; break;
+	case D3DXPT_STRING:	  all[name] = 4; break;
+	case D3DXPT_TEXTURE:	  all[name] = 5; break;
+	case D3DXPT_TEXTURE1D:	  all[name] = 6; break;
+	case D3DXPT_TEXTURE2D:	  all[name] = 7; break;
+	case D3DXPT_TEXTURE3D:	  all[name] = 8; break;
+	case D3DXPT_TEXTURECUBE:  all[name] = 9; break;
+	case D3DXPT_SAMPLER:	  all[name] = 10; break;
+	case D3DXPT_SAMPLER1D:	  all[name] = 11; break;
+	case D3DXPT_SAMPLER2D:	  all[name] = 12; break;
+	case D3DXPT_SAMPLER3D:	  all[name] = 13; break;
+	case D3DXPT_SAMPLERCUBE:  all[name] = 14; break;
+      }
+    }
+  }
+  return true;
+}
+
+bool EffectRecord::GetEffectConstantType(const char *name, int *type) {
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  if (hl) {
+    D3DXPARAMETER_DESC desc;
+    HRESULT hr = pEffect->GetParameterDesc(hl, &desc);
+    if (hr == D3D_OK) {
+      switch (desc.Type) {
+	default:		 *type = -1; break;
+	case D3DXPT_VOID:        *type =  0; break;
+	case D3DXPT_BOOL:        *type =  1; break;
+	case D3DXPT_INT:         *type =  2; break;
+	case D3DXPT_FLOAT:       *type =  3; break;
+	case D3DXPT_STRING:      *type =  4; break;
+	case D3DXPT_TEXTURE:     *type =  5; break;
+	case D3DXPT_TEXTURE1D:   *type =  6; break;
+	case D3DXPT_TEXTURE2D:   *type =  7; break;
+	case D3DXPT_TEXTURE3D:   *type =  8; break;
+	case D3DXPT_TEXTURECUBE: *type =  9; break;
+	case D3DXPT_SAMPLER:     *type = 10; break;
+	case D3DXPT_SAMPLER1D:   *type = 11; break;
+	case D3DXPT_SAMPLER2D:   *type = 12; break;
+	case D3DXPT_SAMPLER3D:   *type = 13; break;
+	case D3DXPT_SAMPLERCUBE: *type = 14; break;
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+bool EffectRecord::GetEffectConstantB(const char *name, bool *value) {
+  HRESULT hr = (HasEffect() ? pEffect->GetBool(name, (BOOL *)value) : -1);
+  return (hr == D3D_OK);
+}
+
+bool EffectRecord::GetEffectConstantI(const char *name, int *value) {
+  HRESULT hr = (HasEffect() ? pEffect->GetInt(name, value) : -1);
+  return (hr == D3D_OK);
+}
+
+bool EffectRecord::GetEffectConstantI(const char *name, int *values, int num) {
+  HRESULT hr = (HasEffect() ? pEffect->GetIntArray(name, values, num) : -1);
+  return (hr == D3D_OK);
+}
+
+bool EffectRecord::GetEffectConstantF(const char *name, float *value) {
+  HRESULT hr = (HasEffect() ? pEffect->GetFloat(name, value) : -1);
+  return (hr == D3D_OK);
+}
+
+bool EffectRecord::GetEffectConstantF(const char *name, float *values, int num) {
+  HRESULT hr = (HasEffect() ? pEffect->GetFloatArray(name, values, num) : -1);
+  return (hr == D3D_OK);
+}
+
+bool EffectRecord::GetEffectConstantV(const char *name, float *value) {
+  HRESULT hr = (HasEffect() ? pEffect->GetVector(name, (D3DXVECTOR4 *)value) : -1);
+  return (hr == D3D_OK);
+}
+
+bool EffectRecord::GetEffectSamplerTexture(const char *name, int *TextureNum) {
+  TextureManager *TexMan = TextureManager::GetSingleton();
+  if (!HasEffect()) return false;
+
+  IDirect3DBaseTexture9 *OldTexture = NULL;
+  /* get old one */
+  pEffect->GetTexture(name, (LPDIRECT3DBASETEXTURE9 *)&OldTexture);
+
+  /* remove any trace of the texture from this effect */
+  if (OldTexture) {
+    *TextureNum = TexMan->FindTexture(OldTexture);
+    return true;
+  }
+
+  return false;
 }
 
 bool EffectRecord::SetEffectConstantB(const char *name, bool value) {
@@ -2697,6 +2815,110 @@ bool EffectManager::EnableEffect(int EffectNum, bool State) {
 
   if ((pEffect = GetEffect(EffectNum))) {
     pEffect->Enable(State); return true; }
+
+  return false;
+}
+
+bool EffectManager::GetEffects(int which, std::map<std::string,int> &all) {
+  all.clear();
+
+  ManagedEffectList::iterator pEffect = ManagedEffects.begin();
+
+  while (pEffect != ManagedEffects.end()) {
+    if (!(*pEffect)->IsPrivate()) {
+      if ((*pEffect)->GetEffect()) {
+	/**/ if (which < 0) {
+	  if ((*pEffect)->IsEnabled())
+	    continue;
+	}
+	else if (which > 0) {
+	  if (!(*pEffect)->IsEnabled())
+	    continue;
+	}
+
+	/* this is very bad ... linear search */
+	int EffectNum = -1;
+
+	EffectRegistry::iterator IEffect = Effects.begin();
+	while (IEffect != Effects.end()) {
+	  if (IEffect->second == (*pEffect)) {
+	    EffectNum = IEffect->first;
+	    break;
+	  }
+
+	  IEffect++;
+	}
+
+	/* locals */
+	std::string name; name.assign((*pEffect)->GetName());
+
+	all[name] = EffectNum;
+      }
+    }
+  }
+
+  return false;
+}
+
+bool EffectManager::GetEffectConstants(int EffectNum, std::map<std::string,int> &all) {
+  ManagedEffectRecord *pEffect;
+
+  if ((pEffect = GetEffect(EffectNum)))
+    return pEffect->GetEffectConstants(all);
+
+  return false;
+}
+
+bool EffectManager::GetEffectConstantType(int EffectNum, char *name, int *type) {
+  ManagedEffectRecord *pEffect;
+
+  if ((pEffect = GetEffect(EffectNum)))
+    return pEffect->GetEffectConstantType(name, type);
+
+  return false;
+}
+
+bool EffectManager::GetEffectConstantB(int EffectNum, char *name, bool *value) {
+  ManagedEffectRecord *pEffect;
+
+  if ((pEffect = GetEffect(EffectNum)))
+    return pEffect->GetEffectConstantB(name, value);
+
+  return false;
+}
+
+bool EffectManager::GetEffectConstantI(int EffectNum, char *name, int *value) {
+  ManagedEffectRecord *pEffect;
+
+  if ((pEffect = GetEffect(EffectNum)))
+    return pEffect->GetEffectConstantI(name, value);
+
+  return false;
+}
+
+bool EffectManager::GetEffectConstantF(int EffectNum, char *name, float *value) {
+  ManagedEffectRecord *pEffect;
+
+  if ((pEffect = GetEffect(EffectNum)))
+    return pEffect->GetEffectConstantF(name, value);
+
+  return false;
+}
+
+bool EffectManager::GetEffectConstantV(int EffectNum, char *name, float *value) {
+  ManagedEffectRecord *pEffect;
+
+  if ((pEffect = GetEffect(EffectNum)))
+    return pEffect->GetEffectConstantV(name, value);
+
+  return false;
+}
+
+bool EffectManager::GetEffectSamplerTexture(int EffectNum, char *name, int *TextureNum) {
+  ManagedEffectRecord *pEffect;
+
+  if ((pEffect = GetEffect(EffectNum)))
+    return pEffect->GetEffectSamplerTexture(name, TextureNum);
 
   return false;
 }

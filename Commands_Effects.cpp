@@ -34,6 +34,10 @@
  * version of this file under either the MPL or the LGPL License."
  */
 
+#include <string>
+#include <vector>
+#include <map>
+
 #include "Commands_Shaders.h"
 #include "Commands_Misc.h"
 #include "Commands_Params.h"
@@ -136,6 +140,241 @@ static bool ReleaseEffect(COMMAND_ARGS) {
 
   if (!EffectManager::GetSingleton()->ReleaseEffect(id))
     *result = -1;
+
+  return true;
+}
+
+static bool GetEffects_Execute(COMMAND_ARGS) {
+  *result = 0;
+
+  DWORD which;
+  char var[256];
+  if (!ExtractArgs(EXTRACTARGS, &which, &var))
+    return true;
+
+  if (!IsEnabled())
+    return true;
+
+  std::map<std::string,int> all;
+  if (EffectManager::GetSingleton()->GetEffects(which, all)) {
+    std::map<std::string,OBSEElement> obsem;
+
+    for (std::map<std::string,int>::iterator it = all.begin(); it != all.end(); it++) {
+      const std::string name = it->first;
+      int id = it->second;
+
+      obsem[name] = OBSEElement(id);
+    }
+
+    OBSEArray *arr = StringMapFromStdMap(obsem, scriptObj);
+    if (g_arrayvar->AssignCommandResult(arr, result))
+      ;
+  }
+
+  return true;
+}
+
+static bool GetEffectConstants_Execute(COMMAND_ARGS) {
+  *result = 0;
+
+  DWORD id;
+  char var[256];
+  if (!ExtractArgs(EXTRACTARGS, &id, &var))
+    return true;
+
+  if (!IsEnabled())
+    return true;
+
+#ifndef	NDEBUG
+  if (id < 0) {
+    Console_Print("EffectID %i is invalid", id);
+    *result = -1; return true;
+  }
+#endif
+
+  std::map<std::string,int> all;
+  if (EffectManager::GetSingleton()->GetEffectConstants(id, all)) {
+    std::map<std::string,OBSEElement> obsem;
+
+    for (std::map<std::string,int>::iterator it = all.begin(); it != all.end(); it++) {
+      const std::string name = it->first;
+      int type = it->second;
+
+      obsem[name] = OBSEElement(type);
+    }
+
+    OBSEArray *arr = StringMapFromStdMap(obsem, scriptObj);
+    if (g_arrayvar->AssignCommandResult(arr, result))
+      ;
+  }
+
+  return true;
+}
+
+static bool GetEffectConstantType_Execute(COMMAND_ARGS) {
+  *result = 0;
+
+  DWORD id;
+  char var[256];
+  if (!ExtractArgs(EXTRACTARGS, &id, &var))
+    return true;
+
+  if (!IsEnabled())
+    return true;
+
+#ifndef	NDEBUG
+  if (id < 0) {
+    Console_Print("EffectID %i is invalid", id);
+    *result = -1; return true;
+  }
+#endif
+
+  int type;
+  if (EffectManager::GetSingleton()->GetEffectConstantType(id, var, &type))
+    *result = type;
+
+  return true;
+}
+
+static bool GetEffectConstantB_Execute(COMMAND_ARGS) {
+  *result = 0;
+
+  DWORD id;
+  char var[256];
+  if (!ExtractArgs(EXTRACTARGS, &id, &var))
+    return true;
+
+  if (!IsEnabled())
+    return true;
+
+#ifndef	NDEBUG
+  if (id < 0) {
+    Console_Print("EffectID %i is invalid", id);
+    *result = -1; return true;
+  }
+#endif
+
+  bool value;
+  if (EffectManager::GetSingleton()->GetEffectConstantB(id, var, &value))
+    *result = value;
+
+  return true;
+}
+
+static bool GetEffectConstantI_Execute(COMMAND_ARGS) {
+  *result = 0;
+
+  DWORD id;
+  char var[256];
+  if (!ExtractArgs(EXTRACTARGS, &id, &var))
+    return true;
+
+  if (!IsEnabled())
+    return true;
+
+#ifndef	NDEBUG
+  if (id < 0) {
+    Console_Print("EffectID %i is invalid", id);
+    *result = -1; return true;
+  }
+#endif
+
+  int value;
+  if (EffectManager::GetSingleton()->GetEffectConstantI(id, var, &value))
+    *result = value;
+
+  return true;
+}
+
+static bool GetEffectConstantF_Execute(COMMAND_ARGS) {
+  *result = 0;
+
+  DWORD id;
+  char var[256];
+  if (!ExtractArgs(EXTRACTARGS, &id, &var))
+    return true;
+
+  if (!IsEnabled())
+    return true;
+
+#ifndef	NDEBUG
+  if (id < 0) {
+    Console_Print("EffectID %i is invalid", id);
+    *result = -1; return true;
+  }
+#endif
+
+  float value;
+  if (EffectManager::GetSingleton()->GetEffectConstantF(id, var, &value))
+    *result = value;
+
+  return true;
+}
+
+static bool GetEffectConstantV_Execute(COMMAND_ARGS) {
+  *result = 0;
+
+  DWORD id;
+  char var[256];
+  if (!ExtractArgs(EXTRACTARGS, &id, &var))
+    return true;
+
+  if (!IsEnabled())
+    return true;
+
+#ifndef	NDEBUG
+  if (id < 0) {
+    Console_Print("EffectID %i is invalid", id);
+    *result = -1; return true;
+  }
+#endif
+
+  std::vector<float> value(4);
+  if (EffectManager::GetSingleton()->GetEffectConstantV(id, var, &value[0])) {
+    std::vector<OBSEElement> obsev(4);
+
+    obsev[0] = value[0];
+    obsev[1] = value[1];
+    obsev[2] = value[2];
+    obsev[3] = value[3];
+
+    OBSEArray *arr = ArrayFromStdVector(obsev, scriptObj);
+    if (g_arrayvar->AssignCommandResult(arr, result))
+      ;
+  }
+
+  return true;
+}
+
+static bool GetEffectSamplerTexture_Execute(COMMAND_ARGS) {
+  *result = 0;
+
+  DWORD id;
+  char var[256];
+  if (!ExtractArgs(EXTRACTARGS, &id, &var))
+    return true;
+
+  if (!IsEnabled())
+    return true;
+
+#ifndef	NDEBUG
+  if (id < 0) {
+    Console_Print("EffectID %i is invalid", id);
+    *result = -1; return true;
+  }
+#endif
+
+  int i;
+  if (EffectManager::GetSingleton()->GetEffectSamplerTexture(id, var, &i)) {
+    *result = i;
+
+#ifndef	NDEBUG
+    if (i < 0) {
+      Console_Print("TextureID %i is invalid", i);
+      *result = -1; return true;
+    }
+#endif
+  }
 
   return true;
 }
@@ -329,6 +568,118 @@ CommandInfo kCommandInfo_ReleaseEffect = {
   1,
   kParams_OneInt,
   ReleaseEffect,
+  0,
+  0,
+  0
+};
+
+CommandInfo kCommandInfo_GetEffects = {
+  "GetEffects",
+  "",
+  0,
+  "Gets the ids of all effects",
+  0,
+  1,
+  kParams_OneInt,
+  GetEffects_Execute,
+  0,
+  0,
+  0
+};
+
+CommandInfo kCommandInfo_GetEffectConstants = {
+  "GetEffectConstants",
+  "",
+  0,
+  "Gets the types of all variables in an effect",
+  0,
+  1,
+  kParams_OneInt,
+  GetEffectConstants_Execute,
+  0,
+  0,
+  0
+};
+
+CommandInfo kCommandInfo_GetEffectConstantType = {
+  "GetEffectConstantType",
+  "",
+  0,
+  "Gets the type of a variable in an effect",
+  0,
+  2,
+  kParams_IntString,
+  GetEffectConstantType_Execute,
+  0,
+  0,
+  0
+};
+
+CommandInfo kCommandInfo_GetEffectConstantB = {
+  "GetEffectConstantB",
+  "",
+  0,
+  "Gets the boolean value of a variable in an effect",
+  0,
+  2,
+  kParams_IntString,
+  GetEffectConstantB_Execute,
+  0,
+  0,
+  0
+};
+
+CommandInfo kCommandInfo_GetEffectConstantI = {
+  "GetEffectConstantI",
+  "",
+  0,
+  "Gets the integer value of a variable in an effect",
+  0,
+  2,
+  kParams_IntString,
+  GetEffectConstantI_Execute,
+  0,
+  0,
+  0
+};
+
+CommandInfo kCommandInfo_GetEffectConstantF = {
+  "GetEffectConstantF",
+  "",
+  0,
+  "Gets the float value of a variable in an effect",
+  0,
+  2,
+  kParams_IntString,
+  GetEffectConstantF_Execute,
+  0,
+  0,
+  0
+};
+
+CommandInfo kCommandInfo_GetEffectConstantV = {
+  "GetEffectConstantV",
+  "",
+  0,
+  "Gets the array of 4 floats of a variable in an effect",
+  0,
+  2,
+  kParams_IntString,
+  GetEffectConstantV_Execute,
+  0,
+  0,
+  0
+};
+
+CommandInfo kCommandInfo_GetEffectSamplerTexture = {
+  "GetEffectSamplerTexture",
+  "",
+  0,
+  "Gets the id assigned to a texture variable in an effect",
+  0,
+  2,
+  kParams_IntString,
+  GetEffectSamplerTexture_Execute,
   0,
   0,
   0

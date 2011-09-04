@@ -185,6 +185,16 @@ public:
 	bool SetEffectConstantV(const char *name, v1_2_416::NiVector4 *value);
 	bool SetEffectSamplerTexture(const char *name, int TextureNum);
 
+	bool GetEffectConstants(std::map<std::string,int> &all);
+	bool GetEffectConstantType(const char *name, int *type);
+	bool GetEffectConstantB(const char *name, bool *value);
+	bool GetEffectConstantI(const char *name, int *value);
+	bool GetEffectConstantI(const char *name, int *values, int num);
+	bool GetEffectConstantF(const char *name, float *value);
+	bool GetEffectConstantF(const char *name, float *values, int num);
+	bool GetEffectConstantV(const char *name, float *value);
+	bool GetEffectSamplerTexture(const char *name, int *TextureNum);
+
 	void PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum = -1);
 	void SaveVars(OBSESerializationInterface *Interface);
 
@@ -317,6 +327,7 @@ public:
 	void						FreeEffect(int EffectNum);
 	bool						GetEffectState(int EffectNum);
 	int						FindEffect(const char *Filename);
+	bool						GetEffects(int which, std::map<std::string,int> &all);
 
 	bool						SetEffectConstantB(int EffectNum, char *name, bool value);
 	bool						SetEffectConstantI(int EffectNum, char *name, int value);
@@ -325,6 +336,16 @@ public:
 	bool						SetEffectConstantF(int EffectNum, char *name, float *values, int num);
 	bool						SetEffectConstantV(int EffectNum, char *name, v1_2_416::NiVector4 *value);
 	bool						SetEffectSamplerTexture(int EffectNum, char *name, int TextureNum);
+
+	bool						GetEffectConstants(int EffectNum, std::map<std::string,int> &all);
+	bool						GetEffectConstantType(int EffectNum, char *name, int *value);
+	bool						GetEffectConstantB(int EffectNum, char *name, bool *value);
+	bool						GetEffectConstantI(int EffectNum, char *name, int *value);
+	bool						GetEffectConstantI(int EffectNum, char *name, int *values, int num);
+	bool						GetEffectConstantF(int EffectNum, char *name, float *value);
+	bool						GetEffectConstantF(int EffectNum, char *name, float *values, int num);
+	bool						GetEffectConstantV(int EffectNum, char *name, float *value);
+	bool						GetEffectSamplerTexture(int EffectNum, char *name, int *TextureNum);
 
 	void						Recalculate();
 	void						PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum = -1);

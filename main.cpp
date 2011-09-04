@@ -38,9 +38,10 @@
 #include "obse/CommandTable.h"
 #include "obse/GameAPI.h"
 #include "obse_common/SafeWrite.h"
-#include "obse/ParamInfos.h"
+//#include "obse/ParamInfos.h"
 #include "nodes/NiDX9Renderer.h"
 
+#include "Commands_Params.h"
 #include "Commands_Misc.h"
 #include "Commands_HUD.h"
 #include "Commands_Shaders.h"
@@ -73,7 +74,43 @@ IDebugLog	gLog("OBGE.log");
 
 PluginHandle			g_pluginHandle = kPluginHandle_Invalid;
 OBSESerializationInterface    * g_serialization = NULL;
+OBSEArrayVarInterface	      * g_arrayvar = NULL;
 
+/*********************
+	Array API Example
+ *********************/
+
+// helper function for creating an OBSE StringMap from a std::map<std::string, OBSEElement>
+OBSEArray* StringMapFromStdMap(const std::map<std::string, OBSEElement>& data, Script* callingScript)
+{
+	// create empty string map
+	OBSEArray* arr = g_arrayvar->CreateStringMap(NULL, NULL, 0, callingScript);
+
+	// add each key-value pair
+	for (std::map<std::string, OBSEElement>::const_iterator iter = data.begin(); iter != data.end(); ++iter) {
+		g_arrayvar->SetElement(arr, iter->first.c_str(), iter->second);
+	}
+
+	return arr;
+}
+
+// helper function for creating an OBSE Map from a std::map<double, OBSEElement>
+OBSEArray* MapFromStdMap(const std::map<double, OBSEElement>& data, Script* callingScript)
+{
+	OBSEArray* arr = g_arrayvar->CreateMap(NULL, NULL, 0, callingScript);
+	for (std::map<double, OBSEElement>::const_iterator iter = data.begin(); iter != data.end(); ++iter) {
+		g_arrayvar->SetElement(arr, iter->first, iter->second);
+	}
+
+	return arr;
+}
+
+// helper function for creating OBSE Array from std::vector<OBSEElement>
+OBSEArray* ArrayFromStdVector(const std::vector<OBSEElement>& data, Script* callingScript)
+{
+	OBSEArray* arr = g_arrayvar->CreateArray(&data[0], data.size(), callingScript);
+	return arr;
+}
 
 int *PixelShaderVersion = (int *)0x00B42F48;
 int *UseHDR = (int *)0x00B43070;
@@ -215,12 +252,6 @@ void MessageHandler(OBSEMessagingInterface::Message* msg)
 	}
 }
 
-static ParamInfo kParams_OneIntOneOptInt[2] =
-{
-	{	"int", kParamType_Integer, 0 },
-	{	"int", kParamType_Integer, 1 },
-};
-
 static CommandInfo kAlpha2Coverage =
 {
 	"Alpha2Coverage",
@@ -309,6 +340,13 @@ bool OBSEPlugin_Query(const OBSEInterface * obse, PluginInfo * info)
 		if(g_serialization->version < OBSESerializationInterface::kVersion)
 		{
 			_ERROR("incorrect serialization version found (got %08X need %08X)", g_serialization->version, OBSESerializationInterface::kVersion);
+			return false;
+		}
+
+		g_arrayvar = (OBSEArrayVarInterface*)obse->QueryInterface(kInterface_ArrayVar);
+		if (!g_arrayvar)
+		{
+			_ERROR("Array interface not found");
 			return false;
 		}
 
@@ -410,13 +448,24 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 	obse->RegisterCommand(&kCommandInfo_SetShaderSamplerTexture);			// 2125
 #endif
 
+	/* effects -------------------------------------------------------------------- */
+	obse->RegisterTypedCommand(&kCommandInfo_GetEffects, kRetnType_Array);		// 2126
+	obse->RegisterTypedCommand(&kCommandInfo_GetEffectConstants, kRetnType_Array);	// 2127
+	obse->RegisterCommand(&kCommandInfo_GetEffectConstantType);			// 2128
+	obse->RegisterCommand(&kCommandInfo_GetEffectConstantB);			// 2129
+	obse->RegisterCommand(&kCommandInfo_GetEffectConstantI);			// 2130
+	obse->RegisterCommand(&kCommandInfo_GetEffectConstantF);			// 2131
+	obse->RegisterTypedCommand(&kCommandInfo_GetEffectConstantV, kRetnType_Array);	// 2132
+	obse->RegisterCommand(&kCommandInfo_GetEffectSamplerTexture);			// 2133
+
 	/* dev ------------------------------------------------------------------------ */
 #ifdef	OBGE_DEVLING
-	obse->RegisterCommand(&kCommandInfo_OpenShaderDeveloper);			// 2126
+	obse->RegisterCommand(&kCommandInfo_OpenShaderDeveloper);			// 2134
 #endif
+
 #ifdef	OBGE_LOGGING
-	obse->RegisterCommand(&kCommandInfo_DumpFrameScript);				// 2127
-	obse->RegisterCommand(&kCommandInfo_DumpFrameSurfaces);				// 2128
+	obse->RegisterCommand(&kCommandInfo_DumpFrameScript);				// 2135
+	obse->RegisterCommand(&kCommandInfo_DumpFrameSurfaces);				// 2136
 #endif
 
 // We don't want to hook the construction set.

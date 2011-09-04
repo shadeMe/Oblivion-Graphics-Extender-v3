@@ -35,6 +35,17 @@
  */
 
 #include "obse/GameAPI.h"
+#include "obse/PluginAPI.h"
+
+extern OBSESerializationInterface *g_serialization;
+extern OBSEArrayVarInterface	  *g_arrayvar;
+
+typedef OBSEArrayVarInterface::Array	OBSEArray;
+typedef OBSEArrayVarInterface::Element	OBSEElement;
+
+OBSEArray* StringMapFromStdMap(const std::map<std::string, OBSEElement>& data, Script* callingScript);
+OBSEArray* MapFromStdMap(const std::map<double, OBSEElement>& data, Script* callingScript);
+OBSEArray* ArrayFromStdVector(const std::vector<OBSEElement>& data, Script* callingScript);
 
 #define EXTRACTARGS paramInfo, arg1, opcodeOffsetPtr, thisObj, arg3, scriptObj, eventList
 
@@ -42,9 +53,15 @@ static ParamInfo kParams_OneString[1] =
 {
   { "string",	kParamType_String,	0 },
 };
+
 static ParamInfo kParams_OneInt[1] =
 {
   { "int", kParamType_Integer, 0 },
+};
+
+static ParamInfo kParams_OneOptionalInt[1] =
+{
+  { "int", kParamType_Integer, 1 }, 
 };
 
 static ParamInfo kParams_OneIntOneOptInt[2] =
@@ -63,6 +80,12 @@ static ParamInfo kParams_IntFloat[2] =
 {
   { "int", kParamType_Integer, 0 },
   { "float", kParamType_Float, 0 },
+};
+
+static ParamInfo kParams_IntString[2] =
+{
+  { "int", kParamType_Integer, 0 },
+  { "string", kParamType_String, 0 }
 };
 
 static ParamInfo kParams_Int2Floats[3] =

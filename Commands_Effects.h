@@ -59,3 +59,12 @@ extern CommandInfo kCommandInfo_SetShaderVector;
 extern CommandInfo kCommandInfo_SetShaderTexture;
 extern CommandInfo kCommandInfo_IsShaderEnabled;
 #endif
+
+extern CommandInfo kCommandInfo_GetEffects;
+extern CommandInfo kCommandInfo_GetEffectConstants;
+extern CommandInfo kCommandInfo_GetEffectConstantType;
+extern CommandInfo kCommandInfo_GetEffectConstantB;
+extern CommandInfo kCommandInfo_GetEffectConstantI;
+extern CommandInfo kCommandInfo_GetEffectConstantF;
+extern CommandInfo kCommandInfo_GetEffectConstantV;
+extern CommandInfo kCommandInfo_GetEffectSamplerTexture;
