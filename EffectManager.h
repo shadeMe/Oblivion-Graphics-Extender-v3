@@ -185,7 +185,9 @@ public:
 	bool SetEffectConstantV(const char *name, v1_2_416::NiVector4 *value);
 	bool SetEffectSamplerTexture(const char *name, int TextureNum);
 
-	bool GetEffectConstants(std::map<std::string,int> &all);
+	bool GetEffectConstantHelps(std::map<std::string,std::string> &all);
+	bool GetEffectConstantTypes(std::map<std::string,int> &all);
+	bool GetEffectConstantHelp(const char *name, const char **help);
 	bool GetEffectConstantType(const char *name, int *type);
 	bool GetEffectConstantB(const char *name, bool *value);
 	bool GetEffectConstantI(const char *name, int *value);
@@ -212,6 +214,8 @@ public:
 	unsigned long GetParameters() const;
 	unsigned long GetConditions() const;
 	unsigned long GetConditions(int pass) const;
+	unsigned long GetOptions() const;
+	unsigned long GetOptions(int pass) const;
 
 public:
 	void Purge();
@@ -253,6 +257,8 @@ protected:
 	int				Class;
 	int				Flags;
 	int				FlagsPass[16];
+	int				Options;
+	int				OptionsPass[16];
 };
 
 class ManagedEffectRecord : public EffectRecord
@@ -337,8 +343,10 @@ public:
 	bool						SetEffectConstantV(int EffectNum, char *name, v1_2_416::NiVector4 *value);
 	bool						SetEffectSamplerTexture(int EffectNum, char *name, int TextureNum);
 
-	bool						GetEffectConstants(int EffectNum, std::map<std::string,int> &all);
-	bool						GetEffectConstantType(int EffectNum, char *name, int *value);
+	bool						GetEffectConstantHelps(int EffectNum, std::map<std::string,std::string> &all);
+	bool						GetEffectConstantTypes(int EffectNum, std::map<std::string,int> &all);
+	bool						GetEffectConstantHelp(int EffectNum, char *name, const char **help);
+	bool						GetEffectConstantType(int EffectNum, char *name, int *type);
 	bool						GetEffectConstantB(int EffectNum, char *name, bool *value);
 	bool						GetEffectConstantI(int EffectNum, char *name, int *value);
 	bool						GetEffectConstantI(int EffectNum, char *name, int *values, int num);

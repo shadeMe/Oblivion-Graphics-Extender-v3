@@ -61,7 +61,9 @@ extern CommandInfo kCommandInfo_IsShaderEnabled;
 #endif
 
 extern CommandInfo kCommandInfo_GetEffects;
-extern CommandInfo kCommandInfo_GetEffectConstants;
+extern CommandInfo kCommandInfo_GetEffectConstantHelps;
+extern CommandInfo kCommandInfo_GetEffectConstantTypes;
+extern CommandInfo kCommandInfo_GetEffectConstantHelp;
 extern CommandInfo kCommandInfo_GetEffectConstantType;
 extern CommandInfo kCommandInfo_GetEffectConstantB;
 extern CommandInfo kCommandInfo_GetEffectConstantI;

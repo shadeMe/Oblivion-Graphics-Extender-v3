@@ -65,4 +65,3 @@ bool LostDepthBuffer(bool stage,void *parameters);
 
 bool HasDepth(void);
 bool IsRAWZ(void);
-bool DoesRESZ(void);

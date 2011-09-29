@@ -174,7 +174,44 @@ static bool GetEffects_Execute(COMMAND_ARGS) {
   return true;
 }
 
-static bool GetEffectConstants_Execute(COMMAND_ARGS) {
+static bool GetEffectConstantHelps_Execute(COMMAND_ARGS) {
+  *result = 0;
+
+  DWORD id;
+  char var[256];
+  if (!ExtractArgs(EXTRACTARGS, &id, &var))
+    return true;
+
+  if (!IsEnabled())
+    return true;
+
+#ifndef	NDEBUG
+  if (id < 0) {
+    Console_Print("EffectID %i is invalid", id);
+    *result = -1; return true;
+  }
+#endif
+
+  std::map<std::string,std::string> all;
+  if (EffectManager::GetSingleton()->GetEffectConstantHelps(id, all)) {
+    std::map<std::string,OBSEElement> obsem;
+
+    for (std::map<std::string,std::string>::iterator it = all.begin(); it != all.end(); it++) {
+      const std::string name = it->first;
+      const char *type = it->second.data();
+
+      obsem[name] = OBSEElement(type);
+    }
+
+    OBSEArray *arr = StringMapFromStdMap(obsem, scriptObj);
+    if (g_arrayvar->AssignCommandResult(arr, result))
+      ;
+  }
+
+  return true;
+}
+
+static bool GetEffectConstantTypes_Execute(COMMAND_ARGS) {
   *result = 0;
 
   DWORD id;
@@ -193,7 +230,7 @@ static bool GetEffectConstants_Execute(COMMAND_ARGS) {
 #endif
 
   std::map<std::string,int> all;
-  if (EffectManager::GetSingleton()->GetEffectConstants(id, all)) {
+  if (EffectManager::GetSingleton()->GetEffectConstantTypes(id, all)) {
     std::map<std::string,OBSEElement> obsem;
 
     for (std::map<std::string,int>::iterator it = all.begin(); it != all.end(); it++) {
@@ -207,6 +244,31 @@ static bool GetEffectConstants_Execute(COMMAND_ARGS) {
     if (g_arrayvar->AssignCommandResult(arr, result))
       ;
   }
+
+  return true;
+}
+
+static bool GetEffectConstantHelp_Execute(COMMAND_ARGS) {
+  *result = 0;
+
+  DWORD id;
+  char var[256];
+  if (!ExtractArgs(EXTRACTARGS, &id, &var))
+    return true;
+
+  if (!IsEnabled())
+    return true;
+
+#ifndef	NDEBUG
+  if (id < 0) {
+    Console_Print("EffectID %i is invalid", id);
+    *result = -1; return true;
+  }
+#endif
+
+  const char *help = "";
+  if (EffectManager::GetSingleton()->GetEffectConstantHelp(id, var, &help))
+    g_stringvar->Assign(PASS_COMMAND_ARGS, help);
 
   return true;
 }
@@ -587,15 +649,43 @@ CommandInfo kCommandInfo_GetEffects = {
   0
 };
 
-CommandInfo kCommandInfo_GetEffectConstants = {
-  "GetEffectConstants",
+CommandInfo kCommandInfo_GetEffectConstantHelps = {
+  "GetEffectConstantHelps",
+  "",
+  0,
+  "Gets the help-texts of all variables in an effect",
+  0,
+  1,
+  kParams_OneInt,
+  GetEffectConstantHelps_Execute,
+  0,
+  0,
+  0
+};
+
+CommandInfo kCommandInfo_GetEffectConstantTypes = {
+  "GetEffectConstantTypes",
   "",
   0,
   "Gets the types of all variables in an effect",
   0,
   1,
   kParams_OneInt,
-  GetEffectConstants_Execute,
+  GetEffectConstantTypes_Execute,
+  0,
+  0,
+  0
+};
+
+CommandInfo kCommandInfo_GetEffectConstantHelp = {
+  "GetEffectConstantHelp",
+  "",
+  0,
+  "Gets the help-text of a variable in an effect",
+  0,
+  2,
+  kParams_IntString,
+  GetEffectConstantHelp_Execute,
   0,
   0,
   0

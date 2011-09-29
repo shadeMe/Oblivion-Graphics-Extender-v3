@@ -56,10 +56,7 @@ void SetPrivateProfile(char *section, char*setting, float value, char *filename)
 {
 	char valuestring[34];
 
-	if ((value > 0) && (value <= 1))
-	  sprintf(valuestring,"%g",value);
-	else
-	  _itoa((int)value,valuestring,10);
+	sprintf(valuestring,"%g",value);
 
 	WritePrivateProfileStringA(section,setting,valuestring,filename);
 }
@@ -70,8 +67,7 @@ void GetPrivateProfile(char *section, char *setting, float &value, char *filenam
 	GetPrivateProfileStringA(section,setting,NULL,TempBuffer,100,filename);
 	if(TempBuffer[0]!=0){
 	  if (sscanf(TempBuffer, "%g", &value)) {
-	    if ((value > 1))
-	      value = (int)value;
+	    ;
 	  }
 	}
 }

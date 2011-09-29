@@ -130,6 +130,10 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	SDConvertRGBH = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip color+height-map [rgbh]") ) , wxEmptyString, wxITEM_NORMAL );
 	SDTools->Append( SDConvertRGBH );
 	
+	wxMenuItem* SDConvertRGBA;
+	SDConvertRGBA = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip color+alpha [rgba]") ) , wxEmptyString, wxITEM_NORMAL );
+	SDTools->Append( SDConvertRGBA );
+	
 	wxMenuItem* SDConvertRGB;
 	SDConvertRGB = new wxMenuItem( SDTools, wxID_ANY, wxString( wxT("Convert / Re-mip color-map [rgb-]") ) , wxEmptyString, wxITEM_NORMAL );
 	SDTools->Append( SDConvertRGB );
@@ -963,6 +967,7 @@ wxShaderDeveloper::wxShaderDeveloper( wxWindow* parent, wxWindowID id, const wxS
 	this->Connect( SDConvertQDMy->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDMy ) );
 	this->Connect( SDConvertQDMn->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDMn ) );
 	this->Connect( SDConvertRGBH->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipRGBH ) );
+	this->Connect( SDConvertRGBA->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipRGBA ) );
 	this->Connect( SDConvertRGB->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipRGB ) );
 	this->Connect( SDConvertLA->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipLA ) );
 	this->Connect( SDConvertA->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipA ) );
@@ -1045,6 +1050,7 @@ wxShaderDeveloper::~wxShaderDeveloper()
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDMy ) );
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolPMtoQDMn ) );
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipRGBH ) );
+	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipRGBA ) );
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipRGB ) );
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipLA ) );
 	this->Disconnect( wxID_ANY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( wxShaderDeveloper::DoToolRemipA ) );

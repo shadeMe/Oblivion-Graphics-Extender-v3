@@ -146,7 +146,7 @@ static void AccuRGBH(long *bs, ULONG b, int level, int l) {
 template<int mode>
 static void AccuRGBM(long *bs, ULONG b, int level, int l) {
   /* seperate the channels and build the sum */
-  bs[0]  = max(bs[0],
+  bs[0]  = max(bs[0], (long)
            (b >> 24) & 0xFF); /*h*/
   bs[1] += (b >> 16) & 0xFF; /*b*/
   bs[2] += (b >>  8) & 0xFF; /*g*/
@@ -197,10 +197,10 @@ template<int mode>
 static void AccuXYZD(float *nn, ULONG n, int level, int l) {
   float vec[4], len;
 
-  vec[0] = ((n >> 24) & 0xFF);
-  vec[1] = ((n >> 16) & 0xFF); vec[1] /= 0xFF; vec[1] -= 0.5f; vec[1] /= 0.5f;
-  vec[2] = ((n >>  8) & 0xFF); vec[2] /= 0xFF; vec[2] -= 0.5f; vec[2] /= 0.5f;
-  vec[3] = ((n >>  0) & 0xFF); vec[3] /= 0xFF; vec[3] -= 0.5f; vec[3] /= 0.5f;
+  vec[0] = (float)((n >> 24) & 0xFF);
+  vec[1] = (float)((n >> 16) & 0xFF); vec[1] /= 0xFF; vec[1] -= 0.5f; vec[1] /= 0.5f;
+  vec[2] = (float)((n >>  8) & 0xFF); vec[2] /= 0xFF; vec[2] -= 0.5f; vec[2] /= 0.5f;
+  vec[3] = (float)((n >>  0) & 0xFF); vec[3] /= 0xFF; vec[3] -= 0.5f; vec[3] /= 0.5f;
 
   if (mode & ACCUMODE_SCALE) {
     /* lower z (heighten the virtual displacement) every level */
@@ -229,10 +229,10 @@ template<int mode>
 static void AccuXYCD(float *nn, ULONG n, int level, int l) {
   float vec[5], len;
 
-  vec[0] = ((n >> 24) & 0xFF);
-  vec[1] = ((n >> 16) & 0xFF);
-  vec[2] = ((n >>  8) & 0xFF); vec[2] /= 0xFF; vec[2] -= 0.5f; vec[2] /= 0.5f;
-  vec[3] = ((n >>  0) & 0xFF); vec[3] /= 0xFF; vec[3] -= 0.5f; vec[3] /= 0.5f;
+  vec[0] = (float)((n >> 24) & 0xFF);
+  vec[1] = (float)((n >> 16) & 0xFF);
+  vec[2] = (float)((n >>  8) & 0xFF); vec[2] /= 0xFF; vec[2] -= 0.5f; vec[2] /= 0.5f;
+  vec[3] = (float)((n >>  0) & 0xFF); vec[3] /= 0xFF; vec[3] -= 0.5f; vec[3] /= 0.5f;
   vec[4] = sqrt(1.0f - min(1.0f, vec[2] * vec[2] + vec[3] * vec[3]));
 
   if (mode & ACCUMODE_SCALE) {
@@ -600,7 +600,7 @@ static ULONG JoinXYZD(float *nn, float *nr) {
     float ang;
 
     len = sqrt(vec[1] * vec[1] + vec[2] * vec[2] + vec[3] * vec[3]);
-    ang = atan2(vec[2], vec[3]) / M_PI; vec[2] = ang;
+    ang = atan2(vec[2], vec[3]) / (float)M_PI; vec[2] = ang;
 
     vec[1] *= 1.0f; vec[1] += 0.0f; vec[1] *= 0xFF;
     vec[2] *= 0.5f; vec[2] += 0.5f; vec[3] *= 0xFF;
@@ -696,14 +696,18 @@ static bool TextureConvert(D3DSURFACE_DESC &info, LPDIRECT3DTEXTURE9 *tex) {
 #define TCOMPRESS_LA		1
 #define TCOMPRESS_RGB		2
 #define TCOMPRESS_RGBA		3
-#define TCOMPRESS_RGBH		TCOMPRESS_RGBA
+#define TCOMPRESS_RGBH		4
 #define	TCOMPRESS_COLOR(fmt)	(((fmt) >= TCOMPRESS_A) && ((fmt) <= TCOMPRESS_RGBH))
+#define	TCOMPRESS_TRANS(fmt)	(((fmt) == TCOMPRESS_LA) || ((fmt) == TCOMPRESS_RGBA))
 
-#define TCOMPRESS_xyZ		4
-#define TCOMPRESS_XY		5
-#define TCOMPRESS_XYz		6
-#define TCOMPRESS_XYZ		7
-#define TCOMPRESS_XYZD		8
+#define TCOMPRESS_xyZ		5
+#define TCOMPRESS_XY		6
+#define TCOMPRESS_XYz		7
+#define TCOMPRESS_xyz		8
+#define TCOMPRESS_xyzD		9
+#define TCOMPRESS_XYZ		10
+#define TCOMPRESS_XYZD		11
+#define	TCOMPRESS_NINDEP(fmt)	(((fmt) >= TCOMPRESS_xyZ) && ((fmt) <= TCOMPRESS_xyzD))
 #define	TCOMPRESS_NORMAL(fmt)	(((fmt) >= TCOMPRESS_xyZ) && ((fmt) <= TCOMPRESS_XYZD))
 
 static int TCOMPRESS_CHANNELS(int fmt) {
@@ -712,9 +716,13 @@ static int TCOMPRESS_CHANNELS(int fmt) {
     case TCOMPRESS_LA		: return 2;
     case TCOMPRESS_RGB		: return 3;
     case TCOMPRESS_RGBA		: return 4;
+    case TCOMPRESS_RGBH		: return 4;
+
     case TCOMPRESS_XY		: return 2;
     case TCOMPRESS_xyZ		: return 1;
     case TCOMPRESS_XYz		: return 2;
+    case TCOMPRESS_xyz		: return 3;
+    case TCOMPRESS_xyzD		: return 4;
     case TCOMPRESS_XYZ		: return 3;
     case TCOMPRESS_XYZD		: return 4;
   }
@@ -727,7 +735,7 @@ static bool TextureCompressDXT(LPDIRECT3DTEXTURE9 *tex) {
 #ifdef	OBGE_DEVLING
   DebugWindow *dw = DebugWindow::Get();
 #endif
-  LPDIRECT3DTEXTURE9 text;
+  LPDIRECT3DTEXTURE9 text = NULL;
   D3DSURFACE_DESC texd, texo;
   D3DLOCKED_RECT texr;
   D3DLOCKED_RECT texs;
@@ -750,7 +758,7 @@ static bool TextureCompressDXT(LPDIRECT3DTEXTURE9 *tex) {
 #endif
 
   /* convert to ARGB8 (TODO: support at least the 16bit formats as well) */
-  if ((texo.Format != D3DFMT_A8B8G8R8) && !TextureConvert(texo, tex))
+  if ((texo.Format != D3DFMT_A8R8G8B8) && !TextureConvert(texo, tex))
     return false;
 
   /* the lowest mip-level contains a row or a column of 4x4 blocks
@@ -776,6 +784,8 @@ static bool TextureCompressDXT(LPDIRECT3DTEXTURE9 *tex) {
     case 1: flags |= squish::kDxt5; lastOBGEDirect3DDevice9->CreateTexture(texo.Width, texo.Height, levels, 0, D3DFMT_ATI1, D3DPOOL_SYSTEMMEM, &text, NULL); break;
   }
 
+  /**/ if (TCOMPRESS_TRANS(format))
+    flags |= squish::kWeightColourByAlpha;
   /**/ if (TCOMPRESS_COLOR(format))
     flags |= squish::kColourMetricPerceptual;
   else if (TCOMPRESS_NORMAL(format))
@@ -854,7 +864,7 @@ static bool TextureCompressDXT(LPDIRECT3DTEXTURE9 *tex) {
 	  NormRGBH<TRGTMODE_CODING_RGB    >(fTex[0][(ly * 4) + lx], ts, av);
 	else if (TCOMPRESS_XY  == format)
 	  NormXYCD<TRGTMODE_CODING_XY     >(fTex[0][(ly * 4) + lx], ts, av);
-	else if (TCOMPRESS_xyZ == format || TCOMPRESS_XYz == format)
+	else if (TCOMPRESS_NINDEP(format))
 	  NormXYZD<TRGTMODE_CODING_XYZ    >(fTex[0][(ly * 4) + lx], ts, av);
 	else if (TCOMPRESS_NORMAL(format))
 	  NormXYZD<TRGTMODE_CODING_DXDYDZt>(fTex[0][(ly * 4) + lx], ts, av);
@@ -869,7 +879,7 @@ static bool TextureCompressDXT(LPDIRECT3DTEXTURE9 *tex) {
 	  LookRGBH<TRGTMODE_CODING_RGB    >(fTex[0][(ly * 4) + lx], tr);
 	else if (TCOMPRESS_XY  == format)
 	  LookXYCD<TRGTMODE_CODING_XY     >(fTex[0][(ly * 4) + lx], tr);
-	else if (TCOMPRESS_xyZ == format || TCOMPRESS_XYz == format)
+	else if (TCOMPRESS_NINDEP(format))
 	  LookXYZD<TRGTMODE_CODING_XYZ    >(fTex[0][(ly * 4) + lx], tr);
 	else if (TCOMPRESS_NORMAL(format))
 	  LookXYZD<TRGTMODE_CODING_DXDYDZt>(fTex[0][(ly * 4) + lx], tr);
@@ -885,7 +895,7 @@ static bool TextureCompressDXT(LPDIRECT3DTEXTURE9 *tex) {
 	  t = JoinRGBH<TRGTMODE_CODING_RGB    >(fTex[0][(ly * 4) + lx], tr);
 	else if (TCOMPRESS_XY  == format)
 	  t = JoinXYCD<TRGTMODE_CODING_XY     >(fTex[0][(ly * 4) + lx], tr);
-	else if (TCOMPRESS_xyZ == format || TCOMPRESS_XYz == format)
+	else if (TCOMPRESS_NINDEP(format))
 	  t = JoinXYZD<TRGTMODE_CODING_XYZ    >(fTex[0][(ly * 4) + lx], tr);
 	else if (TCOMPRESS_NORMAL(format))
 	  t = JoinXYZD<TRGTMODE_CODING_DXDYDZt>(fTex[0][(ly * 4) + lx], tr);
@@ -893,7 +903,7 @@ static bool TextureCompressDXT(LPDIRECT3DTEXTURE9 *tex) {
 	/* write the result ABGR, BGR */
         switch (TCOMPRESS_CHANNELS(format)) {
           /* ABGR -> RGBA */
-          case 4: bTex[0][(ly * 4) + lx] = (t); break;
+          case 4: bTex[0][(ly * 4) + lx] = (t) | 0x00000000; break;
           /* -BGR -> RGB- */
 	  case 3: bTex[0][(ly * 4) + lx] = (t) | 0xFF000000; break;
 	  /* --YX -> XY-- */
@@ -960,6 +970,15 @@ bool TextureCompressRGBH(LPDIRECT3DTEXTURE9 *base, bool gamma) {
 
   if (gamma) res = res && TextureCompressDXT<ULONG, float, TCOMPRESS_RGBH>(base);
   else       res = res && TextureCompressDXT<ULONG, long , TCOMPRESS_RGBH>(base);
+
+  return res;
+}
+
+bool TextureCompressRGBA(LPDIRECT3DTEXTURE9 *base, bool gamma) {
+  bool res = true;
+
+  if (gamma) res = res && TextureCompressDXT<ULONG, float, TCOMPRESS_RGBA>(base);
+  else       res = res && TextureCompressDXT<ULONG, long , TCOMPRESS_RGBA>(base);
 
   return res;
 }

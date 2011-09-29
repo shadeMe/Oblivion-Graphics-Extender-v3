@@ -52,6 +52,7 @@ static global<bool> UseEffectList(true, NULL, "Effects", "bUseEffectList");
 static global<char *> EffectDirectory("data\\shaders\\", NULL, "Effects", "sEffectDirectory");
 static global<char *> EffectListFile("data\\shaders\\shaderlist.txt", NULL, "Effects", "sEffectListFile");
 static global<bool> UseLegacyCompiler(false, NULL, "Effects", "bUseLegacyCompiler");
+static global<bool> CompileSources(true, NULL, "Effects", "bCompileSources");
 static global<bool> Optimize(false, NULL, "Effects", "bOptimize");
 static global<bool> FreezeTweaks(false, NULL, "Effects", "bFreezeTweaks");
 static global<bool> SplitScreen(false, NULL, "Effects", "bRenderHalfScreen");
@@ -162,6 +163,8 @@ static FXIncludeManager incl;
 #define	EFFECTBUF_ZMASK		(EFFECTCOND_HASWNRM | EFFECTCOND_HASWPOS | EFFECTCOND_HASENRM | EFFECTCOND_HASEPOS | EFFECTCOND_HASLBUF | EFFECTCOND_HASZBUF | EFFECTBUF_RAWZ)
 #define	EFFECTBUF_TRANSFERZMASK	(EFFECTCOND_HASWNRM | EFFECTCOND_HASWPOS | EFFECTCOND_HASENRM | EFFECTCOND_HASEPOS | EFFECTCOND_HASLBUF |                      EFFECTBUF_RAWZ)
 
+#define	EFFECTOPT_GATHER	(1 << 0)
+
 /* deprecated */
 #ifndef	NO_DEPRECATED
 #undef	EFFECTBUF_ACHN
@@ -174,10 +177,20 @@ typedef struct _myD3DXMACRO
   char *Definition;
 } myD3DXMACRO;
 
+/* little endian float representations of "GET4" and "GET1" */
+#define GET4_FLOAT  1.9769241532685555e-7f  // 4TEG
+#define GET1_FLOAT  7.722359973705295e-10f  // 1TEG
+#define GET4_DWORD  ((DWORD)MAKEFOURCC('G', 'E', 'T', '4'))
+#define GET1_DWORD  ((DWORD)MAKEFOURCC('G', 'E', 'T', '1'))
+
 static char IN_RAWZ[] = "0";
 static char IN_LINZ[] = "0";
 static char IN_PRJZ[] = "0";
 static char IN_NRMZ[] = "0";
+static char FETCHM [] = "MIPMAPLODBIAS";
+static char FETCH4 [] = "0";
+static char FETCH4G[] = "0";
+static char FETCH1G[] = "0";
 static char *TWEAK_DYNAMIC = "extern";
 static char *TWEAK_FROZEN  = "static const";
 
@@ -186,6 +199,10 @@ static char *TWEAK_FROZEN  = "static const";
 #define	DEFS_INPRJZ	2
 #define	DEFS_INNRMZ	3
 #define	DEFS_iface	4
+#define	DEFS_FETCHM	5
+#define	DEFS_FETCH4	6
+#define	DEFS_FETCH4G	7
+#define	DEFS_FETCH1G	8
 
 static myD3DXMACRO defs[] = {
   {"IN_RAWZ"	        	, IN_RAWZ},
@@ -193,6 +210,10 @@ static myD3DXMACRO defs[] = {
   {"IN_PRJZ"	        	, IN_PRJZ},
   {"IN_NRMZ"	        	, IN_NRMZ},
   {"iface"	        	, TWEAK_DYNAMIC},
+  {"FETCHMODE"	        	, FETCHM},
+  {"FETCH4"	        	, FETCH4},
+  {"GET4"	        	, FETCH4G},
+  {"GET1"	        	, FETCH1G},
 
 #ifndef	OBGE_CONSTANTPOOLS
   {"shared"	        	, ""},
@@ -229,6 +250,8 @@ static myD3DXMACRO defs[] = {
   {"EFFECTCOND_NBUFFER"		, stringify(EFFECTCOND_HASENRM		)}, // hm, error
   {"EFFECTCOND_MIPMAPS"		, stringify(EFFECTCOND_HASMIPS		)}, // hm, error
   {"EFFECTCOND_ACHANNEL"	, stringify(EFFECTCOND_HASACHN		)}, // hm, error
+
+  {"EFFECTOPT_GATHER"		, stringify(EFFECTOPT_GATHER		)},
 
   {"D3DFMT_DEFAULT"	        , "0"},		// same format as main-pass surface
 
@@ -517,6 +540,7 @@ EffectRecord::EffectRecord() {
   Parameters = 0;
   Priority = 0;
   Flags = 0;
+  Options = 0;
   Class = 0;
 }
 
@@ -574,7 +598,7 @@ bool EffectRecord::LoadEffect(const char *Filename, UINT32 refID, bool Private, 
   strcpy(Filepath, ::EffectDirectory.Get());
   strcat(Filepath, Filename);
   if ((ext = strstr(Filepath, ".fx")))
-    *ext = '\0';
+    ext[3] = 'o', ext[4] = '\0';
   if (!stat((const char *)Filepath, &sb)) {
     UINT size = sb.st_size;
     if (D3DXCreateBuffer(size, &pBinary) == D3D_OK) {
@@ -582,7 +606,7 @@ bool EffectRecord::LoadEffect(const char *Filename, UINT32 refID, bool Private, 
 	fread(pBinary->GetBufferPointer(), 1, size, f);
 	fclose(f);
 
-        _DMESSAGE("Loaded binary of %s from %s", Name, Filepath);
+        _DMESSAGE("Loaded binary of %s from %s", Name, Filename);
       }
       else {
 	pBinary->Release();
@@ -591,7 +615,7 @@ bool EffectRecord::LoadEffect(const char *Filename, UINT32 refID, bool Private, 
     }
   }
   if (ext)
-    *ext = '.';
+    ext[3] = '\0';
 
   /* getting a FX source for compiling if there is any
    */
@@ -608,7 +632,7 @@ bool EffectRecord::LoadEffect(const char *Filename, UINT32 refID, bool Private, 
         fread(pSource, 1, size, f);
         fclose(f);
 
-        _DMESSAGE("Loaded source of %s from %s", Name, Filepath);
+        _DMESSAGE("Loaded source of %s from %s", Name, Filename);
 
 	sourceLen = strlen(pSource);
       }
@@ -620,7 +644,7 @@ bool EffectRecord::LoadEffect(const char *Filename, UINT32 refID, bool Private, 
       }
     }
 
-    /* if the HLSL source is newer than the binary, attempt to recompile
+    /* if the FX source is newer than the binary, attempt to recompile
      */
     if (pSource && (sx.st_mtime > sb.st_mtime)) {
       if (pBinary) pBinary->Release();
@@ -676,16 +700,24 @@ bool EffectRecord::SaveEffect() {
     p = pBinary;
 
   if (p) {
+    char *ext;
     FILE *f;
 
+    if ((ext = strstr(Filepath, ".fx")))
+      ext[3] = 'o', ext[4] = '\0';
     if (!fopen_s(&f, Filepath, "wb")) {
       fwrite(p->GetBufferPointer(), 1, p->GetBufferSize(), f);
       fclose(f);
+
+      if (ext)
+	ext[3] = '\0';
 
       _DMESSAGE("Saved binary of %s to %s", Name, Filepath);
 
       return true;
     }
+    if (ext)
+      ext[3] = '\0';
   }
 
   return false;
@@ -693,7 +725,7 @@ bool EffectRecord::SaveEffect() {
 
 bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
   /* nobody wants the automatic recompile */
-  if (0/*!::CompileSources.Get()*/ && !forced)
+  if (!::CompileSources.Get() && !forced)
     return false;
 
   LPSTR src = NULL; int len;
@@ -720,25 +752,55 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
     pErrorMsgs->Release();
     pErrorMsgs = NULL;
 
-    D3DXCreateEffect(
-      slimOBGEDirect3DDevice9,
-      src,
-      len,
-      pDefine,
-      &incl,
-      D3DXSHADER_DEBUG | (
-      ::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
-      ::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
-      FXMan ? FXMan->EffectPool : NULL,
-      &x,
-      &pErrorMsgs
-    );
+    if (!p) {
+      ID3DXEffectCompiler *c = NULL;
 
-    /* this didn't go so well, if it's a legacy "error", just try again */
-    if (pErrorMsgs && strstr((char*)pErrorMsgs->GetBufferPointer(), "X3539")) {
-      pErrorMsgs->Release();
-      pErrorMsgs = NULL;
+      D3DXCreateEffectCompiler(
+	src,
+	len,
+	pDefine,
+	&incl,
+	D3DXSHADER_DEBUG | (
+	::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
+	::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
+	&c,
+	&pErrorMsgs
+      );
 
+      /* this didn't go so well */
+      if (pErrorMsgs) {
+	char *msg = (char *)pErrorMsgs->GetBufferPointer();
+
+	_MESSAGE("Effect compiling messages occured in %s:", Filepath);
+	_MESSAGE((char *)pErrorMsgs->GetBufferPointer());
+      }
+
+      if (c) {
+	if (pErrorMsgs)
+	pErrorMsgs->Release();
+	pErrorMsgs = NULL;
+
+	c->CompileEffect(
+	  D3DXSHADER_DEBUG | (
+	  ::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
+	  ::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
+	  &p,
+	  &pErrorMsgs
+	);
+
+	/* this didn't go so well */
+	if (pErrorMsgs) {
+	  char *msg = (char *)pErrorMsgs->GetBufferPointer();
+
+	  _MESSAGE("Effect compiling messages occured in %s:", Filepath);
+	  _MESSAGE((char *)pErrorMsgs->GetBufferPointer());
+	}
+
+	c->Release();
+      }
+    }
+
+    if (!p) {
       D3DXCreateEffect(
 	slimOBGEDirect3DDevice9,
 	src,
@@ -746,16 +808,113 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
 	pDefine,
 	&incl,
 	D3DXSHADER_DEBUG | (
-	D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
+	::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
+	::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
 	FXMan ? FXMan->EffectPool : NULL,
 	&x,
 	&pErrorMsgs
       );
     }
+    else {
+      D3DXCreateEffect(
+	slimOBGEDirect3DDevice9,
+	p->GetBufferPointer(),
+	p->GetBufferSize(),
+	pDefine,
+	&incl,
+	D3DXSHADER_DEBUG | (
+	::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
+	::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
+	FXMan ? FXMan->EffectPool : NULL,
+	&x,
+	NULL
+      );
+    }
+
+    /* this didn't go so well, if it's a legacy "error", just try again */
+    if (pErrorMsgs && strstr((char*)pErrorMsgs->GetBufferPointer(), "X3539")) {
+      pErrorMsgs->Release();
+      pErrorMsgs = NULL;
+
+      if (!p) {
+	ID3DXEffectCompiler *c = NULL;
+
+	D3DXCreateEffectCompiler(
+	  src,
+	  len,
+	  pDefine,
+	  &incl,
+	  D3DXSHADER_DEBUG | (
+	  D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
+	  &c,
+	  &pErrorMsgs
+	);
+
+	/* this didn't go so well */
+	if (pErrorMsgs) {
+	  char *msg = (char *)pErrorMsgs->GetBufferPointer();
+
+	  _MESSAGE("Effect compiling messages occured in %s:", Filepath);
+	  _MESSAGE((char *)pErrorMsgs->GetBufferPointer());
+	}
+
+	if (c) {
+	  if (pErrorMsgs)
+	  pErrorMsgs->Release();
+	  pErrorMsgs = NULL;
+
+	  c->CompileEffect(
+	    D3DXSHADER_DEBUG | (
+	    D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
+	    &p,
+	    &pErrorMsgs
+	  );
+
+	  /* this didn't go so well */
+	  if (pErrorMsgs) {
+	    char *msg = (char *)pErrorMsgs->GetBufferPointer();
+
+	    _MESSAGE("Effect compiling messages occured in %s:", Filepath);
+	    _MESSAGE((char *)pErrorMsgs->GetBufferPointer());
+	  }
+
+	  c->Release();
+	}
+      }
+
+      if (!p) {
+	D3DXCreateEffect(
+	  slimOBGEDirect3DDevice9,
+	  src,
+	  len,
+	  pDefine,
+	  &incl,
+	  D3DXSHADER_DEBUG | (
+	  D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
+	  FXMan ? FXMan->EffectPool : NULL,
+	  &x,
+	  &pErrorMsgs
+	);
+      }
+      else {
+	D3DXCreateEffect(
+	  slimOBGEDirect3DDevice9,
+	  p->GetBufferPointer(),
+	  p->GetBufferSize(),
+	  pDefine,
+	  &incl,
+	  D3DXSHADER_DEBUG | (
+	  D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
+	  FXMan ? FXMan->EffectPool : NULL,
+	  &x,
+	  NULL
+	);
+      }
+    }
 
     /* this didn't go so well */
     if (pErrorMsgs) {
-      _MESSAGE("Shader compiling messages occured in %s:", Filepath);
+      _MESSAGE("Effect compiling messages occured in %s:", Filepath);
       _MESSAGE((char *)pErrorMsgs->GetBufferPointer());
 
       save = !strstr((char *)pErrorMsgs->GetBufferPointer(), "error");
@@ -884,7 +1043,9 @@ void EffectRecord::ApplyCompileDirectives() {
 	     (EFFECTCLASS_NEUTRAL << 17);
   Class = EFFECTCLASS_NEUTRAL;
   Flags = 0;
+  Options = 0;
   memset(FlagsPass, 0, sizeof(FlagsPass));
+  memset(OptionsPass, 0, sizeof(OptionsPass));
 
   /* extract technique informations */
   for (int teq = 0; teq < Description.Techniques; teq++) {
@@ -931,6 +1092,11 @@ void EffectRecord::ApplyCompileDirectives() {
 	      pEffect->GetInt(handle2, &this->Flags);
 	    }
 	  }
+	  else if ((Description.Name == strstr(Description.Name, "options"))) {
+	    if (Description.Type == D3DXPT_INT) {
+	      pEffect->GetInt(handle2, &this->Options);
+	    }
+	  }
 	  else if ((Description.Name == strstr(Description.Name, "dependency"))) {
 	    if (Description.Type == D3DXPT_INT) {
 	      INT dep; pEffect->GetInt(handle2, &dep);
@@ -967,6 +1133,11 @@ void EffectRecord::ApplyCompileDirectives() {
 	      if ((Description.Name == strstr(Description.Name, "conditions"))) {
 		if (Description.Type == D3DXPT_INT) {
 		  pEffect->GetInt(handle2, &this->FlagsPass[pas]);
+		}
+	      }
+	      else if ((Description.Name == strstr(Description.Name, "options"))) {
+		if (Description.Type == D3DXPT_INT) {
+		  pEffect->GetInt(handle2, &this->OptionsPass[pas]);
 		}
 	      }
 	    }
@@ -1106,6 +1277,7 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 
 #endif
 
   while (true) {
+    /* this sets the sampler-values */
     pEffect->BeginPass(pass);
     D3DDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
     pEffect->EndPass();
@@ -1145,6 +1317,7 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue
 #endif
 
   while (true) {
+    /* this sets the sampler-values */
     pEffect->BeginPass(pass);
     D3DDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
     pEffect->EndPass();
@@ -1256,11 +1429,52 @@ inline unsigned long EffectRecord::GetConditions(int pass) const {
   return this->FlagsPass[pass];
 }
 
+inline unsigned long EffectRecord::GetOptions() const {
+  return this->Options;
+}
+
+inline unsigned long EffectRecord::GetOptions(int pass) const {
+  return this->OptionsPass[pass];
+}
+
 inline void EffectRecord::SetPriority(int pri) {
   this->Priority = (this->Priority & (0xFF << 24)) | (pri & ~(0xFF << 24));
 }
 
-bool EffectRecord::GetEffectConstants(std::map<std::string,int> &all) {
+bool EffectRecord::GetEffectConstantHelps(std::map<std::string,std::string> &all) {
+  if (!HasEffect()) return false;
+  all.clear();
+
+  D3DXEFFECT_DESC Description;
+  pEffect->GetDesc(&Description);
+  Parameters = 0;
+
+  /* extract parameter informations */
+  for (int par = 0; par < Description.Parameters; par++) {
+    D3DXHANDLE handle, handle2;
+
+    if ((handle = pEffect->GetParameter(NULL, par))) {
+      D3DXPARAMETER_DESC Description;
+      pEffect->GetParameterDesc(handle, &Description);
+      std::string name; name.assign(Description.Name);
+
+      /* filter */
+      if (!strncmp(Description.Name, "oblv_", 5) ||
+	  !strncmp(Description.Name, "obge_", 5))
+	continue;
+
+      if ((handle2 = pEffect->GetAnnotationByName(handle, "help"))) {
+	LPCSTR pString = NULL; pEffect->GetString(handle2, &pString);
+
+	all[name] = pString;
+      }
+    }
+  }
+
+  return true;
+}
+
+bool EffectRecord::GetEffectConstantTypes(std::map<std::string,int> &all) {
   if (!HasEffect()) return false;
   all.clear();
 
@@ -1275,7 +1489,12 @@ bool EffectRecord::GetEffectConstants(std::map<std::string,int> &all) {
     if ((handle = pEffect->GetParameter(NULL, par))) {
       D3DXPARAMETER_DESC Description;
       pEffect->GetParameterDesc(handle, &Description);
-      std::string name; name.assign(Name);
+      std::string name; name.assign(Description.Name);
+
+      /* filter */
+      if (!strncmp(Description.Name, "oblv_", 5) ||
+	  !strncmp(Description.Name, "obge_", 5))
+	continue;
 
       switch (Description.Type) {
 	case D3DXPT_VOID:	  all[name] = 0; break;
@@ -1296,7 +1515,30 @@ bool EffectRecord::GetEffectConstants(std::map<std::string,int> &all) {
       }
     }
   }
+
   return true;
+}
+
+bool EffectRecord::GetEffectConstantHelp(const char *name, const char **help) {
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  if (hl) {
+    D3DXPARAMETER_DESC desc;
+    HRESULT hr = pEffect->GetParameterDesc(hl, &desc);
+    if (hr == D3D_OK) {
+      D3DXHANDLE hl2;
+
+      *help = "No help available";
+      if ((hl2 = pEffect->GetAnnotationByName(hl, "help"))) {
+	LPCSTR pString = NULL; pEffect->GetString(hl2, &pString);
+
+	*help = pString;
+      }
+
+      return true;
+    }
+  }
+
+  return false;
 }
 
 bool EffectRecord::GetEffectConstantType(const char *name, int *type) {
@@ -1323,9 +1565,11 @@ bool EffectRecord::GetEffectConstantType(const char *name, int *type) {
 	case D3DXPT_SAMPLER3D:   *type = 13; break;
 	case D3DXPT_SAMPLERCUBE: *type = 14; break;
       }
+
       return true;
     }
   }
+
   return false;
 }
 
@@ -1630,6 +1874,12 @@ EffectManager::EffectManager() {
   RenderFmt = D3DFMT_UNKNOWN;
 #endif
 
+  /* enable FETCH4, how stupid, no "(1.1f != 0)" possible for the preprocessor */
+  defs[DEFS_FETCH4 ].Definition = (DoesFCH4() ? "1" : "0");
+  defs[DEFS_FETCH4G].Definition = (DoesFCH4() ? stringify(GET4_FLOAT) : "0");
+  defs[DEFS_FETCH1G].Definition = (DoesFCH4() ? stringify(GET1_FLOAT) : "0");
+
+  /* freeze parameters */
   if (FreezeTweaks.Get())
     defs[DEFS_iface].Definition = TWEAK_FROZEN;
   else
@@ -2855,16 +3105,36 @@ bool EffectManager::GetEffects(int which, std::map<std::string,int> &all) {
 	all[name] = EffectNum;
       }
     }
+
+    pEffect++;
   }
+
+  return true;
+}
+
+bool EffectManager::GetEffectConstantHelps(int EffectNum, std::map<std::string,std::string> &all) {
+  ManagedEffectRecord *pEffect;
+
+  if ((pEffect = GetEffect(EffectNum)))
+    return pEffect->GetEffectConstantHelps(all);
 
   return false;
 }
 
-bool EffectManager::GetEffectConstants(int EffectNum, std::map<std::string,int> &all) {
+bool EffectManager::GetEffectConstantTypes(int EffectNum, std::map<std::string,int> &all) {
   ManagedEffectRecord *pEffect;
 
   if ((pEffect = GetEffect(EffectNum)))
-    return pEffect->GetEffectConstants(all);
+    return pEffect->GetEffectConstantTypes(all);
+
+  return false;
+}
+
+bool EffectManager::GetEffectConstantHelp(int EffectNum, char *name, const char **help) {
+  ManagedEffectRecord *pEffect;
+
+  if ((pEffect = GetEffect(EffectNum)))
+    return pEffect->GetEffectConstantHelp(name, help);
 
   return false;
 }

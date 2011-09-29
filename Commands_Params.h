@@ -38,6 +38,7 @@
 #include "obse/PluginAPI.h"
 
 extern OBSESerializationInterface *g_serialization;
+extern OBSEStringVarInterface	  *g_stringvar;
 extern OBSEArrayVarInterface	  *g_arrayvar;
 
 typedef OBSEArrayVarInterface::Array	OBSEArray;

@@ -40,6 +40,7 @@
 #include <d3d9.h>
 
 bool TextureCompressRGBH(LPDIRECT3DTEXTURE9 *base, bool gama);
+bool TextureCompressRGBA(LPDIRECT3DTEXTURE9 *base, bool gama);
 bool TextureCompressRGB(LPDIRECT3DTEXTURE9 *base, bool gama);
 bool TextureCompressLA(LPDIRECT3DTEXTURE9 *alpha);
 bool TextureCompressA(LPDIRECT3DTEXTURE9 *alpha);

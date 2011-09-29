@@ -96,6 +96,13 @@ extern const char *passScens[OBGEPASS_NUM][16];
 
 /* ------------------------------------------------------------------------------- */
 
+#define	CODE_INTZ	(D3DFORMAT)MAKEFOURCC('I','N','T','Z')
+#define	CODE_DF24	(D3DFORMAT)MAKEFOURCC('D','F','2','4')
+#define	CODE_DF16	(D3DFORMAT)MAKEFOURCC('D','F','1','6')
+#define	CODE_RAWZ	(D3DFORMAT)MAKEFOURCC('R','A','W','Z')
+#define	CODE_RESZ	(D3DFORMAT)MAKEFOURCC('R','E','S','Z')
+#define	CODE_NULL	(D3DFORMAT)MAKEFOURCC('N','U','L','L')
+
 const char *findShader(void *iface, UINT len, const DWORD* buf);
 const char *findShader(void *iface);
 const char *findFormat(D3DFORMAT fmt);

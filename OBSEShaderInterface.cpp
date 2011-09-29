@@ -320,7 +320,7 @@ bool IsEnabled() {
 }
 
 bool IsHDR() {
-  return ExtHDR.Get() || IntHDR.Get();
+  return !Bloom.Get() && (ExtHDR.Get() || IntHDR.Get());
 }
 
 bool IsBloom() {

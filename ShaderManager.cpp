@@ -1247,7 +1247,7 @@ bool ShaderRecord::CompileShader(bool forced) {
 
 #if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
   /* recompile only, if there is one already, just ignore */
-  if (!t && src && strstr(src, "tess")) {
+  if (!t && s && strstr((char *)s->GetBufferPointer(), "tess")) {
     LPD3DXBUFFER pErrorMsgt = NULL;
 
     D3DXCompileShader(

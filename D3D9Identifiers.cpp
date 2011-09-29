@@ -1025,6 +1025,16 @@ const struct formatID {
 { (D3DFORMAT)MAKEFOURCC('D','F','2','4'), "DF24" },
 { (D3DFORMAT)MAKEFOURCC('D','F','1','6'), "DF16" },
 { (D3DFORMAT)MAKEFOURCC('R','A','W','Z'), "RAWZ" },
+{ (D3DFORMAT)MAKEFOURCC('N','U','L','L'), "NULL" },
+
+{ (D3DFORMAT)MAKEFOURCC('A','T','I','1'), "ATI1" },
+{ (D3DFORMAT)MAKEFOURCC('A','T','I','2'), "ATI2" },
+
+{ (D3DFORMAT)MAKEFOURCC('A','T','O','C'), "ATOC" },
+{ (D3DFORMAT)MAKEFOURCC('S','S','A','A'), "SSAA" },
+{ (D3DFORMAT)MAKEFOURCC('N','V','D','B'), "NVDB" },
+{ (D3DFORMAT)MAKEFOURCC('R','2','V','B'), "R2VB" },
+{ (D3DFORMAT)MAKEFOURCC('I','N','S','T'), "INST" },
 
 };
 

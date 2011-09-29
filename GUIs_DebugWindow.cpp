@@ -4614,6 +4614,136 @@ public:
 //  event.Skip();
   }
 
+  virtual void DoToolRemipRGBA(wxCommandEvent& event) {
+    wxMenuItem *
+    mi = SDToolsSettings->FindChildItem(wxID_MIPGAMMA, NULL);
+    bool gamma = mi->IsChecked();
+    mi = SDToolsSettings->FindChildItem(wxID_BATCH, NULL);
+    bool batch = mi->IsChecked();
+
+    /* ------------------------------------------------ */
+    if (!batch) {
+      wxFileDialog dlg1(
+	this,
+	_T("Select base-texture (RGB+Alpha)"),
+	wxT(em->EffectDirectory()),
+	wxEmptyString,
+	_T(
+	"Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+	"PNG images (*.png)|*.png|"
+	"JPEG images (*.jpg)|*.jpg|"
+	"Windows images (*.bmp)|*.bmp|"
+	"DirextX images (*.dds)|*.dds"
+	),
+	wxFD_OPEN | wxFD_FILE_MUST_EXIST
+      );
+
+      if (dlg1.ShowModal() != wxID_OK)
+	return;
+
+      // get filename
+      wxString m_base_filename = dlg1.GetFilename();
+      wxString m_base_filepath = dlg1.GetPath();
+
+      LPDIRECT3DTEXTURE9 base = NULL;
+
+      D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_base_filepath, &base);
+
+      if (base) {
+	ProgressSubject = m_base_filename;
+
+	if (TextureCompressRGBA(&base, gamma)) {
+	  wxFileDialog dlg1(
+	    this,
+	    _T("Select base-texture (RGB+Alpha)"),
+	    wxT(em->EffectDirectory()),
+	    wxEmptyString,
+	    _T(
+	    "DirextX images (*.dds)|*.dds"
+	    ),
+	    wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+	  );
+
+	  if (dlg1.ShowModal() != wxID_OK)
+	    return;
+
+	  // get filename
+	  wxString m_base_filename = dlg1.GetFilename();
+	  wxString m_base_filepath = dlg1.GetPath();
+
+	  HRESULT res = D3DXSaveTextureToFile(m_base_filepath, D3DXIFF_DDS, base, NULL);
+
+	  base->Release();
+	}
+      }
+    }
+    else {
+      wxFileDialog dlg2(
+	this,
+	_T("Select base-textures (RGB+Alpha)"),
+	wxT(em->EffectDirectory()),
+	wxEmptyString,
+	_T(
+	"Image files (*.png;*.jpg;*.bmp;*.dds)|*.png;*.jpg;*.bmp;*.dds|"
+	"PNG images (*.png)|*.png|"
+	"JPEG images (*.jpg)|*.jpg|"
+	"Windows images (*.bmp)|*.bmp|"
+	"DirextX images (*.dds)|*.dds"
+	),
+	wxFD_OPEN | wxFD_FILE_MUST_EXIST | wxFD_MULTIPLE
+      );
+
+      if (dlg2.ShowModal() != wxID_OK)
+	return;
+
+      wxDirDialog dlg1(
+	this,
+	_T("Select base-textures (RGB+Alpha) destination"),
+	wxT(em->EffectDirectory()),
+	wxDD_DIR_MUST_EXIST
+      );
+
+      if (dlg1.ShowModal() != wxID_OK)
+	return;
+
+      // get filenames
+      wxArrayString m_base_filenames; dlg2.GetFilenames(m_base_filenames);
+      wxArrayString m_base_filepaths; dlg2.GetPaths(m_base_filepaths);
+      wxString m_base_filedestn = dlg1.GetPath();
+
+      for (int f = 0; f < m_base_filepaths.GetCount(); f++) {
+	wxString m_base_filename = m_base_filenames[f];
+	wxString m_base_filepath = m_base_filepaths[f];
+
+	LPDIRECT3DTEXTURE9 base = NULL;
+	D3DXCreateTextureFromFile(lastOBGEDirect3DDevice9, m_base_filepath, &base);
+
+	if (base) {
+	  ProgressSubject = m_base_filename;
+
+	  if (TextureCompressRGBA(&base, gamma)) {
+	    wxFileName n_base_filename(m_base_filename);
+	    wxFileName n_base_filepath(m_base_filepath);
+	    wxFileName n_base_filedest(m_base_filedestn, m_base_filename);
+
+	    // get filename
+	    n_base_filename.ClearExt(); n_base_filename.SetExt("dds");
+	    n_base_filepath.ClearExt(); n_base_filepath.SetExt("dds");
+	    n_base_filedest.ClearExt(); n_base_filedest.SetExt("dds");
+
+	    wxString path = n_base_filedest.GetFullPath();
+	    HRESULT res = D3DXSaveTextureToFile(path, D3DXIFF_DDS, base, NULL);
+	    base->Release();
+	  }
+	}
+      }
+    }
+
+    SDStatusBar->SetStatusText(wxT("Ready"), 0);
+    ProgressSubject = "...";
+//  event.Skip();
+  }
+
   virtual void DoToolRemipRGB(wxCommandEvent& event) {
     wxMenuItem *
     mi = SDToolsSettings->FindChildItem(wxID_MIPGAMMA, NULL);

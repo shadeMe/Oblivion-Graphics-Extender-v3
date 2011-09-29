@@ -74,6 +74,7 @@ IDebugLog	gLog("OBGE.log");
 
 PluginHandle			g_pluginHandle = kPluginHandle_Invalid;
 OBSESerializationInterface    * g_serialization = NULL;
+OBSEStringVarInterface	      * g_stringvar = NULL;
 OBSEArrayVarInterface	      * g_arrayvar = NULL;
 
 /*********************
@@ -343,6 +344,13 @@ bool OBSEPlugin_Query(const OBSEInterface * obse, PluginInfo * info)
 			return false;
 		}
 
+		g_stringvar = (OBSEStringVarInterface*)obse->QueryInterface(kInterface_StringVar);
+		if (!g_stringvar)
+		{
+			_ERROR("String interface not found");
+			return false;
+		}
+
 		g_arrayvar = (OBSEArrayVarInterface*)obse->QueryInterface(kInterface_ArrayVar);
 		if (!g_arrayvar)
 		{
@@ -450,17 +458,19 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 
 	/* effects -------------------------------------------------------------------- */
 	obse->RegisterTypedCommand(&kCommandInfo_GetEffects, kRetnType_Array);		// 2126
-	obse->RegisterTypedCommand(&kCommandInfo_GetEffectConstants, kRetnType_Array);	// 2127
-	obse->RegisterCommand(&kCommandInfo_GetEffectConstantType);			// 2128
-	obse->RegisterCommand(&kCommandInfo_GetEffectConstantB);			// 2129
-	obse->RegisterCommand(&kCommandInfo_GetEffectConstantI);			// 2130
-	obse->RegisterCommand(&kCommandInfo_GetEffectConstantF);			// 2131
-	obse->RegisterTypedCommand(&kCommandInfo_GetEffectConstantV, kRetnType_Array);	// 2132
-	obse->RegisterCommand(&kCommandInfo_GetEffectSamplerTexture);			// 2133
+	obse->RegisterTypedCommand(&kCommandInfo_GetEffectConstantHelps, kRetnType_Array);	// 2127
+	obse->RegisterTypedCommand(&kCommandInfo_GetEffectConstantTypes, kRetnType_Array);	// 2128
+	obse->RegisterTypedCommand(&kCommandInfo_GetEffectConstantHelp, kRetnType_String);	// 2129
+	obse->RegisterCommand(&kCommandInfo_GetEffectConstantType);			// 2130
+	obse->RegisterCommand(&kCommandInfo_GetEffectConstantB);			// 2131
+	obse->RegisterCommand(&kCommandInfo_GetEffectConstantI);			// 2132
+	obse->RegisterCommand(&kCommandInfo_GetEffectConstantF);			// 2133
+	obse->RegisterTypedCommand(&kCommandInfo_GetEffectConstantV, kRetnType_Array);	// 2134
+	obse->RegisterCommand(&kCommandInfo_GetEffectSamplerTexture);			// 2135
 
 	/* dev ------------------------------------------------------------------------ */
 #ifdef	OBGE_DEVLING
-	obse->RegisterCommand(&kCommandInfo_OpenShaderDeveloper);			// 2134
+	obse->RegisterCommand(&kCommandInfo_OpenShaderDeveloper);			// 2136
 #endif
 
 #ifdef	OBGE_LOGGING

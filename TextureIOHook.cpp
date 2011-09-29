@@ -122,11 +122,11 @@ bool Anonymous::TrackLoadTextureFile(const char *texture, void *renderer, void *
 	    /* remember DeGamma for this kind of texture */
 //	    if (DeGamma) {
 	      if (/* menus are on the backbuffer, no shader there */
-		  !strstr(textlwr, "menus\\") || !strstr(textlwr, "menus/") ||
+		  !strstr(textlwr, "menus\\") && !strstr(textlwr, "menus/") &&
 		  /* faces contain blend-factors, no colors */
-		  !strstr(textlwr, "faces\\") || !strstr(textlwr, "faces/") ||
+		  !strstr(textlwr, "faces\\") && !strstr(textlwr, "faces/") &&
 		  /* fires are emitter, no need for gamma */
-		  !strstr(textlwr, "fire\\" ) || !strstr(textlwr, "fire/" )) {
+		  !strstr(textlwr, "fire\\" ) && !strstr(textlwr, "fire/" )) {
 		static const bool PotDeGamma = true;
 
 		lastOBGEDirect3DBaseTexture9->SetPrivateData(GammaGUID, &PotDeGamma, sizeof(PotDeGamma), 0);

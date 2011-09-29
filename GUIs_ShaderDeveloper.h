@@ -183,6 +183,7 @@ class wxShaderDeveloper : public wxFrame
 		virtual void DoToolPMtoQDMy( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoToolPMtoQDMn( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoToolRemipRGBH( wxCommandEvent& event ) { event.Skip(); }
+		virtual void DoToolRemipRGBA( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoToolRemipRGB( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoToolRemipLA( wxCommandEvent& event ) { event.Skip(); }
 		virtual void DoToolRemipA( wxCommandEvent& event ) { event.Skip(); }

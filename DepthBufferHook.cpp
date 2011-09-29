@@ -57,16 +57,7 @@ static IDirect3DSurface9 *pOldSurface = NULL;
 static D3DSURFACE_DESC DepthInfo;
 static bool HasDepthVar = false;
 static bool DoResolve = false;
-static bool DoesRESZflag = false;
-static bool DoesNULLflag = false;
 static bool IsRAWZflag = false;
-
-#define	CODE_INTZ	(D3DFORMAT)MAKEFOURCC('I','N','T','Z')
-#define	CODE_DF24	(D3DFORMAT)MAKEFOURCC('D','F','2','4')
-#define	CODE_DF16	(D3DFORMAT)MAKEFOURCC('D','F','1','6')
-#define	CODE_RAWZ	(D3DFORMAT)MAKEFOURCC('R','A','W','Z')
-#define	CODE_RESZ	(D3DFORMAT)MAKEFOURCC('R','E','S','Z')
-#define	CODE_NULL	(D3DFORMAT)MAKEFOURCC('N','U','L','L')
 
 struct DFLIST {
   D3DFORMAT	FourCC;
@@ -121,42 +112,20 @@ bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3
   _MESSAGE("Re-attaching depth buffer texture.");
   assert(NULL);
 
-  DoesRESZflag = false;
-  DoesNULLflag = false;
   IsRAWZflag = false;
 
   Width = v1_2_416::GetRenderer()->SizeWidth;
   Height = v1_2_416::GetRenderer()->SizeHeight;
 
+  IDirect3D9	*pD3D;
+  D3DDISPLAYMODE d3ddm;
+  D3DDevice->GetDirect3D(&pD3D);
+  pD3D->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm);
+
   if (UseDepthBuffer.Get()) {
     D3DDevice->GetDepthStencilSurface(&pOldSurface);
     pOldSurface->GetDesc(&DepthInfo);
     HasDepthVar = true;
-
-    IDirect3D9	*pD3D;
-    D3DDISPLAYMODE d3ddm;
-    D3DDevice->GetDirect3D(&pD3D);
-    pD3D->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm);
-
-    hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_SURFACE, CODE_RAWZ);
-    if (hr == D3D_OK)
-      _MESSAGE("RAWZ format supported.");
-    else
-      _MESSAGE("RAWZ not supported.");
-
-    hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, CODE_RESZ);
-    if (hr == D3D_OK)
-      _MESSAGE("RESZ format supported.");
-    else
-      _MESSAGE("RESZ not supported.");
-    DoesRESZflag = (hr == D3D_OK);
-
-    hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, CODE_NULL);
-    if (hr == D3D_OK)
-      _MESSAGE("NULL format supported.");
-    else
-      _MESSAGE("NULL not supported.");
-    DoesNULLflag = (hr == D3D_OK);
 
     int DepthCount;
     for (DepthCount = 0; DepthCount < 4; DepthCount++) {
@@ -170,8 +139,8 @@ bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3
         pDepthTexture->GetSurfaceLevel(0, &pDepthSurface);
 
         // Check if it's multi-sampled
-	if (DoesRESZflag && (IsMultiSampled() || (DepthInfo.MultiSampleType != D3DMULTISAMPLE_NONE))) {
-	  assert (DoesNULLflag);
+	if (DoesRESZ() && (IsMultiSampled() || (DepthInfo.MultiSampleType != D3DMULTISAMPLE_NONE))) {
+	  assert (DoesNULL());
 	  D3DDevice->CreateRenderTarget(DepthInfo.Width, DepthInfo.Height, CODE_NULL, DepthInfo.MultiSampleType, DepthInfo.MultiSampleQuality, FALSE, &pMultiSurface, NULL);
 	  assert(pMultiSurface);
 
@@ -263,42 +232,20 @@ void static _cdecl DepthBufferHook(IDirect3DDevice9 *Device, UInt32 u2) {
   HRESULT hr;
   UInt32 Width, Height;
 
-  DoesRESZflag = false;
-  DoesNULLflag = false;
   IsRAWZflag = false;
 
   Width = v1_2_416::GetRenderer()->SizeWidth;
   Height = v1_2_416::GetRenderer()->SizeHeight;
 
+  IDirect3D9 *pD3D;
+  D3DDISPLAYMODE d3ddm;
+  Device->GetDirect3D(&pD3D);
+  pD3D->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm);
+
   if (UseDepthBuffer.Get()) {
     Device->GetDepthStencilSurface(&pOldSurface);
     pOldSurface->GetDesc(&DepthInfo);
     HasDepthVar = true;
-
-    IDirect3D9 *pD3D;
-    D3DDISPLAYMODE d3ddm;
-    Device->GetDirect3D(&pD3D);
-    pD3D->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm);
-
-    hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, CODE_RAWZ);
-    if (hr == D3D_OK)
-      _MESSAGE("RAWZ format supported.");
-    else
-      _MESSAGE("RAWZ not supported.");
-
-    hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, CODE_RESZ);
-    if (hr == D3D_OK)
-      _MESSAGE("RESZ format supported.");
-    else
-      _MESSAGE("RESZ not supported.");
-    DoesRESZflag = (hr == D3D_OK);
-
-    hr = pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, CODE_NULL);
-    if (hr == D3D_OK)
-      _MESSAGE("NULL format supported.");
-    else
-      _MESSAGE("NULL not supported.");
-    DoesNULLflag = (hr == D3D_OK);
 
     int DepthCount;
     for (DepthCount = 0; DepthCount < 4; DepthCount++) {
@@ -312,8 +259,8 @@ void static _cdecl DepthBufferHook(IDirect3DDevice9 *Device, UInt32 u2) {
         pDepthTexture->GetSurfaceLevel(0, &pDepthSurface);
 
 	// Check if it's multi-sampled
-	if (DoesRESZflag && (IsMultiSampled() || (DepthInfo.MultiSampleType != D3DMULTISAMPLE_NONE))) {
-	  assert (DoesNULLflag);
+	if (DoesRESZ() && (IsMultiSampled() || (DepthInfo.MultiSampleType != D3DMULTISAMPLE_NONE))) {
+	  assert (DoesNULL());
 	  Device->CreateRenderTarget(DepthInfo.Width, DepthInfo.Height, CODE_NULL, DepthInfo.MultiSampleType, DepthInfo.MultiSampleQuality, FALSE, &pMultiSurface, NULL);
 	  assert(pMultiSurface);
 
@@ -393,7 +340,7 @@ UInt32 static _cdecl TextureSanityCheckHook(D3DFORMAT TextureFormat, UInt32 u2) 
   UInt32 (_cdecl * Hook)(D3DFORMAT , UInt32) = (UInt32 ( *)(D3DFORMAT, UInt32))0x0076C3B0;
 
   /* corrections only if the own the depth-stencil surface */
-  if (!DoesRESZflag || (DepthInfo.MultiSampleType == D3DMULTISAMPLE_NONE)) {
+  if (!DoesRESZ() || (DepthInfo.MultiSampleType == D3DMULTISAMPLE_NONE)) {
     /**/ if ((TextureFormat == CODE_INTZ) ||
 	     (TextureFormat == CODE_RAWZ))
       TextureFormat = D3DFMT_D24S8;
@@ -527,8 +474,4 @@ bool HasDepth(void) {
 
 bool IsRAWZ(void) {
   return IsRAWZflag;
-};
-
-bool DoesRESZ(void) {
-  return DoesRESZflag;
 };

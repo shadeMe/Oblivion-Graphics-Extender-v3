@@ -83,5 +83,8 @@ extern D3DCAPS9 lastOBGEDirect3D9CAPS;
 #endif
 
 extern bool IsMultiSampled();
+extern bool DoesRESZ(void);
+extern bool DoesNULL(void);
+extern bool DoesFCH4(void);
 
 #endif

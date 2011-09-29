@@ -45,11 +45,11 @@
 #include "shlwapi.h"
 #pragma comment(lib, "shlwapi.lib")
 
-void SetPrivateProfile(char* section,char *setting, int value, char* filename);
+void SetPrivateProfile(char *section, char *setting, int value, char* filename);
 void SetPrivateProfile(char *section, char *setting, bool value, char *filename);
 void SetPrivateProfile(char *section, char *setting, float value, char *filename);
 
-void GetPrivateProfile(char* section,char *setting, int &value, char* filename);
+void GetPrivateProfile(char *section, char *setting, int &value, char* filename);
 void GetPrivateProfile(char *section, char *setting, bool &value, char *filename);
 void GetPrivateProfile(char *section, char *setting, float &value, char *filename);
 
