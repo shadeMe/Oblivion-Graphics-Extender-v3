@@ -142,6 +142,7 @@ static FXIncludeManager incl;
 #define	EFFECTCOND_HASREFL	(1 << 18)
 #define	EFFECTCOND_HASACHN	(1 << 19)	// special one
 #define	EFFECTCOND_HASMIPS	(1 << 20)	// special one
+#define	EFFECTCOND_HASSBUF	(1 << 25)	// special one
 #define	EFFECTCOND_HASWNRM	(1 << 26)	// special one
 #define	EFFECTCOND_HASWPOS	(1 << 27)	// special one
 #define	EFFECTCOND_HASENRM	(1 << 28)	// special one
@@ -154,6 +155,7 @@ static FXIncludeManager incl;
 #define	EFFECTBUF_PREV		(1 <<  2)	// need previous effect "copy"
 #define	EFFECTBUF_PAST		(1 <<  3)	// need previous frame "copy"
 #define	EFFECTBUF_ACHN		EFFECTCOND_HASACHN
+#define	EFFECTBUF_SBUF		EFFECTCOND_HASSBUF
 #define	EFFECTBUF_WNRM		EFFECTCOND_HASWNRM
 #define	EFFECTBUF_WPOS		EFFECTCOND_HASWPOS
 #define	EFFECTBUF_ENRM		EFFECTCOND_HASENRM
@@ -164,6 +166,8 @@ static FXIncludeManager incl;
 #define	EFFECTBUF_TRANSFERZMASK	(EFFECTCOND_HASWNRM | EFFECTCOND_HASWPOS | EFFECTCOND_HASENRM | EFFECTCOND_HASEPOS | EFFECTCOND_HASLBUF |                      EFFECTBUF_RAWZ)
 
 #define	EFFECTOPT_GATHER	(1 << 0)
+#define	EFFECTOPT_SKIPSWAP	(1 << 1)
+#define	EFFECTOPT_STENCIL	(1 << 2)
 
 /* deprecated */
 #ifndef	NO_DEPRECATED
@@ -183,6 +187,11 @@ typedef struct _myD3DXMACRO
 #define GET4_DWORD  ((DWORD)MAKEFOURCC('G', 'E', 'T', '4'))
 #define GET1_DWORD  ((DWORD)MAKEFOURCC('G', 'E', 'T', '1'))
 
+#define RT_SIGNED   '0'
+#define RT_UNSIGNED '1'
+#define RT_FLOAT    '0'
+#define RT_INTEGER  '1'
+
 static char IN_RAWZ[] = "0";
 static char IN_LINZ[] = "0";
 static char IN_PRJZ[] = "0";
@@ -191,6 +200,8 @@ static char FETCHM [] = "MIPMAPLODBIAS";
 static char FETCH4 [] = "0";
 static char FETCH4G[] = "0";
 static char FETCH1G[] = "0";
+static char STARGET[] = "1";
+static char TTARGET[] = "1";
 static char *TWEAK_DYNAMIC = "extern";
 static char *TWEAK_FROZEN  = "static const";
 
@@ -203,6 +214,8 @@ static char *TWEAK_FROZEN  = "static const";
 #define	DEFS_FETCH4	6
 #define	DEFS_FETCH4G	7
 #define	DEFS_FETCH1G	8
+#define	DEFS_STARGET	9
+#define	DEFS_TTARGET	10
 
 static myD3DXMACRO defs[] = {
   {"IN_RAWZ"	        	, IN_RAWZ},
@@ -215,6 +228,13 @@ static myD3DXMACRO defs[] = {
   {"GET4"	        	, FETCH4G},
   {"GET1"	        	, FETCH1G},
 
+  {"RENDERTARGET_SIGN"	        , STARGET},
+  {"RENDERTARGET_TYPE"	        , TTARGET},
+
+  {"UNSIGNED"	        	, "1"},
+  {"SIGNED"	        	, "0"},
+  {"INTEGER"	        	, "1"},
+  {"FLOAT"	        	, "0"},
 #ifndef	OBGE_CONSTANTPOOLS
   {"shared"	        	, ""},
 #endif
@@ -237,6 +257,7 @@ static myD3DXMACRO defs[] = {
   {"EFFECTCOND_HASWATER"	, stringify(EFFECTCOND_HASWATER	        )},
   {"EFFECTCOND_HASREFLECTIONS"	, stringify(EFFECTCOND_HASREFL	        )},
   {"EFFECTCOND_HASZBUFFER"	, stringify(EFFECTCOND_HASZBUF		)},
+  {"EFFECTCOND_HASSBUFFER"	, stringify(EFFECTCOND_HASSBUF		)},
   {"EFFECTCOND_HASMIPMAPS"	, stringify(EFFECTCOND_HASMIPS		)},
   {"EFFECTCOND_INTERIOUR"	, stringify(EFFECTCOND_INTERIOUR	)},
   {"EFFECTCOND_EXTERIOUR"	, stringify(EFFECTCOND_EXTERIOUR	)},
@@ -244,6 +265,7 @@ static myD3DXMACRO defs[] = {
   {"EFFECTCOND_ISDAY"	        , stringify(EFFECTCOND_ISDAY	        )},
   {"EFFECTCOND_ISNIGHT"	        , stringify(EFFECTCOND_ISNIGHT	        )},
 
+  {"EFFECTCOND_SBUFFER"		, stringify(EFFECTCOND_HASSBUF		)}, // hm, error
   {"EFFECTCOND_ZBUFFER"		, stringify(EFFECTCOND_HASZBUF		)}, // hm, error
   {"EFFECTCOND_LBUFFER"		, stringify(EFFECTCOND_HASLBUF		)}, // hm, error
   {"EFFECTCOND_PBUFFER"		, stringify(EFFECTCOND_HASEPOS		)}, // hm, error
@@ -252,6 +274,8 @@ static myD3DXMACRO defs[] = {
   {"EFFECTCOND_ACHANNEL"	, stringify(EFFECTCOND_HASACHN		)}, // hm, error
 
   {"EFFECTOPT_GATHER"		, stringify(EFFECTOPT_GATHER		)},
+  {"EFFECTOPT_SKIPSWAP"		, stringify(EFFECTOPT_SKIPSWAP		)},
+  {"EFFECTOPT_STENCIL"		, stringify(EFFECTOPT_STENCIL		)},
 
   {"D3DFMT_DEFAULT"	        , "0"},		// same format as main-pass surface
 
@@ -283,9 +307,8 @@ EffectBuffer::EffectBuffer() {
   for (int rt = 0; rt < EBUFRT_NUM; rt++) {
     Tex[rt] = NULL;
     Srf[rt] = NULL;
+    mne[rt] = false;
   }
-
-  mine = false;
 }
 
 EffectBuffer::~EffectBuffer() {
@@ -293,7 +316,7 @@ EffectBuffer::~EffectBuffer() {
 }
 
 inline HRESULT EffectBuffer::Initialize(IDirect3DTexture9 *text) {
-  Release();
+  Release(0, 1);
 
   Tex[0] = text;
 //Tex[0]->GetSurfaceLevel(0, &Srf[0]);
@@ -322,7 +345,7 @@ inline HRESULT EffectBuffer::Initialize(IDirect3DSurface9 *surf) {
   }
 
   /* this is now the texture/surface-pair to use */
-  Release();
+  Release(0, 1);
 
   Tex[0] = text;
   Srf[0] = surf;
@@ -343,6 +366,8 @@ inline HRESULT EffectBuffer::Initialize(const D3DFORMAT fmt[EBUFRT_NUM]) {
 
   for (int rt = 0; rt < EBUFRT_NUM; rt++) {
     if (!Tex[rt] && (fmt[rt] != D3DFMT_UNKNOWN)) {
+//    Release(rt, rt + 1);
+
       if ((hr = lastOBGEDirect3DDevice9->CreateTexture(Width, Height, 1, EFFECT_USAGE, fmt[rt], D3DPOOL_DEFAULT, &Tex[0], 0)) == D3D_OK)
 	Tex[rt]->GetSurfaceLevel(0, &Srf[rt]);
 #if	defined(OBGE_AUTOMIPMAP)
@@ -350,44 +375,37 @@ inline HRESULT EffectBuffer::Initialize(const D3DFORMAT fmt[EBUFRT_NUM]) {
 	Tex[rt]->SetAutoGenFilterType(AMFilter);
 #endif
 
+      mne[rt] = true;
+
       _DMESSAGE("Creating EffectBuffer surface %s: %s", findFormat(fmt[rt]), Tex[rt] ? "success" : "failed");
     }
   }
 
-  mine = true;
   return D3D_OK;
 }
 
-inline void EffectBuffer::Release() {
-  if (mine)
-    for (int rt = 0; rt < EBUFRT_NUM; rt++) {
-      if (Tex[rt]) Tex[rt]->Release(); Tex[rt] = NULL;
-      if (Srf[rt]) Srf[rt]->Release(); Srf[rt] = NULL;
-    }
-  else
-    for (int rt = 0; rt < EBUFRT_NUM; rt++) {
-      Srf[rt] = NULL;
-      Tex[rt] = NULL;
-    }
-
-  mine = false;
+inline void EffectBuffer::Release(int rmin, int rnum) {
+  for (int rt = rmin; rt < rnum; rt++) {
+    if (Tex[rt] && mne[rt]) Tex[rt]->Release(); Tex[rt] = NULL; mne[rt] = false;
+    if (Srf[rt] && mne[rt]) Srf[rt]->Release(); Srf[rt] = NULL; mne[rt] = false;
+  }
 }
 
-inline bool EffectBuffer::IsValid() {
+inline bool EffectBuffer::IsValid() const {
   for (int rt = 0; rt < EBUFRT_NUM; rt++)
     if (Tex[rt]) return true;
 
   return false;
 }
 
-bool EffectBuffer::IsTexture(IDirect3DBaseTexture9 *text) {
+bool EffectBuffer::IsTexture(IDirect3DBaseTexture9 *text) const {
   for (int rt = 0; rt < EBUFRT_NUM; rt++)
     if (Tex[rt] == text) return true;
 
   return false;
 }
 
-inline void EffectBuffer::SetTexture(const char *fmt, ID3DXEffect *pEffect) {
+inline void EffectBuffer::SetTexture(const char *fmt, ID3DXEffect *pEffect) const {
   char buf[256];
   for (int rt = 0; rt < EBUFRT_NUM; rt++) {
     if (Tex[rt]) {
@@ -397,21 +415,21 @@ inline void EffectBuffer::SetTexture(const char *fmt, ID3DXEffect *pEffect) {
   }
 }
 
-inline void EffectBuffer::SetRenderTarget(IDirect3DDevice9 *Device) {
+inline void EffectBuffer::SetRenderTarget(IDirect3DDevice9 *Device) const {
   for (int rt = 0; rt < EBUFRT_NUM; rt++) {
     if (Srf[rt])
       Device->SetRenderTarget(rt, Srf[rt]);
   }
 }
 
-inline void EffectBuffer::Copy(IDirect3DDevice9 *Device, EffectBuffer *from) {
+inline void EffectBuffer::Copy(IDirect3DDevice9 *Device, EffectBuffer *from) const {
   for (int rt = 0; rt < EBUFRT_NUM; rt++) {
     if (from->Srf[rt] && Srf[rt] && (from->Srf[rt] != Srf[rt]))
       minStretchRect(Device, from->Srf[rt], 0, Srf[rt], 0, D3DTEXF_NONE);
   }
 }
 
-inline void EffectBuffer::Copy(IDirect3DDevice9 *Device, IDirect3DSurface9 *from) {
+inline void EffectBuffer::Copy(IDirect3DDevice9 *Device, IDirect3DSurface9 *from) const {
   for (int rt = 0; rt < EBUFRT_NUM; rt++) {
     if (from          && Srf[rt] && (from          != Srf[rt]))
       minStretchRect(Device, from, 0, Srf[rt], 0, D3DTEXF_NONE);
@@ -426,11 +444,15 @@ inline void EffectBuffer::Copy(IDirect3DDevice9 *Device, IDirect3DSurface9 *from
 
 inline void EffectQueue::Init(EffectBuffer *past,
 			      EffectBuffer *prev,
-			      EffectBuffer *alt) {
+			      EffectBuffer *alt, bool stencil) {
   this->past = past;
   this->prev = prev;
 
   queue[1] = alt;
+
+  /* set alternate trashable depth/stencil buffer */
+  if ((dsc = (stencil ? D3DCLEAR_ZBUFFER | D3DCLEAR_STENCIL : 0)))
+    device->SetDepthStencilSurface(GetStencilSurface());
 }
 
 inline void EffectQueue::Begin(EffectBuffer *orig,
@@ -475,14 +497,14 @@ inline void EffectQueue::Begin(ID3DXEffect *pEffect) {
   rotate[EQLAST]->SetTexture("obge_LastRendertarget%d_EFFECTPASS", pEffect);
 
   alterning ^= 1; (rotate[EQLAST] = queue[alterning])->SetRenderTarget(device);
-  device->Clear(0, NULL, D3DCLEAR_TARGET, 0, 0, 0);
+  device->Clear(0, NULL, D3DCLEAR_TARGET | dsc, 0, 1.0f, 0);
 }
 
-inline void EffectQueue::Step(ID3DXEffect *pEffect) {
+inline void EffectQueue::Swap(ID3DXEffect *pEffect) {
   rotate[EQLAST]->SetTexture("obge_LastRendertarget%d_EFFECTPASS", pEffect);
 
   alterning ^= 1; (rotate[EQLAST] = queue[alterning])->SetRenderTarget(device);
-  device->Clear(0, NULL, D3DCLEAR_TARGET, 0, 0, 0);
+  device->Clear(0, NULL, D3DCLEAR_TARGET, 0, 1.0f, 0);
 }
 
 inline void EffectQueue::End(ID3DXEffect *pEffect) {
@@ -511,8 +533,9 @@ inline void EffectQueue::End(EffectBuffer *target) {
   if (past)
     past->Copy(device, orig);
 
-  /* restore original rendertarget (Oblivion expects this!) */
+  /* restore original rendertarget/depthbuffer (Oblivion expects this!) */
   target->SetRenderTarget(device);
+  device->SetDepthStencilSurface(GetDepthBufferSurface());
 }
 
 #undef EQLAST
@@ -709,10 +732,10 @@ bool EffectRecord::SaveEffect() {
       fwrite(p->GetBufferPointer(), 1, p->GetBufferSize(), f);
       fclose(f);
 
+      _DMESSAGE("Saved binary of %s to %s", Name, Filepath);
+
       if (ext)
 	ext[3] = '\0';
-
-      _DMESSAGE("Saved binary of %s to %s", Name, Filepath);
 
       return true;
     }
@@ -722,16 +745,16 @@ bool EffectRecord::SaveEffect() {
 
   return false;
 }
-
 bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
   /* nobody wants the automatic recompile */
   if (!::CompileSources.Get() && !forced)
     return false;
-
   LPSTR src = NULL; int len;
   LPD3DXBUFFER p = NULL;
+  ID3DXEffectCompiler *c = NULL;
   ID3DXEffect *x = NULL;
   bool save = false;
+  HRESULT res;
 
   /* cascade, the highest possible is selected */
   if (pSource) {
@@ -743,7 +766,7 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
   }
 
   /* recompile only, if there is one already, just ignore */
-  if (!x && src) {
+  if (!p && src) {
     if (pDisasmbly)
     pDisasmbly->Release();
     pDisasmbly = NULL;
@@ -752,164 +775,70 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
     pErrorMsgs->Release();
     pErrorMsgs = NULL;
 
-    if (!p) {
-      ID3DXEffectCompiler *c = NULL;
-
-      D3DXCreateEffectCompiler(
-	src,
-	len,
-	pDefine,
-	&incl,
-	D3DXSHADER_DEBUG | (
-	::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
-	::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
-	&c,
-	&pErrorMsgs
-      );
-
-      /* this didn't go so well */
-      if (pErrorMsgs) {
-	char *msg = (char *)pErrorMsgs->GetBufferPointer();
-
-	_MESSAGE("Effect compiling messages occured in %s:", Filepath);
-	_MESSAGE((char *)pErrorMsgs->GetBufferPointer());
-      }
-
-      if (c) {
-	if (pErrorMsgs)
-	pErrorMsgs->Release();
-	pErrorMsgs = NULL;
-
-	c->CompileEffect(
-	  D3DXSHADER_DEBUG | (
-	  ::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
-	  ::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
-	  &p,
-	  &pErrorMsgs
-	);
-
-	/* this didn't go so well */
-	if (pErrorMsgs) {
-	  char *msg = (char *)pErrorMsgs->GetBufferPointer();
-
-	  _MESSAGE("Effect compiling messages occured in %s:", Filepath);
-	  _MESSAGE((char *)pErrorMsgs->GetBufferPointer());
-	}
-
-	c->Release();
-      }
-    }
-
-    if (!p) {
-      D3DXCreateEffect(
-	slimOBGEDirect3DDevice9,
-	src,
-	len,
-	pDefine,
-	&incl,
-	D3DXSHADER_DEBUG | (
-	::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
-	::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
-	FXMan ? FXMan->EffectPool : NULL,
-	&x,
-	&pErrorMsgs
-      );
-    }
-    else {
-      D3DXCreateEffect(
-	slimOBGEDirect3DDevice9,
-	p->GetBufferPointer(),
-	p->GetBufferSize(),
-	pDefine,
-	&incl,
-	D3DXSHADER_DEBUG | (
-	::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
-	::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
-	FXMan ? FXMan->EffectPool : NULL,
-	&x,
-	NULL
-      );
-    }
+    res = D3DXCreateEffectCompiler(
+      src,
+      len,
+      pDefine,
+      &incl,
+      D3DXSHADER_DEBUG | (
+      ::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
+      ::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
+      &c,
+      &pErrorMsgs
+    );
 
     /* this didn't go so well, if it's a legacy "error", just try again */
     if (pErrorMsgs && strstr((char*)pErrorMsgs->GetBufferPointer(), "X3539")) {
       pErrorMsgs->Release();
       pErrorMsgs = NULL;
 
-      if (!p) {
-	ID3DXEffectCompiler *c = NULL;
+      res = D3DXCreateEffectCompiler(
+	src,
+	len,
+	pDefine,
+	&incl,
+	D3DXSHADER_DEBUG | (
+	D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
+	&c,
+	&pErrorMsgs
+      );
+    }
 
-	D3DXCreateEffectCompiler(
-	  src,
-	  len,
-	  pDefine,
-	  &incl,
+    /* this didn't go so well */
+    if (pErrorMsgs) {
+      char *msg = (char *)pErrorMsgs->GetBufferPointer();
+
+      _MESSAGE("Effect compiling messages occured in %s:", Filepath);
+      _MESSAGE((char *)pErrorMsgs->GetBufferPointer());
+    }
+
+    if (c) {
+      if (pErrorMsgs)
+      pErrorMsgs->Release();
+      pErrorMsgs = NULL;
+
+      res = c->CompileEffect(
+	D3DXSHADER_DEBUG | (
+	::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
+	::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
+	&p,
+	&pErrorMsgs
+      );
+
+      /* this didn't go so well, if it's a legacy "error", just try again */
+      if (pErrorMsgs && strstr((char*)pErrorMsgs->GetBufferPointer(), "X3539")) {
+	pErrorMsgs->Release();
+	pErrorMsgs = NULL;
+
+	res = c->CompileEffect(
 	  D3DXSHADER_DEBUG | (
 	  D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
-	  &c,
-	  &pErrorMsgs
-	);
-
-	/* this didn't go so well */
-	if (pErrorMsgs) {
-	  char *msg = (char *)pErrorMsgs->GetBufferPointer();
-
-	  _MESSAGE("Effect compiling messages occured in %s:", Filepath);
-	  _MESSAGE((char *)pErrorMsgs->GetBufferPointer());
-	}
-
-	if (c) {
-	  if (pErrorMsgs)
-	  pErrorMsgs->Release();
-	  pErrorMsgs = NULL;
-
-	  c->CompileEffect(
-	    D3DXSHADER_DEBUG | (
-	    D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
-	    &p,
-	    &pErrorMsgs
-	  );
-
-	  /* this didn't go so well */
-	  if (pErrorMsgs) {
-	    char *msg = (char *)pErrorMsgs->GetBufferPointer();
-
-	    _MESSAGE("Effect compiling messages occured in %s:", Filepath);
-	    _MESSAGE((char *)pErrorMsgs->GetBufferPointer());
-	  }
-
-	  c->Release();
-	}
-      }
-
-      if (!p) {
-	D3DXCreateEffect(
-	  slimOBGEDirect3DDevice9,
-	  src,
-	  len,
-	  pDefine,
-	  &incl,
-	  D3DXSHADER_DEBUG | (
-	  D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
-	  FXMan ? FXMan->EffectPool : NULL,
-	  &x,
+	  &p,
 	  &pErrorMsgs
 	);
       }
-      else {
-	D3DXCreateEffect(
-	  slimOBGEDirect3DDevice9,
-	  p->GetBufferPointer(),
-	  p->GetBufferSize(),
-	  pDefine,
-	  &incl,
-	  D3DXSHADER_DEBUG | (
-	  D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
-	  FXMan ? FXMan->EffectPool : NULL,
-	  &x,
-	  NULL
-	);
-      }
+
+      c->Release();
     }
 
     /* this didn't go so well */
@@ -921,6 +850,104 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
     }
     else
       save = true;
+  }
+
+  /* recompile only, if there is one already, just ignore */
+  if (!x && (p || src)) {
+    if (pDisasmbly)
+    pDisasmbly->Release();
+    pDisasmbly = NULL;
+
+    /* try from binary */
+    if (p) {
+      if (pErrorMsgs)
+      pErrorMsgs->Release();
+      pErrorMsgs = NULL;
+
+      res = D3DXCreateEffect(
+	slimOBGEDirect3DDevice9,
+	p->GetBufferPointer(),
+	p->GetBufferSize(),
+	pDefine,
+	&incl,
+	D3DXSHADER_DEBUG | (
+	::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
+	::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
+	FXMan ? FXMan->EffectPool : NULL,
+	&x,
+	&pErrorMsgs
+      );
+    }
+
+    /* try from source */
+    if (!x && src) {
+      if (pErrorMsgs)
+      pErrorMsgs->Release();
+      pErrorMsgs = NULL;
+
+      res = D3DXCreateEffect(
+	slimOBGEDirect3DDevice9,
+	src,
+	len,
+	pDefine,
+	&incl,
+	D3DXSHADER_DEBUG | (
+	::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
+	::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
+	FXMan ? FXMan->EffectPool : NULL,
+	&x,
+	&pErrorMsgs
+      );
+    }
+
+    /* this didn't go so well, if it's a legacy "error", just try again */
+    if (pErrorMsgs && strstr((char*)pErrorMsgs->GetBufferPointer(), "X3539")) {
+      /* try from binary */
+      if (p) {
+	if (pErrorMsgs)
+	pErrorMsgs->Release();
+	pErrorMsgs = NULL;
+
+	res = D3DXCreateEffect(
+	  slimOBGEDirect3DDevice9,
+	  p->GetBufferPointer(),
+	  p->GetBufferSize(),
+	  pDefine,
+	  &incl,
+	  D3DXSHADER_DEBUG | (
+	  D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
+	  FXMan ? FXMan->EffectPool : NULL,
+	  &x,
+	  &pErrorMsgs
+	);
+      }
+
+      /* try from source */
+      if (!x && src) {
+	if (pErrorMsgs)
+	pErrorMsgs->Release();
+	pErrorMsgs = NULL;
+
+	res = D3DXCreateEffect(
+	  slimOBGEDirect3DDevice9,
+	  src,
+	  len,
+	  pDefine,
+	  &incl,
+	  D3DXSHADER_DEBUG | (
+	  D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
+	  FXMan ? FXMan->EffectPool : NULL,
+	  &x,
+	  &pErrorMsgs
+	);
+      }
+    }
+
+    /* this didn't go so well */
+    if (pErrorMsgs) {
+      _MESSAGE("Effect compiling messages occured in %s:", Filepath);
+      _MESSAGE((char *)pErrorMsgs->GetBufferPointer());
+    }
   }
 
   /* cascade, the highest possible is selected */
@@ -974,7 +1001,7 @@ void EffectRecord::ApplyCompileDirectives() {
 	if ((handle2 = pEffect->GetAnnotationByName(handle, "filename"))) {
 	  LPCSTR pString = NULL; pEffect->GetString(handle2, &pString);
 
-	  _MESSAGE("Found filename : %s", pString);
+	  _MESSAGE("Found texture to load: %s", pString);
 
 	  int TexNum = TexMan->LoadDependtTexture((char *)pString, TR_CUBIC);
 	  if (TexNum != -1) {
@@ -989,7 +1016,7 @@ void EffectRecord::ApplyCompileDirectives() {
 	if ((handle2 = pEffect->GetAnnotationByName(handle, "filename"))) {
 	  LPCSTR pString = NULL; pEffect->GetString(handle2, &pString);
 
-	  _MESSAGE("Found filename : %s", pString);
+	  _MESSAGE("Found texture to load: %s", pString);
 
 	  int TexNum = TexMan->LoadDependtTexture((char *)pString, TR_VOLUMETRIC);
 	  if (TexNum != -1) {
@@ -1006,7 +1033,7 @@ void EffectRecord::ApplyCompileDirectives() {
 	  if ((handle2 = pEffect->GetAnnotationByName(handle, "filename"))) {
 	    LPCSTR pString = NULL; pEffect->GetString(handle2, &pString);
 
-	    _MESSAGE("Found filename : %s", pString);
+	    _MESSAGE("Found texture to load: %s", pString);
 
 	    int TexNum = TexMan->LoadDependtTexture((char *)pString, TR_PLANAR);
 	    if (TexNum != -1) {
@@ -1225,6 +1252,7 @@ inline void EffectRecord::ApplySharedConstants() {
   pEffect->SetVector("oblv_ProjectionFoV_MAINPASS", &Constants.FoV);
 
   pEffect->SetVector("oblv_FogRange", &Constants.FogRange);
+  pEffect->SetVector("oblv_FogColor", &Constants.FogColor);
   pEffect->SetVector("oblv_SunDirection", &Constants.SunDir);
   pEffect->SetVector("oblv_SunTiming", &Constants.SunTiming);
 
@@ -1309,7 +1337,7 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue
   ApplyUniqueConstants();
 
 #ifdef	OBGE_STATEBLOCKS
-  UINT pass = 0; Queue->Begin(pEffect);
+  UINT pass = 0; Queue->Begin(pEffect/*, OptionsPass[pass] & EFFECTOPT_STENCIL*/);
   UINT passes; pEffect->Begin(&passes, D3DXFX_DONOTSAVESTATE);
 #else
   UINT pass = 0; Queue->Begin(pEffect);
@@ -1317,6 +1345,9 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue
 #endif
 
   while (true) {
+    /* allow freeze of swap-chain (fe. writing to temporary rendertargets) */
+    bool swap = !(OptionsPass[pass] & EFFECTOPT_SKIPSWAP);
+
     /* this sets the sampler-values */
     pEffect->BeginPass(pass);
     D3DDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
@@ -1324,8 +1355,8 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue
 
     if (++pass >= passes)
       break;
-
-    Queue->Step(pEffect);
+    if (swap)
+      Queue->Swap(pEffect);
   }
 
   pEffect->End();
@@ -1871,6 +1902,7 @@ EffectManager::EffectManager() {
   RenderTransferZ = (IsRAWZ() ? EFFECTBUF_RAWZ : 0);
   RenderBuf = 0;
   RenderCnd = 0;
+  RenderOpt = 0;
   RenderFmt = D3DFMT_UNKNOWN;
 #endif
 
@@ -1941,6 +1973,7 @@ void EffectManager::Reset() {
 #else
   RenderBuf = 0;
   RenderCnd = 0;
+  RenderOpt = 0;
 #endif
 }
 
@@ -2111,9 +2144,9 @@ void EffectManager::InitializeFrameTextures() {
      */
     if (frmt == D3DFMT_UNKNOWN) {
       if (IsHDR())
-	frmt = D3DFMT_A16B16G16R16F;
+	bits = 16, frmt = D3DFMT_A16B16G16R16F;
       else
-	frmt = D3DFMT_A8R8G8B8;
+	bits = 8, frmt = D3DFMT_A8R8G8B8;
     }
 
     if (frmt != D3DFMT_UNKNOWN) {
@@ -2150,8 +2183,8 @@ void EffectManager::InitializeFrameTextures() {
 	  ? (!bitz || (bitz > 16) ? D3DFMT_A32B32G32R32F : D3DFMT_A16B16G16R16F)  // linear
 	  :
 	RenderTransferZ & EFFECTBUF_LBUF
-	  ? (!bitz || (bitz > 16) ? D3DFMT_R32F          : D3DFMT_R16F         )	// linear
-	  : (!bitz || (bitz > 16) ? D3DFMT_R32F          : D3DFMT_R16F         )	// non-linear
+	  ? (!bitz || (bitz > 16) ? D3DFMT_R32F          : D3DFMT_R16F         )  // linear
+	  : (!bitz || (bitz > 16) ? D3DFMT_R32F          : D3DFMT_R16F         )  // non-linear
       );
     if (RenderBuf & EFFECTBUF_ENRM) if (RenderTransferZ)
       CurrNM.Initialize(
@@ -2166,6 +2199,9 @@ void EffectManager::InitializeFrameTextures() {
 #ifndef	OBGE_NOSHADER
   RenderCnd = (RenderCnd & ~EFFECTCOND_HASMIPS) | (AMFilter != D3DTEXF_NONE		? EFFECTCOND_HASMIPS : 0);
 #endif
+
+  if (bits > 0) STARGET[0] = RT_SIGNED,   TTARGET[0] = RT_FLOAT;
+  if (bits < 0) STARGET[0] = RT_UNSIGNED, TTARGET[0] = RT_INTEGER;
 }
 
 void EffectManager::ReleaseFrameTextures() {
@@ -2427,6 +2463,7 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
   Renderer->RenderStateManager->SetRenderState(D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_ALPHA | D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_RED, false);
   Renderer->RenderStateManager->SetRenderState(D3DRS_ALPHATESTENABLE, false, false);
   Renderer->RenderStateManager->SetRenderState(D3DRS_ALPHABLENDENABLE, false, false);
+  Renderer->RenderStateManager->SetRenderState(D3DRS_STENCILENABLE, false, false);
   Renderer->RenderStateManager->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE, false);
   Renderer->RenderStateManager->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE, false);
 
@@ -2555,7 +2592,8 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
   RenderQueue.Init(
     (RenderBuf & EFFECTBUF_PAST) ? &PastRT : NULL,
     (RenderBuf & EFFECTBUF_PREV) ? &PrevRT : NULL,
-				   &LastRT
+				   &LastRT,
+    (RenderOpt & EFFECTOPT_STENCIL) ? true : false
   );
 
   /* over effects */
@@ -2761,12 +2799,14 @@ void EffectManager::Recalculate() {
   /* redo the conditions */
   RenderBuf = 0;
   RenderCnd = 0;
+  RenderOpt = 0;
 
   for (ManagedEffectList::iterator e = ManagedEffects.begin(); e != ManagedEffects.end(); e++) {
     if ((*e)->IsEnabled()) {
       /* integrate */
       RenderBuf |= (*e)->GetParameters();
       RenderCnd |= (*e)->GetConditions();
+      RenderOpt |= (*e)->GetOptions();
     }
   }
 

@@ -60,8 +60,10 @@ void CreateDepthBufferHook(void);
 
 IDirect3DTexture9 *ResolvableDepthBuffer(IDirect3DSurface9 *DepthS = NULL, IDirect3DTexture9 *DepthT = NULL);
 bool ResolveDepthBuffer(IDirect3DDevice9 *Device);
-IDirect3DTexture9 *GetDepthBufferTexture(void);
-bool LostDepthBuffer(bool stage,void *parameters);
+IDirect3DSurface9 *GetStencilSurface();
+IDirect3DSurface9 *GetDepthBufferSurface();
+IDirect3DTexture9 *GetDepthBufferTexture();
+bool LostDepthBuffer(bool stage, void *parameters);
 
 bool HasDepth(void);
 bool IsRAWZ(void);

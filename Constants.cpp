@@ -86,12 +86,15 @@ void sConstants::Update(v1_2_416::NiDX9Renderer *Renderer) {
 
   TES *tes = TES::GetSingleton();
 
-  // farF, nearF, farF - nearF, farF + nearF
-  FogRange.x = tes->fogProperty->fogEnd;
-  FogRange.y = tes->fogProperty->fogStart;
-  FogRange.z = FogRange.x - FogRange.y;
-  FogRange.w = FogRange.x + FogRange.y;
-
+  // nearF, farF, farF - nearF, farF + nearF
+  FogRange.x = tes->fogProperty->fogStart;
+  FogRange.y = tes->fogProperty->fogEnd;
+  FogRange.z = FogRange.y - FogRange.x;
+  FogRange.w = FogRange.y + FogRange.x;
+  // colorF
+  FogColor.x = tes->fogProperty->color.r;
+  FogColor.y = tes->fogProperty->color.g;
+  FogColor.z = tes->fogProperty->color.b;
 }
 
 void sConstants::UpdateSun() {

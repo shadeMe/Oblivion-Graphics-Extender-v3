@@ -1983,6 +1983,8 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.SunTiming;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_FogRange"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.FogRange;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_FogColor"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.FogColor;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_PlayerPosition"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.PlayerPosition;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_EyeTransform_CURRENTPASS"))

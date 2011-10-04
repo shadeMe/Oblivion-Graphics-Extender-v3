@@ -357,7 +357,6 @@ HRESULT STDMETHODCALLTYPE OBGEDirect3D9::CreateDevice(
 
   return hr;
 }
-
 #endif
 
 bool IsMultiSampled() {

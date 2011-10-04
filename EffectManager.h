@@ -107,20 +107,20 @@ public:
 	HRESULT				Initialize(IDirect3DSurface9 *surf);
 	/* initialize the buffer from newly allocated resources */
 	HRESULT				Initialize(const D3DFORMAT fmt[EBUFRT_NUM]);
-	void				Release();
-	bool				IsValid();
+	void				Release(int rmin = 0, int rnum = EBUFRT_NUM);
 
-	bool				IsTexture(IDirect3DBaseTexture9 *text);
-	void				SetTexture(const char *fmt, ID3DXEffect *Effect);
-	void				SetRenderTarget(IDirect3DDevice9 *Device);
-	void				Copy(IDirect3DDevice9 *Device, EffectBuffer *from);
-	void				Copy(IDirect3DDevice9 *Device, IDirect3DSurface9 *from);
+	bool				IsValid() const;
+	bool				IsTexture(IDirect3DBaseTexture9 *text) const;
+
+	void				SetTexture(const char *fmt, ID3DXEffect *Effect) const;
+	void				SetRenderTarget(IDirect3DDevice9 *Device) const;
+	void				Copy(IDirect3DDevice9 *Device, EffectBuffer *from) const;
+	void				Copy(IDirect3DDevice9 *Device, IDirect3DSurface9 *from) const;
 
 private:
 	IDirect3DTexture9 *		Tex[EBUFRT_NUM];
 	IDirect3DSurface9 *		Srf[EBUFRT_NUM];
-
-	bool				mine;
+	bool				mne[EBUFRT_NUM];
 };
 
 class EffectQueue
@@ -129,7 +129,7 @@ public:
 	/* over frames */
 	void Init(EffectBuffer *past,
 		  EffectBuffer *prev,
-		  EffectBuffer *alt);
+		  EffectBuffer *alt, bool stencil = false);
 
 	/* over effects */
 	void Begin(EffectBuffer *orig,
@@ -139,7 +139,7 @@ public:
 
 	/* over passes */
 	void Begin(ID3DXEffect *Effect);
-	void Step(ID3DXEffect *Effect);
+	void Swap(ID3DXEffect *Effect);
 	void End(ID3DXEffect *Effect);
 
 public:
@@ -147,7 +147,7 @@ public:
 private:
 	EffectBuffer *past, *orig, *prev;
 	EffectBuffer *queue[2], *rotate[2];
-	int alterning, pos;
+	int alterning, pos; int dsc;
 };
 
 class EffectRecord
@@ -390,6 +390,7 @@ struct EffectQuad { float x,y,z;      float u,v, i; };
 	EffectQueue					RenderQueue;
 	unsigned long					RenderBuf;
 	unsigned long					RenderCnd;
+	unsigned long					RenderOpt;
 	D3DFORMAT					RenderFmt;
 
 public:

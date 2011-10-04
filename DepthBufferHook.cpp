@@ -64,6 +64,7 @@ struct DFLIST {
   char		*Name;
 }
 
+/* these are all available ones */
 ReplacementList[8] = {
   CODE_INTZ, "INTZ",
   D3DFMT_D24S8, "D24S8",
@@ -77,6 +78,7 @@ ReplacementList[8] = {
   D3DFMT_D16, "DF16",*/
 },
 
+/* these ones can be read (and bound at the same time) */
 #define RAWZINDEX 3
 DepthList[4] = {
   CODE_INTZ, "INTZ",
@@ -105,6 +107,16 @@ D3DFORMAT GetDepthBufferFormat(IDirect3D9 *pD3D, D3DFORMAT def, D3DMULTISAMPLE_T
   return def;
 }
 
+#ifdef	OBGE_NOSHADER
+static bool DoesRESZflag = false;
+static bool DoesNULLflag = false;
+static bool DoesFCH4flag = false;
+
+bool DoesRESZ(void) { return DoesRESZflag; };
+bool DoesNULL(void) { return DoesNULLflag; };
+bool DoesFCH4(void) { return DoesFCH4flag; };
+#endif
+
 bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3DDevice9 *D3DDevice) {
   HRESULT hr;
   UInt32 Width, Height;
@@ -122,7 +134,16 @@ bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3
   D3DDevice->GetDirect3D(&pD3D);
   pD3D->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm);
 
+#ifdef	OBGE_NOSHADER
+  DoesRESZflag = (D3D_OK == pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, CODE_RESZ));
+  DoesNULLflag = (D3D_OK == pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, CODE_NULL));
+  DoesFCH4flag = (D3D_OK == pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, CODE_DF24));
+#endif
+
   if (UseDepthBuffer.Get()) {
+    /* even if the old format was INTZ we need to allocate a
+     * seperate surface to allow it to be bound as a texture
+     */
     D3DDevice->GetDepthStencilSurface(&pOldSurface);
     pOldSurface->GetDesc(&DepthInfo);
     HasDepthVar = true;
@@ -151,7 +172,7 @@ bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3
 	// Bind depth buffer if not multi-sampled
         hr = D3DDevice->SetDepthStencilSurface(pDepthSurface);
         if (hr == D3D_OK) {
-          _MESSAGE("Depth buffer attached OK. %i", DepthCount);
+          _MESSAGE("Depth buffer reattached OK. %i", DepthCount);
 
 #ifndef	OBGE_NOSHADER
 	  /* register in the device-tracker because apparently
@@ -181,7 +202,7 @@ bool v1_2_416::NiDX9ImplicitDepthStencilBufferDataEx::GetBufferDataHook(IDirect3
           break;
         }
         else {
-          _MESSAGE("Failed to attach depth buffer.");
+          _MESSAGE("Failed to reattach depth buffer.");
 
           pDepthSurface->Release();
           pDepthTexture->Release();
@@ -242,7 +263,16 @@ void static _cdecl DepthBufferHook(IDirect3DDevice9 *Device, UInt32 u2) {
   Device->GetDirect3D(&pD3D);
   pD3D->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm);
 
+#ifdef	OBGE_NOSHADER
+  DoesRESZflag = (D3D_OK == pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, CODE_RESZ));
+  DoesNULLflag = (D3D_OK == pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, CODE_NULL));
+  DoesFCH4flag = (D3D_OK == pD3D->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, CODE_DF24));
+#endif
+
   if (UseDepthBuffer.Get()) {
+    /* even if the old format was INTZ we need to allocate a
+     * seperate surface to allow it to be bound as a texture
+     */
     Device->GetDepthStencilSurface(&pOldSurface);
     pOldSurface->GetDesc(&DepthInfo);
     HasDepthVar = true;
@@ -271,7 +301,7 @@ void static _cdecl DepthBufferHook(IDirect3DDevice9 *Device, UInt32 u2) {
 	// Bind depth buffer if not multi-sampled
         hr = Device->SetDepthStencilSurface(pDepthSurface);
         if (hr == D3D_OK) {
-          _MESSAGE("Depth buffer attached OK. %i", DepthCount);
+          _MESSAGE("Depth buffer reattached OK. %i", DepthCount);
 
 #ifndef	OBGE_NOSHADER
 	  /* register in the device-tracker because apparently
@@ -301,7 +331,7 @@ void static _cdecl DepthBufferHook(IDirect3DDevice9 *Device, UInt32 u2) {
           break;
         }
         else {
-          _MESSAGE("Failed to attach depth buffer.");
+          _MESSAGE("Failed to reattach depth buffer.");
           pDepthSurface->Release();
           pDepthTexture->Release();
         }
@@ -464,7 +494,15 @@ bool ResolveDepthBuffer(IDirect3DDevice9 *Device) {
   return false;
 };
 
-IDirect3DTexture9 *GetDepthBufferTexture(void) {
+IDirect3DSurface9 *GetStencilSurface() {
+  return pOldSurface;
+};
+
+IDirect3DSurface9 *GetDepthBufferSurface() {
+  return pDepthSurface;
+};
+
+IDirect3DTexture9 *GetDepthBufferTexture() {
   return pDepthTexture;
 };
 
