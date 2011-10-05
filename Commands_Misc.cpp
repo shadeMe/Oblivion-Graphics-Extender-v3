@@ -110,7 +110,7 @@ static bool DumpFrameSurfaces_Execute(COMMAND_ARGS) {
 #ifdef	OBGE_DEVLING
 static bool OpenShaderDeveloper_Execute(COMMAND_ARGS) {
   if (IsEnabled())
-    DebugWindow::Create();
+    DebugWindow::Expunge();
 
   *result = 0;
   return true;

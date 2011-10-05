@@ -447,6 +447,7 @@ inline void EffectQueue::Init(EffectBuffer *past,
 			      EffectBuffer *alt, bool stencil) {
   this->past = past;
   this->prev = prev;
+  this->prvl = NULL;
 
   queue[1] = alt;
 
@@ -488,7 +489,10 @@ inline void EffectQueue::Begin(EffectBuffer *orig,
   rotate[EQLAST] = orig;
 }
 
-inline void EffectQueue::Begin(ID3DXEffect *pEffect) {
+inline void EffectQueue::Begin(ID3DXEffect *pEffect, unsigned long Parameters) {
+  /* configure the backup of the past effect's rendertarget per effect */
+  prvl = (Parameters & EFFECTBUF_PREV ? prev : NULL);
+
   /* set this effects initial constant parameters */
   if (past) past->SetTexture("obge_PastRendertarget%d_MAINPASS", pEffect);
   /*     */ orig->SetTexture("oblv_CurrRendertarget%d_MAINPASS", pEffect);
@@ -501,6 +505,8 @@ inline void EffectQueue::Begin(ID3DXEffect *pEffect) {
 }
 
 inline void EffectQueue::Swap(ID3DXEffect *pEffect) {
+  rotate[EQPREV] = (prvl ? prvl->Copy(device, rotate[EQPREV]), prvl : rotate[EQPREV]);
+  rotate[EQPREV]->SetTexture("obge_PrevRendertarget%d_EFFECTPASS", pEffect);
   rotate[EQLAST]->SetTexture("obge_LastRendertarget%d_EFFECTPASS", pEffect);
 
   alterning ^= 1; (rotate[EQLAST] = queue[alterning])->SetRenderTarget(device);
@@ -508,19 +514,7 @@ inline void EffectQueue::Swap(ID3DXEffect *pEffect) {
 }
 
 inline void EffectQueue::End(ID3DXEffect *pEffect) {
-  /* not allocated if not needed! */
-  if (prev) {
-    /* TODO: I believe this can be done, it's only complex */
-  /*if (alterning) {
-      IDirect3DSurface9 *swap[4];
-      swap[0] = prev[0];
-      prev[0] = queue[1][0];
-      queue[1][0] = swap[0];
-    }
-    else*/
-      /* once we have an updated prev we move to that rendertarget */
-      (rotate[EQPREV] = prev)->Copy(device, rotate[EQLAST]);
-  }
+  rotate[EQPREV] = rotate[EQLAST];
 }
 
 inline void EffectQueue::End(EffectBuffer *target) {
@@ -529,7 +523,9 @@ inline void EffectQueue::End(EffectBuffer *target) {
    */
   target->Copy(device, rotate[EQLAST]);
 
-  /* not allocated if not needed! */
+  /* not allocated if not needed! make a copy for the
+   * next frame, means frame 0 is always invalid
+   */
   if (past)
     past->Copy(device, orig);
 
@@ -1337,10 +1333,10 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue
   ApplyUniqueConstants();
 
 #ifdef	OBGE_STATEBLOCKS
-  UINT pass = 0; Queue->Begin(pEffect/*, OptionsPass[pass] & EFFECTOPT_STENCIL*/);
+  UINT pass = 0; Queue->Begin(pEffect, Parameters);
   UINT passes; pEffect->Begin(&passes, D3DXFX_DONOTSAVESTATE);
 #else
-  UINT pass = 0; Queue->Begin(pEffect);
+  UINT pass = 0; Queue->Begin(pEffect, Parameters);
   UINT passes; pEffect->Begin(&passes, 0);
 #endif
 
@@ -1355,6 +1351,8 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue
 
     if (++pass >= passes)
       break;
+
+    /* pass custom effect-parameters/conditions */
     if (swap)
       Queue->Swap(pEffect);
   }

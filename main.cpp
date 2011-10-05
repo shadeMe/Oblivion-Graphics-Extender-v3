@@ -239,7 +239,7 @@ void MessageHandler(OBSEMessagingInterface::Message* msg)
 #ifdef	OBGE_DEVLING
 		DebugWindow::Exit();
 #endif
-		ReleaseShader();
+//		ReleaseShader();
 		LostDepthBuffer(true, NULL);
 		break;
 	case OBSEMessagingInterface::kMessage_LoadGame:

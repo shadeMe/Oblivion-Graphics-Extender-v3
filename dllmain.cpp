@@ -56,13 +56,13 @@ void GlobalCleanup() {
 	DebugWindow::Exit();
 #endif
 
-	if (EffectManager::Singleton) delete EffectManager::Singleton;
+	if ( EffectManager::Singleton) delete  EffectManager::Singleton;
 	if (TextureManager::Singleton) delete TextureManager::Singleton;
-	if (ShaderManager::Singleton) delete ShaderManager::Singleton;
+	if ( ShaderManager::Singleton) delete  ShaderManager::Singleton;
 
 #ifndef	OBGE_NOSHADER
 	if (lastOBGEDirect3DDevice9) delete lastOBGEDirect3DDevice9;
-	if (lastOBGEDirect3D9) delete lastOBGEDirect3D9;
+	if (lastOBGEDirect3D9      ) delete lastOBGEDirect3D9;
 #endif
 }
 

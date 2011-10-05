@@ -5532,8 +5532,14 @@ WXDLLIMPEXP_BASE void wxSetInstance(HINSTANCE hInst);
 
 DebugWindow *dw = NULL;
 DebugWindow *DebugWindow::Create() {
-	if (!FullScreen.data && !dw)
-	  dw = new DebugWindow();
+	if (!FullScreen.data && !dw) {
+	  if (dw = new DebugWindow())
+	    _MESSAGE("ShaderDeveloper did open sucessfully");
+	  else
+	    _MESSAGE("ShaderDeveloper didn't open sucessfully");
+	}
+	else
+	  _MESSAGE("ShaderDeveloper can't start because of \"bFull Screen=1\"");
 
 	return dw;
 }
@@ -5558,6 +5564,8 @@ DebugWindow *DebugWindow::Expunge() {
 
 	  return DebugWindow::Create();
 	}
+	else
+	  _MESSAGE("ShaderDeveloper can't start because of \"bEnableDW=0\"");
 
 	return NULL;
 }

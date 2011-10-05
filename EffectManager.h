@@ -138,14 +138,14 @@ public:
 	void End(EffectBuffer *target);
 
 	/* over passes */
-	void Begin(ID3DXEffect *Effect);
+	void Begin(ID3DXEffect *Effect, unsigned long Parameters);
 	void Swap(ID3DXEffect *Effect);
 	void End(ID3DXEffect *Effect);
 
 public:
 	IDirect3DDevice9 *device;
 private:
-	EffectBuffer *past, *orig, *prev;
+	EffectBuffer *past, *orig, *prev, *prvl;
 	EffectBuffer *queue[2], *rotate[2];
 	int alterning, pos; int dsc;
 };
@@ -255,10 +255,17 @@ protected:
 	unsigned long			Parameters;
 	int				Priority;
 	int				Class;
+
 	int				Flags;
 	int				FlagsPass[16];
 	int				Options;
 	int				OptionsPass[16];
+
+	/* while it is attractive to give it an entire custom queue
+	 * (as it allows to pass custom data from frame to frame) we
+	 * currently maintain a custom queue per format (R16F fe.)
+	 */
+	EffectQueue *			CustomQueue;
 };
 
 class ManagedEffectRecord : public EffectRecord
