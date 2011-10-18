@@ -40,6 +40,8 @@
 #ifndef	OBGE_NOSHADER
 
 #include <intrin.h>
+
+#define D3DXFX_LARGEADDRESS_HANDLE
 #include <d3d9.h>
 #include <d3dx9.h>
 

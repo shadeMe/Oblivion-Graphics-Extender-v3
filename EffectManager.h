@@ -36,6 +36,7 @@
 
 #pragma once
 
+#define D3DXFX_LARGEADDRESS_HANDLE
 #include <d3dx9.h>
 
 #define _USE_MATH_DEFINES
@@ -113,6 +114,8 @@ public:
 	bool				IsTexture(IDirect3DBaseTexture9 *text) const;
 
 	void				SetTexture(const char *fmt, ID3DXEffect *Effect) const;
+	void				SetTexture(const D3DXHANDLE *hs, ID3DXEffect *pEffect) const;
+	void				SetTexture(const D3DXHANDLE hs, ID3DXEffect *pEffect) const;
 	void				SetRenderTarget(IDirect3DDevice9 *Device) const;
 	void				Copy(IDirect3DDevice9 *Device, EffectBuffer *from) const;
 	void				Copy(IDirect3DDevice9 *Device, IDirect3DSurface9 *from) const;
@@ -126,29 +129,59 @@ private:
 class EffectQueue
 {
 public:
+	EffectQueue(bool custom = false);
+	~EffectQueue();
+
+	void SetCustom(bool custom = false);
+
 	/* over frames */
-	void Init(EffectBuffer *past,
-		  EffectBuffer *prev,
+	void Init(EffectBuffer *prev,
 		  EffectBuffer *alt, bool stencil = false);
 
 	/* over effects */
 	void Begin(EffectBuffer *orig,
 		   EffectBuffer *target,
 		   EffectBuffer *alt);
-	void End(EffectBuffer *target);
+	void End(EffectBuffer *past,
+		 EffectBuffer *target);
 
 	/* over passes */
-	void Begin(ID3DXEffect *Effect, unsigned long Parameters);
-	void Swap(ID3DXEffect *Effect);
-	void End(ID3DXEffect *Effect);
+	void Begin(const D3DXHANDLE *h, ID3DXEffect *Effect, unsigned long Parameters);
+	void Swap(const D3DXHANDLE *h, ID3DXEffect *Effect);
+	void Pass(const D3DXHANDLE *h, ID3DXEffect *Effect);
+	void End(const D3DXHANDLE *h, ID3DXEffect *Effect);
 
 public:
 	IDirect3DDevice9 *device;
 private:
-	EffectBuffer *past, *orig, *prev, *prvl;
+	EffectBuffer *orig, *prev, *prvl;
 	EffectBuffer *queue[2], *rotate[2];
-	int alterning, pos; int dsc;
+	int alterning, pos; int dsc, dclr;
+
+	/* indices into the parameter-handles LUT */
+	unsigned int currHL, prevHL, lastHL;
 };
+
+class ManagedEffectQueue : public EffectQueue
+{
+	friend class EffectRecord;
+	friend class GUIs_ShaderDeveloper;
+
+public:
+	ManagedEffectQueue();
+	~ManagedEffectQueue();
+
+	void ClrRef();
+	int AddRef();
+	int Release();
+	int RefCount;
+
+private:
+	/* may need double-buffering */
+	EffectBuffer OrigRT, LastRT, TrgtRT;
+};
+
+typedef std::map<D3DFORMAT, ManagedEffectQueue> ManagedQueueList;
 
 class EffectRecord
 {
@@ -165,8 +198,9 @@ public:
 	bool CompileEffect(EffectManager *FXMan, bool forced = false);
 	bool SaveEffect();
 
-	void ApplyCompileDirectives();
+	void ApplyCompileDirectives(EffectManager *FXMan);
 	void ApplyPermanents(EffectManager *FXMan);
+	void ApplyCustomConstants();
 	void ApplySharedConstants();
 	void ApplyUniqueConstants();
 
@@ -174,6 +208,7 @@ public:
 	void OnResetDevice(void);
 
 	void Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo, IDirect3DSurface9 *RenderCopy);
+	bool Render(IDirect3DDevice9 *D3DDevice, ManagedEffectQueue *Queue);
 	bool Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue);
 	void Render(IDirect3DDevice9 *D3DDevice);
 
@@ -185,17 +220,17 @@ public:
 	bool SetEffectConstantV(const char *name, v1_2_416::NiVector4 *value);
 	bool SetEffectSamplerTexture(const char *name, int TextureNum);
 
-	bool GetEffectConstantHelps(std::map<std::string,std::string> &all);
-	bool GetEffectConstantTypes(std::map<std::string,int> &all);
-	bool GetEffectConstantHelp(const char *name, const char **help);
-	bool GetEffectConstantType(const char *name, int *type);
-	bool GetEffectConstantB(const char *name, bool *value);
-	bool GetEffectConstantI(const char *name, int *value);
-	bool GetEffectConstantI(const char *name, int *values, int num);
-	bool GetEffectConstantF(const char *name, float *value);
-	bool GetEffectConstantF(const char *name, float *values, int num);
-	bool GetEffectConstantV(const char *name, float *value);
-	bool GetEffectSamplerTexture(const char *name, int *TextureNum);
+	bool GetEffectConstantHelps(std::map<std::string,std::string> &all) const;
+	bool GetEffectConstantTypes(std::map<std::string,int> &all) const;
+	bool GetEffectConstantHelp(const char *name, const char **help) const;
+	bool GetEffectConstantType(const char *name, int *type) const;
+	bool GetEffectConstantB(const char *name, bool *value) const;
+	bool GetEffectConstantI(const char *name, int *value) const;
+	bool GetEffectConstantI(const char *name, int *values, int num) const;
+	bool GetEffectConstantF(const char *name, float *value) const;
+	bool GetEffectConstantF(const char *name, float *values, int num) const;
+	bool GetEffectConstantV(const char *name, float *value) const;
+	bool GetEffectSamplerTexture(const char *name, int *TextureNum) const;
 
 	void PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum = -1);
 	void SaveVars(OBSESerializationInterface *Interface);
@@ -230,6 +265,7 @@ public:
 
 private:
 	char				Name[100];
+	char				Prolog[100];
 	char				Filepath[MAX_PATH];
 	bool				Enabled;
 	bool				Private;
@@ -252,7 +288,29 @@ private:
 	std::vector<int>		Textures;
 
 protected:
+	/* handle-array */
+	D3DXHANDLE			h[256];
+
+	inline void SetValue(unsigned int hl, LPCVOID pData, UINT Bytes)  { if (h[hl]) pEffect->SetValue(h[hl], pData, Bytes); }
+	inline void SetBool(unsigned int hl, BOOL b)  { if (h[hl]) pEffect->SetBool(h[hl], b); }
+	inline void SetBoolArray(unsigned int hl, CONST BOOL* pb, UINT Count)  { if (h[hl]) pEffect->SetBoolArray(h[hl], pb, Count); }
+	inline void SetInt(unsigned int hl, INT n)  { if (h[hl]) pEffect->SetInt(h[hl], n); }
+	inline void SetIntArray(unsigned int hl, CONST INT* pn, UINT Count)  { if (h[hl]) pEffect->SetIntArray(h[hl], pn, Count); }
+	inline void SetFloat(unsigned int hl, FLOAT f)  { if (h[hl]) pEffect->SetFloat(h[hl], f); }
+	inline void SetFloatArray(unsigned int hl, CONST FLOAT* pf, UINT Count)  { if (h[hl]) pEffect->SetFloatArray(h[hl], pf, Count); }
+	inline void SetVector(unsigned int hl, CONST D3DXVECTOR4* pVector)  { if (h[hl]) pEffect->SetVector(h[hl], pVector); }
+	inline void SetVectorArray(unsigned int hl, CONST D3DXVECTOR4* pVector, UINT Count)  { if (h[hl]) pEffect->SetVectorArray(h[hl], pVector, Count); }
+	inline void SetMatrix(unsigned int hl, CONST D3DXMATRIX* pMatrix)  { if (h[hl]) pEffect->SetMatrix(h[hl], pMatrix); }
+	inline void SetMatrixArray(unsigned int hl, CONST D3DXMATRIX* pMatrix, UINT Count)  { if (h[hl]) pEffect->SetMatrixArray(h[hl], pMatrix, Count); }
+	inline void SetMatrixPointerArray(unsigned int hl, CONST D3DXMATRIX** ppMatrix, UINT Count)  { if (h[hl]) pEffect->SetMatrixPointerArray(h[hl], ppMatrix, Count); }
+	inline void SetMatrixTranspose(unsigned int hl, CONST D3DXMATRIX* pMatrix)  { if (h[hl]) pEffect->SetMatrixTranspose(h[hl], pMatrix); }
+	inline void SetMatrixTransposeArray(unsigned int hl, CONST D3DXMATRIX* pMatrix, UINT Count)  { if (h[hl]) pEffect->SetMatrixTransposeArray(h[hl], pMatrix, Count); }
+	inline void SetMatrixTransposePointerArray(unsigned int hl, CONST D3DXMATRIX** ppMatrix, UINT Count)  { if (h[hl]) pEffect->SetMatrixTransposePointerArray(h[hl], ppMatrix, Count); }
+	inline void SetString(unsigned int hl, LPCSTR pString)  { if (h[hl]) pEffect->SetString(h[hl], pString); }
+	inline void SetTexture(unsigned int hl, LPDIRECT3DBASETEXTURE9 pTexture)  { if (h[hl]) pEffect->SetTexture(h[hl], pTexture); }
+
 	unsigned long			Parameters;
+	unsigned long			ParametersCustom;
 	int				Priority;
 	int				Class;
 
@@ -260,12 +318,14 @@ protected:
 	int				FlagsPass[16];
 	int				Options;
 	int				OptionsPass[16];
+	int				OptionsCustom;
+	int				OptionsCustomPass[16];
 
 	/* while it is attractive to give it an entire custom queue
 	 * (as it allows to pass custom data from frame to frame) we
 	 * currently maintain a custom queue per format (R16F fe.)
 	 */
-	EffectQueue *			CustomQueue;
+	ManagedEffectQueue *		CustomQueue;
 };
 
 class ManagedEffectRecord : public EffectRecord
@@ -329,18 +389,22 @@ public:
 	void						Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo, IDirect3DSurface9 *RenderFrom);
 	void						RenderRAWZfix(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo);
 
+	inline ManagedEffectQueue *			RequestQueue(D3DFORMAT format);
+	void						ReleaseQueue(D3DFORMAT format);
+	void						ReleaseQueue(ManagedEffectQueue *queue);
+
 	int						AddPrivateEffect(const char *Filename, UINT32 refID);
 	int						AddManagedEffect(const char *Filename, UINT32 refID);
 	int						AddDependtEffect(const char *Filename, UINT32 refID);
 
 	inline bool					IsEffectValid(int EffectNum) const { return Effects.count(EffectNum) != 0; };
-	inline ManagedEffectRecord *			GetEffect(int EffectNum) { return (IsEffectValid(EffectNum) ? Effects[EffectNum] : NULL); };
+	inline ManagedEffectRecord *			GetEffect(int EffectNum) const { return (IsEffectValid(EffectNum) ? ((EffectRegistry &)Effects)[EffectNum] : NULL); };
 	bool						EnableEffect(int EffectNum, bool State);
 	bool						ReleaseEffect(int EffectNum);
 	void						FreeEffect(int EffectNum);
-	bool						GetEffectState(int EffectNum);
-	int						FindEffect(const char *Filename);
-	bool						GetEffects(int which, std::map<std::string,int> &all);
+	bool						GetEffectState(int EffectNum) const;
+	int						FindEffect(const char *Filename) const;
+	bool						GetEffects(int which, std::map<std::string,int> &all) const;
 
 	bool						SetEffectConstantB(int EffectNum, char *name, bool value);
 	bool						SetEffectConstantI(int EffectNum, char *name, int value);
@@ -350,17 +414,17 @@ public:
 	bool						SetEffectConstantV(int EffectNum, char *name, v1_2_416::NiVector4 *value);
 	bool						SetEffectSamplerTexture(int EffectNum, char *name, int TextureNum);
 
-	bool						GetEffectConstantHelps(int EffectNum, std::map<std::string,std::string> &all);
-	bool						GetEffectConstantTypes(int EffectNum, std::map<std::string,int> &all);
-	bool						GetEffectConstantHelp(int EffectNum, char *name, const char **help);
-	bool						GetEffectConstantType(int EffectNum, char *name, int *type);
-	bool						GetEffectConstantB(int EffectNum, char *name, bool *value);
-	bool						GetEffectConstantI(int EffectNum, char *name, int *value);
-	bool						GetEffectConstantI(int EffectNum, char *name, int *values, int num);
-	bool						GetEffectConstantF(int EffectNum, char *name, float *value);
-	bool						GetEffectConstantF(int EffectNum, char *name, float *values, int num);
-	bool						GetEffectConstantV(int EffectNum, char *name, float *value);
-	bool						GetEffectSamplerTexture(int EffectNum, char *name, int *TextureNum);
+	bool						GetEffectConstantHelps(int EffectNum, std::map<std::string,std::string> &all) const;
+	bool						GetEffectConstantTypes(int EffectNum, std::map<std::string,int> &all) const;
+	bool						GetEffectConstantHelp(int EffectNum, char *name, const char **help) const;
+	bool						GetEffectConstantType(int EffectNum, char *name, int *type) const;
+	bool						GetEffectConstantB(int EffectNum, char *name, bool *value) const;
+	bool						GetEffectConstantI(int EffectNum, char *name, int *value) const;
+	bool						GetEffectConstantI(int EffectNum, char *name, int *values, int num) const;
+	bool						GetEffectConstantF(int EffectNum, char *name, float *value) const;
+	bool						GetEffectConstantF(int EffectNum, char *name, float *values, int num) const;
+	bool						GetEffectConstantV(int EffectNum, char *name, float *value) const;
+	bool						GetEffectSamplerTexture(int EffectNum, char *name, int *TextureNum) const;
 
 	void						Recalculate();
 	void						PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum = -1);
@@ -394,6 +458,7 @@ struct EffectQuad { float x,y,z;      float u,v, i; };
 
 	long						RenderTransferZ;
 
+	ManagedQueueList				CustomQueues;
 	EffectQueue					RenderQueue;
 	unsigned long					RenderBuf;
 	unsigned long					RenderCnd;
@@ -409,6 +474,7 @@ public:
 	bool CompileSources();
 	bool Optimize();
 	bool UseEffectList();
+
 	const char *EffectDirectory();
 	const char *EffectListFile();
 

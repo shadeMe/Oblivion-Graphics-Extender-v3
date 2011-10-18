@@ -36,9 +36,11 @@
 
 #pragma once
 
+#define D3DXFX_LARGEADDRESS_HANDLE
+#include <d3dx9.h>
+
 #include "SpoofShader.h"
 #include "TextBuffer.h"
-#include "d3dx9.h"
 #include "EffectManager.h"
 #include <stdio.h>
 #include "obse\PluginAPI.h"

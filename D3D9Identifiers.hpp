@@ -37,6 +37,7 @@
 #ifndef	D3D9IDENTIFIERS_HPP
 #define	D3D9IDENTIFIERS_HPP
 
+#define D3DXFX_LARGEADDRESS_HANDLE
 #include <d3d9.h>
 #include <d3dx9.h>
 

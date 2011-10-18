@@ -293,11 +293,33 @@ extern struct sConstants
 	  /* make a new one */
 	  viewproj     =        view * proj;
 	  wrldviewproj = wrld * view * proj;
-
-	  /* inverse(s) */
+  
+	  /* inverse(s) of projection(s) */
 	  D3DXMatrixInverse(&proj_inv        , NULL, &proj        );
 	  D3DXMatrixInverse(&viewproj_inv    , NULL, &viewproj    );
 	  D3DXMatrixInverse(&wrldviewproj_inv, NULL, &wrldviewproj);
+
+#if 0
+	  D3DXVECTOR3 test(0.5f, 0.5f, 0.5f);
+	  D3DXVECTOR4 rest;
+	  D3DXVECTOR4 resr;
+
+	  // Transform (x, y, z, 1) by matrix.
+	  D3DXVec3Transform(&rest, &test, &proj_inv);
+	  D3DXVec4Transform(&resr, &rest, &proj);
+
+	  // Transform (x, y, z, 1) by matrix.
+	  D3DXVec3Transform(&rest, &test, &proj_inv);
+	  rest.x /= rest.w;
+	  rest.y /= rest.w;
+	  rest.z /= rest.w;
+	  rest.w /= rest.w;
+	  D3DXVec4Transform(&resr, &rest, &proj);
+	  resr.x /= resr.w;
+	  resr.y /= resr.w;
+	  resr.z /= resr.w;
+	  resr.w /= resr.w;
+#endif
 
 	  /* http://www.lighthouse3d.com/tutorials/view-frustum-culling/geometric-approach-extracting-the-planes/
 	   *

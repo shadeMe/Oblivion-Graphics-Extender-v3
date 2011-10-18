@@ -154,6 +154,7 @@ static FXIncludeManager incl;
 #define	EFFECTBUF_COPY		(1 <<  1)	// need frame "copy" because the effect surfaces have other format
 #define	EFFECTBUF_PREV		(1 <<  2)	// need previous effect "copy"
 #define	EFFECTBUF_PAST		(1 <<  3)	// need previous frame "copy"
+#define	EFFECTBUF_SKIP		(1 <<  4)	// the first pass is skip-swap or blend
 #define	EFFECTBUF_ACHN		EFFECTCOND_HASACHN
 #define	EFFECTBUF_SBUF		EFFECTCOND_HASSBUF
 #define	EFFECTBUF_WNRM		EFFECTCOND_HASWNRM
@@ -168,6 +169,7 @@ static FXIncludeManager incl;
 #define	EFFECTOPT_GATHER	(1 << 0)
 #define	EFFECTOPT_SKIPSWAP	(1 << 1)
 #define	EFFECTOPT_STENCIL	(1 << 2)
+#define	EFFECTOPT_BLENDING	EFFECTOPT_SKIPSWAP
 
 /* deprecated */
 #ifndef	NO_DEPRECATED
@@ -276,6 +278,7 @@ static myD3DXMACRO defs[] = {
   {"EFFECTOPT_GATHER"		, stringify(EFFECTOPT_GATHER		)},
   {"EFFECTOPT_SKIPSWAP"		, stringify(EFFECTOPT_SKIPSWAP		)},
   {"EFFECTOPT_STENCIL"		, stringify(EFFECTOPT_STENCIL		)},
+  {"EFFECTOPT_BLENDING"		, stringify(EFFECTOPT_BLENDING		)},
 
   {"D3DFMT_DEFAULT"	        , "0"},		// same format as main-pass surface
 
@@ -301,6 +304,210 @@ static myD3DXMACRO defs[] = {
 };
 
 /* #################################################################################################
+ * we have to use string-tables because we can not use fake-handles when LAA is enabled
+ */
+
+typedef struct _myD3DXCONST
+{
+  D3DXHANDLE Handle;
+  const char *Name;
+} myD3DXCONST;
+
+enum {
+  obge_PastRendertarget0_MAINPASS,
+  obge_PastRendertarget1_MAINPASS,
+  obge_PastRendertarget2_MAINPASS,
+  obge_PastRendertarget3_MAINPASS,
+
+  oblv_CurrRendertarget0_MAINPASS,
+  oblv_CurrRendertarget1_MAINPASS,
+  oblv_CurrRendertarget2_MAINPASS,
+  oblv_CurrRendertarget3_MAINPASS,
+
+  obge_PrevRendertarget0_EFFECTPASS,
+  obge_PrevRendertarget1_EFFECTPASS,
+  obge_PrevRendertarget2_EFFECTPASS,
+  obge_PrevRendertarget3_EFFECTPASS,
+
+  obge_LastRendertarget0_EFFECTPASS,
+  obge_LastRendertarget1_EFFECTPASS,
+  obge_LastRendertarget2_EFFECTPASS,
+  obge_LastRendertarget3_EFFECTPASS,
+
+  oblv_CurrCustomtarget0_MAINPASS,
+  oblv_CurrCustomtarget1_MAINPASS,
+  oblv_CurrCustomtarget2_MAINPASS,
+  oblv_CurrCustomtarget3_MAINPASS,
+
+  obge_PrevCustomtarget0_EFFECTPASS,
+  obge_PrevCustomtarget1_EFFECTPASS,
+  obge_PrevCustomtarget2_EFFECTPASS,
+  obge_PrevCustomtarget3_EFFECTPASS,
+
+  obge_LastCustomtarget0_EFFECTPASS,
+  obge_LastCustomtarget1_EFFECTPASS,
+  obge_LastCustomtarget2_EFFECTPASS,
+  obge_LastCustomtarget3_EFFECTPASS,
+
+  oblv_CurrWorldProjectedNormals_EFFECTPASS,
+  oblv_CurrWorldProjectedZXYL_EFFECTPASS,
+  oblv_CurrEyeProjectedNormals_EFFECTPASS,
+  oblv_CurrEyeProjectedZXYD_EFFECTPASS,
+  oblv_CurrLinearDepthZ_EFFECTPASS,
+  oblv_CurrDepthStencilZ_MAINPASS,
+
+  oblv_ReciprocalResolution_MAINPASS,
+
+  oblv_WorldTransform_MAINPASS,
+//oblv_WorldInverse_MAINPASS,
+  oblv_ViewTransform_MAINPASS,
+  oblv_ViewInverse_MAINPASS,
+  oblv_ProjectionTransform_MAINPASS,
+  oblv_ProjectionInverse_MAINPASS,
+
+  oblv_PastViewProjectionTransform_MAINPASS,
+  oblv_ViewProjectionTransform_MAINPASS,
+  oblv_ViewProjectionInverse_MAINPASS,
+
+  oblv_PastWorldViewProjectionTransform_MAINPASS,
+  oblv_WorldViewProjectionTransform_MAINPASS,
+  oblv_WorldViewProjectionInverse_MAINPASS,
+
+  oblv_CameraForward_MAINPASS,
+  oblv_CameraFrustum_MAINPASS,
+  oblv_CameraPosition_MAINPASS,
+
+  oblv_ProjectionDepthRange_MAINPASS,
+  oblv_ProjectionFoV_MAINPASS,
+
+  oblv_FogRange,
+  oblv_FogColor,
+  oblv_SunDirection,
+  oblv_SunTiming,
+
+  oblv_GameTime,
+  obge_Tick,
+
+#ifndef	NO_DEPRECATED
+  depr_f4Time,
+  depr_bHasDepth,
+  depr_rcpres,
+#endif
+
+#ifndef	OBGE_NOSHADER
+  oblv_Rendertarget0_REFLECTIONPASS,
+  oblv_Rendertarget1_REFLECTIONPASS,
+  oblv_Rendertarget2_REFLECTIONPASS,
+  oblv_Rendertarget3_REFLECTIONPASS,
+
+#ifndef	NO_DEPRECATED
+  depr_bHasReflection,
+#endif
+#endif
+
+  /* special */
+  zbufferTexture,
+
+  hndl_Size,
+};
+
+static myD3DXCONST hndl[] = {
+  { NULL, "obge_PastRendertarget0_MAINPASS" },
+  { NULL, "obge_PastRendertarget1_MAINPASS" },
+  { NULL, "obge_PastRendertarget2_MAINPASS" },
+  { NULL, "obge_PastRendertarget3_MAINPASS" },
+
+  { NULL, "oblv_CurrRendertarget0_MAINPASS" },
+  { NULL, "oblv_CurrRendertarget1_MAINPASS" },
+  { NULL, "oblv_CurrRendertarget2_MAINPASS" },
+  { NULL, "oblv_CurrRendertarget3_MAINPASS" },
+
+  { NULL, "obge_PrevRendertarget0_EFFECTPASS" },
+  { NULL, "obge_PrevRendertarget1_EFFECTPASS" },
+  { NULL, "obge_PrevRendertarget2_EFFECTPASS" },
+  { NULL, "obge_PrevRendertarget3_EFFECTPASS" },
+
+  { NULL, "obge_LastRendertarget0_EFFECTPASS" },
+  { NULL, "obge_LastRendertarget1_EFFECTPASS" },
+  { NULL, "obge_LastRendertarget2_EFFECTPASS" },
+  { NULL, "obge_LastRendertarget3_EFFECTPASS" },
+
+  { NULL, "oblv_CurrCustomtarget0_MAINPASS" },
+  { NULL, "oblv_CurrCustomtarget1_MAINPASS" },
+  { NULL, "oblv_CurrCustomtarget2_MAINPASS" },
+  { NULL, "oblv_CurrCustomtarget3_MAINPASS" },
+
+  { NULL, "obge_PrevCustomtarget0_EFFECTPASS" },
+  { NULL, "obge_PrevCustomtarget1_EFFECTPASS" },
+  { NULL, "obge_PrevCustomtarget2_EFFECTPASS" },
+  { NULL, "obge_PrevCustomtarget3_EFFECTPASS" },
+
+  { NULL, "obge_LastCustomtarget0_EFFECTPASS" },
+  { NULL, "obge_LastCustomtarget1_EFFECTPASS" },
+  { NULL, "obge_LastCustomtarget2_EFFECTPASS" },
+  { NULL, "obge_LastCustomtarget3_EFFECTPASS" },
+
+  { NULL, "oblv_CurrWorldProjectedNormals_EFFECTPASS" },
+  { NULL, "oblv_CurrWorldProjectedZXYL_EFFECTPASS" },
+  { NULL, "oblv_CurrEyeProjectedNormals_EFFECTPASS" },
+  { NULL, "oblv_CurrEyeProjectedZXYD_EFFECTPASS" },
+  { NULL, "oblv_CurrLinearDepthZ_EFFECTPASS" },
+  { NULL, "oblv_CurrDepthStencilZ_MAINPASS" },
+
+  { NULL, "oblv_ReciprocalResolution_MAINPASS" },
+
+  { NULL, "oblv_WorldTransform_MAINPASS" },
+//{ NULL, "oblv_WorldInverse_MAINPASS" },
+  { NULL, "oblv_ViewTransform_MAINPASS" },
+  { NULL, "oblv_ViewInverse_MAINPASS" },
+  { NULL, "oblv_ProjectionTransform_MAINPASS" },
+  { NULL, "oblv_ProjectionInverse_MAINPASS" },
+
+  { NULL, "oblv_PastViewProjectionTransform_MAINPASS" },
+  { NULL, "oblv_ViewProjectionTransform_MAINPASS" },
+  { NULL, "oblv_ViewProjectionInverse_MAINPASS" },
+
+  { NULL, "oblv_PastWorldViewProjectionTransform_MAINPASS" },
+  { NULL, "oblv_WorldViewProjectionTransform_MAINPASS" },
+  { NULL, "oblv_WorldViewProjectionInverse_MAINPASS" },
+
+  { NULL, "oblv_CameraForward_MAINPASS" },
+  { NULL, "oblv_CameraFrustum_MAINPASS" },
+  { NULL, "oblv_CameraPosition_MAINPASS" },
+
+  { NULL, "oblv_ProjectionDepthRange_MAINPASS" },
+  { NULL, "oblv_ProjectionFoV_MAINPASS" },
+
+  { NULL, "oblv_FogRange" },
+  { NULL, "oblv_FogColor" },
+  { NULL, "oblv_SunDirection" },
+  { NULL, "oblv_SunTiming" },
+
+  { NULL, "oblv_GameTime" },
+  { NULL, "obge_Tick" },
+
+#ifndef	NO_DEPRECATED
+  { NULL, "f4Time" },
+  { NULL, "bHasDepth" },
+  { NULL, "rcpres" },
+#endif
+
+#ifndef	OBGE_NOSHADER
+  { NULL, "oblv_Rendertarget0_REFLECTIONPASS" },
+  { NULL, "oblv_Rendertarget1_REFLECTIONPASS" },
+  { NULL, "oblv_Rendertarget2_REFLECTIONPASS" },
+  { NULL, "oblv_Rendertarget3_REFLECTIONPASS" },
+
+#ifndef	NO_DEPRECATED
+  { NULL, "bHasReflection" },
+#endif
+#endif
+
+  /* special */
+  { NULL, "zbufferTexture" },
+};
+
+/* #################################################################################################
  */
 
 EffectBuffer::EffectBuffer() {
@@ -320,6 +527,11 @@ inline HRESULT EffectBuffer::Initialize(IDirect3DTexture9 *text) {
 
   Tex[0] = text;
 //Tex[0]->GetSurfaceLevel(0, &Srf[0]);
+
+#if	defined(OBGE_AUTOMIPMAP)
+  if (Tex[0])
+    Tex[0]->SetAutoGenFilterType(AMFilter);
+#endif
 
   return (Srf[0] ? D3D_OK : S_FALSE);
 }
@@ -350,6 +562,11 @@ inline HRESULT EffectBuffer::Initialize(IDirect3DSurface9 *surf) {
   Tex[0] = text;
   Srf[0] = surf;
 
+#if	defined(OBGE_AUTOMIPMAP)
+  if (Tex[0])
+    Tex[0]->SetAutoGenFilterType(AMFilter);
+#endif
+
   return D3D_OK;
 }
 
@@ -368,12 +585,12 @@ inline HRESULT EffectBuffer::Initialize(const D3DFORMAT fmt[EBUFRT_NUM]) {
     if (!Tex[rt] && (fmt[rt] != D3DFMT_UNKNOWN)) {
 //    Release(rt, rt + 1);
 
-      if ((hr = lastOBGEDirect3DDevice9->CreateTexture(Width, Height, 1, EFFECT_USAGE, fmt[rt], D3DPOOL_DEFAULT, &Tex[0], 0)) == D3D_OK)
+      if ((hr = lastOBGEDirect3DDevice9->CreateTexture(Width, Height, 1, EFFECT_USAGE, fmt[rt], D3DPOOL_DEFAULT, &Tex[0], 0)) == D3D_OK) {
 	Tex[rt]->GetSurfaceLevel(0, &Srf[rt]);
 #if	defined(OBGE_AUTOMIPMAP)
-      if (Tex[rt] && (AMFilter != D3DTEXF_NONE))
 	Tex[rt]->SetAutoGenFilterType(AMFilter);
 #endif
+      }
 
       mne[rt] = true;
 
@@ -410,7 +627,41 @@ inline void EffectBuffer::SetTexture(const char *fmt, ID3DXEffect *pEffect) cons
   for (int rt = 0; rt < EBUFRT_NUM; rt++) {
     if (Tex[rt]) {
       sprintf(buf, fmt, rt);
-      pEffect->SetTexture(buf, Tex[rt]);
+      D3DXHANDLE hl = pEffect->GetParameterByName(NULL, buf);
+      if (hl) {
+	pEffect->SetTexture(hl, Tex[rt]);
+#if	defined(OBGE_AUTOMIPMAP)
+	Tex[rt]->SetAutoGenFilterType(AMFilter);
+#endif
+
+	assert(Tex[rt]->GetAutoGenFilterType() == AMFilter);
+      }
+    }
+  }
+}
+
+inline void EffectBuffer::SetTexture(const D3DXHANDLE *hs, ID3DXEffect *pEffect) const {
+  for (int rt = 0; rt < EBUFRT_NUM; rt++) {
+    if (Tex[rt] && hs[rt]) {
+      pEffect->SetTexture(hs[rt], Tex[rt]);
+#if	defined(OBGE_AUTOMIPMAP)
+      Tex[rt]->SetAutoGenFilterType(AMFilter);
+#endif
+
+      assert(Tex[rt]->GetAutoGenFilterType() == AMFilter);
+    }
+  }
+}
+
+inline void EffectBuffer::SetTexture(const D3DXHANDLE hs, ID3DXEffect *pEffect) const {
+  for (int rt = 0; rt < 1; rt++) {
+    if (Tex[rt] && hs) {
+      pEffect->SetTexture(hs, Tex[rt]);
+#if	defined(OBGE_AUTOMIPMAP)
+      Tex[rt]->SetAutoGenFilterType(AMFilter);
+#endif
+
+      assert(Tex[rt]->GetAutoGenFilterType() == AMFilter);
     }
   }
 }
@@ -439,13 +690,31 @@ inline void EffectBuffer::Copy(IDirect3DDevice9 *Device, IDirect3DSurface9 *from
 /* #################################################################################################
  */
 
+EffectQueue::EffectQueue(bool custom) {
+  SetCustom(custom);
+}
+
+EffectQueue::~EffectQueue() {
+}
+
+void EffectQueue::SetCustom(bool custom) {
+  if (custom) {
+    currHL = oblv_CurrCustomtarget0_MAINPASS;
+    prevHL = obge_PrevCustomtarget0_EFFECTPASS;
+    lastHL = obge_LastCustomtarget0_EFFECTPASS;
+  }
+  else {
+    currHL = oblv_CurrRendertarget0_MAINPASS;
+    prevHL = obge_PrevRendertarget0_EFFECTPASS;
+    lastHL = obge_LastRendertarget0_EFFECTPASS;
+  }
+}
+
 #define EQLAST	0
 #define EQPREV	1
 
-inline void EffectQueue::Init(EffectBuffer *past,
-			      EffectBuffer *prev,
+inline void EffectQueue::Init(EffectBuffer *prev,
 			      EffectBuffer *alt, bool stencil) {
-  this->past = past;
   this->prev = prev;
   this->prvl = NULL;
 
@@ -468,56 +737,90 @@ inline void EffectQueue::Begin(EffectBuffer *orig,
   else
     (queue[0] = alt)->Copy(device, target);
 
-  /* 1)  begin() alterning = 1
-   *  a) begin() alterning = 0, 0 == target, setrendertarget(target)
+  /* 1)  begin() alterning = 0
+   *  a) step()  alterning = 1, 1 == alt,    setrendertarget(alt)
+   *     end()
+   *  b) step()  alterning = 0, 0 == target, setrendertarget(target)
+   *     step()  alterning = 1, 1 == alt,    setrendertarget(alt)
+   *     skip()  alterning = 1, 1 == alt,    setrendertarget(alt)
+   *     end()
+   *  c) step()  alterning = 0, 0 == target, setrendertarget(target)
    *     step()  alterning = 1, 1 == alt,    setrendertarget(alt)
    *     end()
-   *  b) begin() alterning = 0, 0 == target, setrendertarget(target)
-   *     step()  alterning = 1, 1 == alt,    setrendertarget(alt)
-   *     step()  alterning = 0, 0 == target, setrendertarget(target)
-   *     end()
-   *  c) begin() alterning = 1, 1 == alt,    setrendertarget(alt)
-   *     step()  alterning = 0, 0 == target, setrendertarget(target)
-   *     step()  alterning = 1, 1 == alt,    setrendertarget(alt)
-   *     end()
-   *     end()   alterning = 1, 1 == alt, copy alt to target
+   *     end()   alterning = 1, 1 == alt,    copy alt to target
    */
-  alterning = 1;
+  alterning = 0;
 
   /* initially prev is orig */
   rotate[EQPREV] = orig;
   rotate[EQLAST] = orig;
 }
 
-inline void EffectQueue::Begin(ID3DXEffect *pEffect, unsigned long Parameters) {
+inline void EffectQueue::Begin(const D3DXHANDLE *h, ID3DXEffect *pEffect, unsigned long Parameters) {
   /* configure the backup of the past effect's rendertarget per effect */
   prvl = (Parameters & EFFECTBUF_PREV ? prev : NULL);
+  dclr = D3DCLEAR_TARGET | dsc;
 
-  /* set this effects initial constant parameters */
-  if (past) past->SetTexture("obge_PastRendertarget%d_MAINPASS", pEffect);
-  /*     */ orig->SetTexture("oblv_CurrRendertarget%d_MAINPASS", pEffect);
+  /* set this effects initial constant parameters (unbind any possible future RT) */
+  /*     */ orig->SetTexture(h + currHL, pEffect);
 
-  rotate[EQPREV]->SetTexture("obge_PrevRendertarget%d_EFFECTPASS", pEffect);
-  rotate[EQLAST]->SetTexture("obge_LastRendertarget%d_EFFECTPASS", pEffect);
+  /* we need a valid incoming state (textures and rt bound correctly) */
+  if ((Parameters & EFFECTBUF_SKIP)) {
+    if ((Parameters & EFFECTBUF_PREV) && prev) {
+      rotate[EQPREV] = (prev->Copy(device, rotate[EQPREV]), prev);
+      rotate[EQPREV]->SetTexture(h + prevHL, pEffect);
+      rotate[EQPREV]->SetTexture(h + lastHL, pEffect);
+    }
+    else {
+      /*     */ orig->SetTexture(h + prevHL, pEffect);
+      /*     */ orig->SetTexture(h + lastHL, pEffect);
+    }
 
-  alterning ^= 1; (rotate[EQLAST] = queue[alterning])->SetRenderTarget(device);
-  device->Clear(0, NULL, D3DCLEAR_TARGET | dsc, 0, 1.0f, 0);
+    /* the very first pass of all can not write to the last rendertarget
+     * which is the original surface, which is either not writable, or
+     * need to be preserved for later access
+     */
+    if (!alterning) {
+      if (rotate[EQLAST]->IsValid()) {
+	queue[0]->Copy(device, rotate[EQLAST]);
+	dclr &= ~D3DCLEAR_TARGET;
+      }
+    }
+    else
+      dclr &= ~D3DCLEAR_TARGET;
+
+    (rotate[EQLAST] = queue[(alterning += 0) & 1])->SetRenderTarget(device);
+    device->Clear(0, NULL, dclr, 0, 1.0f, 0); dclr = D3DCLEAR_TARGET;
+  }
 }
 
-inline void EffectQueue::Swap(ID3DXEffect *pEffect) {
+inline void EffectQueue::Swap(const D3DXHANDLE *h, ID3DXEffect *pEffect) {
   rotate[EQPREV] = (prvl ? prvl->Copy(device, rotate[EQPREV]), prvl : rotate[EQPREV]);
-  rotate[EQPREV]->SetTexture("obge_PrevRendertarget%d_EFFECTPASS", pEffect);
-  rotate[EQLAST]->SetTexture("obge_LastRendertarget%d_EFFECTPASS", pEffect);
+  rotate[EQPREV]->SetTexture(h + prevHL, pEffect);
+  rotate[EQLAST]->SetTexture(h + lastHL, pEffect);
 
-  alterning ^= 1; (rotate[EQLAST] = queue[alterning])->SetRenderTarget(device);
-  device->Clear(0, NULL, D3DCLEAR_TARGET, 0, 1.0f, 0);
+  (rotate[EQLAST] = queue[(alterning += 1) & 1])->SetRenderTarget(device);
+  device->Clear(0, NULL, dclr, 0, 1.0f, 0); dclr = D3DCLEAR_TARGET;
 }
 
-inline void EffectQueue::End(ID3DXEffect *pEffect) {
+inline void EffectQueue::End(const D3DXHANDLE *h, ID3DXEffect *pEffect) {
   rotate[EQPREV] = rotate[EQLAST];
 }
 
-inline void EffectQueue::End(EffectBuffer *target) {
+inline void EffectQueue::Pass(const D3DXHANDLE *h, ID3DXEffect *pEffect) {
+//rotate[EQPREV]->SetTexture(h + obge_PrevCustomtarget0_EFFECTPASS, pEffect);
+  rotate[EQLAST]->SetTexture(h + obge_LastCustomtarget0_EFFECTPASS, pEffect);
+
+  /* reset queue */
+  alterning = 0;
+
+  /* successive prev is orig */
+  rotate[EQPREV] = orig;
+  rotate[EQLAST] = orig;
+}
+
+inline void EffectQueue::End(EffectBuffer *past,
+			     EffectBuffer *target) {
   /* this occurs when "target" never entered the queue,
    * or when we have an odd number of accumulated passes
    */
@@ -537,6 +840,35 @@ inline void EffectQueue::End(EffectBuffer *target) {
 #undef EQLAST
 #undef EQPREV
 
+// *********************************************************************************************************
+
+ManagedEffectQueue::ManagedEffectQueue() {
+  RefCount = 0;
+}
+
+ManagedEffectQueue::~ManagedEffectQueue() {
+}
+
+void ManagedEffectQueue::ClrRef() {
+  RefCount = 0;
+}
+
+int ManagedEffectQueue::AddRef() {
+  return ++RefCount;
+}
+
+int ManagedEffectQueue::Release() {
+  if (RefCount)
+    RefCount--;
+
+  if (!RefCount) {
+//  delete this;
+    return 0;
+  }
+
+  return RefCount;
+}
+
 /* #################################################################################################
  */
 
@@ -555,6 +887,7 @@ EffectRecord::EffectRecord() {
   pSource = NULL; sourceLen = 0;
   pErrorMsgs = NULL;
   pDisasmbly = NULL;
+  CustomQueue = NULL;
 
   Parameters = 0;
   Priority = 0;
@@ -569,6 +902,7 @@ EffectRecord::~EffectRecord() {
   if (pSource) delete[] pSource;
   if (pErrorMsgs) pErrorMsgs->Release();
   if (pDisasmbly) pDisasmbly->Release();
+  if (CustomQueue) EffectManager::GetSingleton()->ReleaseQueue(CustomQueue);
 
   /* release previous texture */
   TextureManager *TexMan = TextureManager::GetSingleton();
@@ -586,6 +920,7 @@ void EffectRecord::Kill() {
   if (pSource) delete[] pSource;
   if (pErrorMsgs) pErrorMsgs->Release();
   if (pDisasmbly) pDisasmbly->Release();
+  if (CustomQueue) EffectManager::GetSingleton()->ReleaseQueue(CustomQueue);
 
   this->pDefine = NULL;
   this->pBinary = NULL;
@@ -593,12 +928,17 @@ void EffectRecord::Kill() {
   this->pSource = NULL;
   this->pErrorMsgs = NULL;
   this->pDisasmbly = NULL;
+  this->CustomQueue = NULL;
 
   this->Name[0] = '\0';
   this->Filepath[0] = '\0';
 }
 
 bool EffectRecord::LoadEffect(const char *Filename, UINT32 refID, bool Private, D3DXMACRO *defs) {
+  if (refID != NULL) {
+    int a = 0;
+  }
+
   Kill();
 
   if (strlen(Filename) > 240)
@@ -688,11 +1028,13 @@ bool EffectRecord::RuntimeFlush() {
   if (pEffect) pEffect->Release();
   if (pErrorMsgs) pErrorMsgs->Release();
   if (pDisasmbly) pDisasmbly->Release();
+  if (CustomQueue) EffectManager::GetSingleton()->ReleaseQueue(CustomQueue);
 
   pBinary = NULL;
   pEffect = NULL;
   pErrorMsgs = NULL;
   pDisasmbly = NULL;
+  CustomQueue = NULL;
 
   return true;
 }
@@ -776,6 +1118,7 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
       len,
       pDefine,
       &incl,
+      D3DXFX_LARGEADDRESSAWARE |
       D3DXSHADER_DEBUG | (
       ::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
       ::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
@@ -793,6 +1136,7 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
 	len,
 	pDefine,
 	&incl,
+	D3DXFX_LARGEADDRESSAWARE |
 	D3DXSHADER_DEBUG | (
 	D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
 	&c,
@@ -813,7 +1157,8 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
       pErrorMsgs->Release();
       pErrorMsgs = NULL;
 
-      res = c->CompileEffect(
+      res = c->CompileEffect(/*
+	D3DXFX_LARGEADDRESSAWARE*/ 0 |
 	D3DXSHADER_DEBUG | (
 	::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
 	::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
@@ -826,7 +1171,8 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
 	pErrorMsgs->Release();
 	pErrorMsgs = NULL;
 
-	res = c->CompileEffect(
+	res = c->CompileEffect(/*
+	  D3DXFX_LARGEADDRESSAWARE*/ 0 |
 	  D3DXSHADER_DEBUG | (
 	  D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
 	  &p,
@@ -866,6 +1212,7 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
 	p->GetBufferSize(),
 	pDefine,
 	&incl,
+	D3DXFX_LARGEADDRESSAWARE |
 	D3DXSHADER_DEBUG | (
 	::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
 	::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
@@ -887,6 +1234,7 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
 	len,
 	pDefine,
 	&incl,
+	D3DXFX_LARGEADDRESSAWARE |
 	D3DXSHADER_DEBUG | (
 	::UseLegacyCompiler.Get() ? D3DXSHADER_USE_LEGACY_D3DX9_31_DLL : (
 	::Optimize.Get()          ? D3DXSHADER_OPTIMIZATION_LEVEL3 : 0)),
@@ -910,6 +1258,7 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
 	  p->GetBufferSize(),
 	  pDefine,
 	  &incl,
+	  D3DXFX_LARGEADDRESSAWARE |
 	  D3DXSHADER_DEBUG | (
 	  D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
 	  FXMan ? FXMan->EffectPool : NULL,
@@ -930,6 +1279,7 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
 	  len,
 	  pDefine,
 	  &incl,
+	  D3DXFX_LARGEADDRESSAWARE |
 	  D3DXSHADER_DEBUG | (
 	  D3DXSHADER_USE_LEGACY_D3DX9_31_DLL),
 	  FXMan ? FXMan->EffectPool : NULL,
@@ -964,24 +1314,29 @@ bool EffectRecord::CompileEffect(EffectManager *FXMan, bool forced) {
         &pDisasmbly
       );
 
-    ApplyCompileDirectives();
+    ApplyCompileDirectives(FXMan);
   }
 
   return (pSource && (pEffect != NULL));
 }
 
-void EffectRecord::ApplyCompileDirectives() {
+void EffectRecord::ApplyCompileDirectives(EffectManager *FXMan) {
   if (!HasEffect()) return;
-  LPCSTR pName = NULL; pEffect->GetString("Name", &pName);
-  if (pName)
-    strcpy(Name, (char *)pName);
+
+  /* get an alternative name if possible */
+  D3DXHANDLE hName = pEffect->GetParameterByName(NULL, "Name");
+  LPCSTR pName = NULL;
+  if (hName) pEffect->GetString(hName, &pName);
+  if (pName) strcpy(Name, (char *)pName);
 
   /* obtain a copy of the old resources */
   TextureManager *TexMan = TextureManager::GetSingleton();
   std::vector<int> prevTextures = Textures; Textures.clear();
   D3DXEFFECT_DESC Description;
   pEffect->GetDesc(&Description);
+
   Parameters = 0;
+  ParametersCustom = 0;
 
   /* extract parameter informations */
   for (int par = 0; par < Description.Parameters; par++) {
@@ -1061,22 +1416,37 @@ void EffectRecord::ApplyCompileDirectives() {
     }
   }
 
+  /* extract parameter handles */
+  memset(h, 0, sizeof(h));
+  for (int s = 0; s < hndl_Size; s++)
+    h[s] = pEffect->GetParameterByName(NULL, hndl[s].Name);
+
   /* clear */
   Priority = (EFFECTGROUP_MAIN    << 24) |
 	     (EFFECTCLASS_NEUTRAL << 17);
   Class = EFFECTCLASS_NEUTRAL;
   Flags = 0;
   Options = 0;
+  OptionsCustom = 0;
   memset(FlagsPass, 0, sizeof(FlagsPass));
   memset(OptionsPass, 0, sizeof(OptionsPass));
+  memset(OptionsCustomPass, 0, sizeof(OptionsCustomPass));
+  D3DFORMAT format = D3DFMT_UNKNOWN;
 
-  /* extract technique informations */
-  for (int teq = 0; teq < Description.Techniques; teq++) {
+  /* extract technique informations in reverse (top technique selected) */
+  for (int teq = Description.Techniques - 1; teq >= 0; teq--) {
     D3DXHANDLE handle;
 
     if ((handle = pEffect->GetTechnique(teq))) {
       D3DXTECHNIQUE_DESC Description;
       pEffect->GetTechniqueDesc(handle, &Description);
+
+      /* custom render-queue */
+      bool prolog = false;
+      if ((prolog = !stricmp(Description.Name, "prolog")))
+	;
+      else
+	pEffect->SetTechnique(handle);
 
       for (int ann = 0; ann < Description.Annotations; ann++) {
 	D3DXHANDLE handle2;
@@ -1108,16 +1478,19 @@ void EffectRecord::ApplyCompileDirectives() {
 	  }
 	  else if ((Description.Name == strstr(Description.Name, "rendertarget"))) {
 	    if (Description.Type == D3DXPT_INT) {
+	      pEffect->GetInt(handle2, (INT *)&format);
+	      if ( prolog) if (!CustomQueue) CustomQueue = FXMan->RequestQueue(format);
 	    }
 	  }
 	  else if ((Description.Name == strstr(Description.Name, "conditions"))) {
 	    if (Description.Type == D3DXPT_INT) {
-	      pEffect->GetInt(handle2, &this->Flags);
+	      if (!prolog) pEffect->GetInt(handle2, &this->Flags);
 	    }
 	  }
 	  else if ((Description.Name == strstr(Description.Name, "options"))) {
 	    if (Description.Type == D3DXPT_INT) {
-	      pEffect->GetInt(handle2, &this->Options);
+	      if (!prolog) pEffect->GetInt(handle2, &this->Options);
+	      else         pEffect->GetInt(handle2, &this->OptionsCustom);
 	    }
 	  }
 	  else if ((Description.Name == strstr(Description.Name, "dependency"))) {
@@ -1138,6 +1511,7 @@ void EffectRecord::ApplyCompileDirectives() {
 	}
       }
 
+      /* TODO, if just one pass, prev is not needed */
       for (int pas = 0; (pas < Description.Passes) && (pas < 16); pas++) {
 	D3DXHANDLE handle2;
 
@@ -1148,26 +1522,48 @@ void EffectRecord::ApplyCompileDirectives() {
 	  for (int ann = 0; ann < Description.Annotations; ann++) {
 	    D3DXHANDLE handle3;
 
-	    if ((handle3 = pEffect->GetAnnotation(handle, ann))) {
+	    if ((handle3 = pEffect->GetAnnotation(handle2, ann))) {
 	      D3DXPARAMETER_DESC Description;
 	      pEffect->GetParameterDesc(handle3, &Description);
 
 	      // int conditions = ...;
 	      if ((Description.Name == strstr(Description.Name, "conditions"))) {
 		if (Description.Type == D3DXPT_INT) {
-		  pEffect->GetInt(handle2, &this->FlagsPass[pas]);
+		  if (!prolog) pEffect->GetInt(handle3, &this->FlagsPass[pas]);
 		}
 	      }
 	      else if ((Description.Name == strstr(Description.Name, "options"))) {
 		if (Description.Type == D3DXPT_INT) {
-		  pEffect->GetInt(handle2, &this->OptionsPass[pas]);
+		  if (!prolog) pEffect->GetInt(handle3, &this->OptionsPass[pas]);
+		  else         pEffect->GetInt(handle3, &this->OptionsCustomPass[pas]);
 		}
 	      }
 	    }
 	  }
 	}
       }
+
+      /* no double-buffering for the custom pass, the main pass has always two buffers */
+      if (Description.Passes == 1) {
+	if (prolog) OptionsCustomPass[0] |= EFFECTOPT_SKIPSWAP;
+	else        ;
+      }
+
+      /* if the first pass is skip, act accordingly */
+      if (prolog) ParametersCustom |= ((OptionsCustomPass[0] & EFFECTOPT_SKIPSWAP) ? EFFECTBUF_SKIP : 0);
+      else        Parameters       |= ((OptionsPass      [0] & EFFECTOPT_SKIPSWAP) ? EFFECTBUF_SKIP : 0);
     }
+  }
+
+  /* allocate and initialize custom queue (ready to go) */
+  if (CustomQueue) {
+    /* onepass, it's froozen, so only last is used all the time (no swap occurs) */
+    CustomQueue->TrgtRT.Initialize(format); if (!(ParametersCustom & EFFECTBUF_SKIP))
+    CustomQueue->LastRT.Initialize(format);
+
+    /* Orig is a fake ... */
+    CustomQueue->Init(NULL, &CustomQueue->LastRT, (OptionsCustom & EFFECTOPT_STENCIL) ? true : false);
+    CustomQueue->Begin(&CustomQueue->OrigRT, &CustomQueue->TrgtRT, NULL);
   }
 
   /* release previous texture */
@@ -1184,87 +1580,95 @@ void EffectRecord::ApplyCompileDirectives() {
 
 inline void EffectRecord::ApplyPermanents(EffectManager *FXMan) {
 #ifdef	OLD_QUEUE
-  pEffect->SetTexture("obge_PrevRendertarget0_EFFECTPASS", FXMan->thisframeTex);
-  pEffect->SetTexture("obge_LastRendertarget0_EFFECTPASS", FXMan->lastpassTex);
-  pEffect->SetTexture("obge_PastRendertarget0_MAINPASS"  , FXMan->lastframeTex);
-  pEffect->SetTexture("oblv_CurrDepthStencilZ_MAINPASS"  , FXMan->depth);
+  SetTexture(obge_PrevRendertarget0_EFFECTPASS, FXMan->thisframeTex);
+  SetTexture(obge_LastRendertarget0_EFFECTPASS, FXMan->lastpassTex);
+  SetTexture(obge_PastRendertarget0_MAINPASS  , FXMan->lastframeTex);
+  SetTexture(oblv_CurrDepthStencilZ_MAINPASS  , FXMan->depth);
 #else
-//pEffect->SetTexture("obge_PrevRendertarget0_EFFECTPASS", FXMan->thisframeTex);
-//pEffect->SetTexture("obge_LastRendertarget0_EFFECTPASS", FXMan->lastpassTex);
-//pEffect->SetTexture("obge_PastRendertarget0_MAINPASS"  , FXMan->lastframeTex);
+//SetTexture(obge_PrevRendertarget0_EFFECTPASS, FXMan->thisframeTex);
+//SetTexture(obge_LastRendertarget0_EFFECTPASS, FXMan->lastpassTex);
+//SetTexture(obge_PastRendertarget0_MAINPASS  , FXMan->lastframeTex);
+
+  /* past is a frame-buffer copy and never changes */
+  FXMan->PastRT.SetTexture(h + obge_PastRendertarget0_MAINPASS, pEffect);
 
   /* convert WHATEVER to linearized form (CurrDS) */
   /* convert linearized to unlinearize form (OrigDS) */
   if (FXMan->RenderTransferZ) {
     if (FXMan->RenderTransferZ > EFFECTBUF_RAWZ) {
-      FXMan->CurrNM.SetTexture("oblv_CurrWorldProjectedNormals_EFFECTPASS", pEffect);
-      FXMan->CurrDS.SetTexture("oblv_CurrWorldProjectedZXYL_EFFECTPASS", pEffect);
+      FXMan->CurrNM.SetTexture(h[oblv_CurrWorldProjectedNormals_EFFECTPASS], pEffect);
+      FXMan->CurrDS.SetTexture(h[oblv_CurrWorldProjectedZXYL_EFFECTPASS], pEffect);
 
-      FXMan->CurrNM.SetTexture("oblv_CurrEyeProjectedNormals_EFFECTPASS", pEffect);
-      FXMan->CurrDS.SetTexture("oblv_CurrEyeProjectedZXYD_EFFECTPASS", pEffect);
+      FXMan->CurrNM.SetTexture(h[oblv_CurrEyeProjectedNormals_EFFECTPASS], pEffect);
+      FXMan->CurrDS.SetTexture(h[oblv_CurrEyeProjectedZXYD_EFFECTPASS], pEffect);
 
-      FXMan->CurrDS.SetTexture("oblv_CurrLinearDepthZ_EFFECTPASS", pEffect);
-      FXMan->OrigDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect);
+      FXMan->CurrDS.SetTexture(h[oblv_CurrLinearDepthZ_EFFECTPASS], pEffect);
+      FXMan->OrigDS.SetTexture(h[oblv_CurrDepthStencilZ_MAINPASS], pEffect);
     }
     else
       /* convert linearized to unlinearize form (OrigDS) */
-      FXMan->CurrDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect);
+      FXMan->CurrDS.SetTexture(h[oblv_CurrDepthStencilZ_MAINPASS], pEffect);
   }
   else
     /* convert linearized to unlinearize form (OrigDS) */
-    FXMan->OrigDS.SetTexture("oblv_CurrDepthStencilZ_MAINPASS", pEffect);
+    FXMan->OrigDS.SetTexture(h[oblv_CurrDepthStencilZ_MAINPASS], pEffect);
 #endif
 
-  pEffect->SetVector("oblv_ReciprocalResolution_MAINPASS", &Constants.rcpres);
+  SetVector(oblv_ReciprocalResolution_MAINPASS, &Constants.rcpres);
 
   /* deprecated */
 #ifndef	NO_DEPRECATED
-  pEffect->SetBool("bHasDepth", Constants.bHasDepth);
-  pEffect->SetFloatArray("rcpres", (float *)&Constants.rcpres, 2);
+  SetBool(depr_bHasDepth, Constants.bHasDepth);
+  SetFloatArray(depr_rcpres, (float *)&Constants.rcpres, 2);
 #endif
 }
 
+inline void EffectRecord::ApplyCustomConstants() {
+  if (CustomQueue)
+    CustomQueue->Pass(h, pEffect);
+}
+
 inline void EffectRecord::ApplySharedConstants() {
-  pEffect->SetMatrix("oblv_WorldTransform_MAINPASS", &Constants.wrld);
-//pEffect->SetMatrix("oblv_WorldInverse_MAINPASS", &Constants.wrld_inv);
-  pEffect->SetMatrix("oblv_ViewTransform_MAINPASS", &Constants.view);
-  pEffect->SetMatrix("oblv_ViewInverse_MAINPASS", &Constants.view_inv);
-  pEffect->SetMatrix("oblv_ProjectionTransform_MAINPASS", &Constants.proj);
-  pEffect->SetMatrix("oblv_ProjectionInverse_MAINPASS", &Constants.proj_inv);
+  SetMatrix(oblv_WorldTransform_MAINPASS, &Constants.wrld);
+//SetMatrix(oblv_WorldInverse_MAINPASS, &Constants.wrld_inv);
+  SetMatrix(oblv_ViewTransform_MAINPASS, &Constants.view);
+  SetMatrix(oblv_ViewInverse_MAINPASS, &Constants.view_inv);
+  SetMatrix(oblv_ProjectionTransform_MAINPASS, &Constants.proj);
+  SetMatrix(oblv_ProjectionInverse_MAINPASS, &Constants.proj_inv);
 
-  pEffect->SetMatrix("oblv_PastViewProjectionTransform_MAINPASS", &Constants.pastviewproj);
-  pEffect->SetMatrix("oblv_ViewProjectionTransform_MAINPASS", &Constants.viewproj);
-  pEffect->SetMatrix("oblv_ViewProjectionInverse_MAINPASS", &Constants.viewproj_inv);
+  SetMatrix(oblv_PastViewProjectionTransform_MAINPASS, &Constants.pastviewproj);
+  SetMatrix(oblv_ViewProjectionTransform_MAINPASS, &Constants.viewproj);
+  SetMatrix(oblv_ViewProjectionInverse_MAINPASS, &Constants.viewproj_inv);
 
-  pEffect->SetMatrix("oblv_PastWorldViewProjectionTransform_MAINPASS", &Constants.pastwrldviewproj);
-  pEffect->SetMatrix("oblv_WorldViewProjectionTransform_MAINPASS", &Constants.wrldviewproj);
-  pEffect->SetMatrix("oblv_WorldViewProjectionInverse_MAINPASS", &Constants.wrldviewproj_inv);
+  SetMatrix(oblv_PastWorldViewProjectionTransform_MAINPASS, &Constants.pastwrldviewproj);
+  SetMatrix(oblv_WorldViewProjectionTransform_MAINPASS, &Constants.wrldviewproj);
+  SetMatrix(oblv_WorldViewProjectionInverse_MAINPASS, &Constants.wrldviewproj_inv);
 
-  pEffect->SetFloatArray("oblv_CameraForward_MAINPASS", &Constants.EyeForward.x, 3);
-  pEffect->SetMatrix("oblv_CameraFrustum_MAINPASS", &Constants.EyeFrustum);
-  pEffect->SetVector("oblv_CameraPosition_MAINPASS", &Constants.EyePosition);
+  SetFloatArray(oblv_CameraForward_MAINPASS, &Constants.EyeForward.x, 3);
+  SetMatrix(oblv_CameraFrustum_MAINPASS, &Constants.EyeFrustum);
+  SetVector(oblv_CameraPosition_MAINPASS, &Constants.EyePosition);
 
-  pEffect->SetVector("oblv_ProjectionDepthRange_MAINPASS", &Constants.ZRange);
-  pEffect->SetVector("oblv_ProjectionFoV_MAINPASS", &Constants.FoV);
+  SetVector(oblv_ProjectionDepthRange_MAINPASS, &Constants.ZRange);
+  SetVector(oblv_ProjectionFoV_MAINPASS, &Constants.FoV);
 
-  pEffect->SetVector("oblv_FogRange", &Constants.FogRange);
-  pEffect->SetVector("oblv_FogColor", &Constants.FogColor);
-  pEffect->SetVector("oblv_SunDirection", &Constants.SunDir);
-  pEffect->SetVector("oblv_SunTiming", &Constants.SunTiming);
+  SetVector(oblv_FogRange, &Constants.FogRange);
+  SetVector(oblv_FogColor, &Constants.FogColor);
+  SetVector(oblv_SunDirection, &Constants.SunDir);
+  SetVector(oblv_SunTiming, &Constants.SunTiming);
 
-  pEffect->SetIntArray("oblv_GameTime", &Constants.iGameTime.x, 4);
-  pEffect->SetIntArray("obge_Tick", &Constants.iTikTiming.x, 4);
+  SetIntArray(oblv_GameTime, &Constants.iGameTime.x, 4);
+  SetIntArray(obge_Tick, &Constants.iTikTiming.x, 4);
 
 #ifndef	NO_DEPRECATED
-  pEffect->SetVector("f4Time", &Constants.time);
+  SetVector(depr_f4Time, &Constants.time);
 #endif
 
 #ifndef	OBGE_NOSHADER
-  pEffect->SetTexture("oblv_Rendertarget0_REFLECTIONPASS", passTexture[OBGEPASS_REFLECTION]);
+  SetTexture(oblv_Rendertarget0_REFLECTIONPASS, passTexture[OBGEPASS_REFLECTION]);
 
   /* deprecated */
 #ifndef	NO_DEPRECATED
-  pEffect->SetBool("bHasReflection", !!passTexture[OBGEPASS_REFLECTION]);
+  SetBool(depr_bHasReflection, !!passTexture[OBGEPASS_REFLECTION]);
 #endif
 #endif
 }
@@ -1292,9 +1696,10 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 
   // uses the last vertex effect that was active and much strangeness occurs.
   D3DDevice->SetVertexShader(NULL);
 
+  /* sampler-states have become increasingly complex, we really need to save some state from now on */
 #ifdef	OBGE_STATEBLOCKS
   UINT pass = 0;
-  UINT passes; pEffect->Begin(&passes, D3DXFX_DONOTSAVESTATE);
+  UINT passes; pEffect->Begin(&passes, D3DXFX_DONOTSAVESHADERSTATE | D3DXFX_DONOTSAVESAMPLERSTATE /*| D3DXFX_DONOTSAVESTATE*/);
 #else
   UINT pass = 0;
   UINT passes; pEffect->Begin(&passes, 0);
@@ -1317,7 +1722,7 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 
   markerStop(D3DDevice);
 }
 
-inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue) {
+inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, ManagedEffectQueue *Queue) {
   if (!IsEnabled())
     return false;
 
@@ -1332,30 +1737,89 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue
 #endif
   ApplyUniqueConstants();
 
+  /* sampler-states have become increasingly complex, we really need to save some state from now on */
 #ifdef	OBGE_STATEBLOCKS
-  UINT pass = 0; Queue->Begin(pEffect, Parameters);
-  UINT passes; pEffect->Begin(&passes, D3DXFX_DONOTSAVESTATE);
+  UINT pass = 0; Queue->Begin(h, pEffect, ParametersCustom);
+  UINT passes; pEffect->Begin(&passes, D3DXFX_DONOTSAVESHADERSTATE | D3DXFX_DONOTSAVESAMPLERSTATE /*| D3DXFX_DONOTSAVESTATE*/);
 #else
-  UINT pass = 0; Queue->Begin(pEffect, Parameters);
+  UINT pass = 0; Queue->Begin(h, pEffect, Parameters);
   UINT passes; pEffect->Begin(&passes, 0);
 #endif
 
-  while (true) {
-    /* allow freeze of swap-chain (fe. writing to temporary rendertargets) */
-    bool swap = !(OptionsPass[pass] & EFFECTOPT_SKIPSWAP);
+  /* Begin() makes no swap */
+  do {
+    /* allow freeze of swap-chain (fe. just one pass) */
+    if (!(OptionsCustomPass[pass] & EFFECTOPT_SKIPSWAP))
+      Queue->Swap(h, pEffect);
 
     /* this sets the sampler-values */
     pEffect->BeginPass(pass);
     D3DDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
     pEffect->EndPass();
+  } while (++pass < passes);
 
-    if (++pass >= passes)
-      break;
+  pEffect->End();
 
-    /* pass custom effect-parameters/conditions */
-    if (swap)
-      Queue->Swap(pEffect);
+#ifdef	OBGE_DEVLING
+  sprintf(Prolog, "%s [prolog]", this->GetName());
+  passScene = Prolog;
+#endif
+
+  markerStop(D3DDevice);
+
+  Queue->End(h, pEffect);
+
+  return true;
+}
+
+inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue) {
+  if (!IsEnabled())
+    return false;
+
+  /* run the custom queue first (with almost all bells'n'wistles) */
+  if (CustomQueue) {
+    D3DXHANDLE teq = pEffect->GetCurrentTechnique();
+    D3DXHANDLE pro = pEffect->GetTechniqueByName("prolog");
+
+    pEffect->SetTechnique(pro);
+    CustomQueue->device = D3DDevice;
+    Render(D3DDevice, CustomQueue);
+    pEffect->SetTechnique(teq);
+
+    ApplyCustomConstants();
   }
+
+  markerStart(D3DDevice);
+
+  // Have to do this in case the effect has no vertex effect. The stupid effect system
+  // uses the last vertex effect that was active and much strangeness occurs.
+  D3DDevice->SetVertexShader(NULL);
+
+#ifndef OBGE_CONSTANTPOOLS
+  ApplySharedConstants();
+#endif
+  ApplyUniqueConstants();
+
+  /* sampler-states have become increasingly complex, we really need to save some state from now on */
+#ifdef	OBGE_STATEBLOCKS
+  UINT pass = 0; Queue->Begin(h, pEffect, Parameters);
+  UINT passes; pEffect->Begin(&passes, D3DXFX_DONOTSAVESHADERSTATE | D3DXFX_DONOTSAVESAMPLERSTATE /*| (Options & EFFECTOPT_BLENDING ? 0 : D3DXFX_DONOTSAVESTATE)*/);
+#else
+  UINT pass = 0; Queue->Begin(h, pEffect, Parameters);
+  UINT passes; pEffect->Begin(&passes, 0);
+#endif
+
+  /* Begin() makes no swap */
+  do {
+    /* allow freeze of swap-chain (fe. writing to temporary rendertargets) */
+    if (!(OptionsPass[pass] & EFFECTOPT_SKIPSWAP))
+      Queue->Swap(h, pEffect);
+
+    /* this sets the sampler-values */
+    pEffect->BeginPass(pass);
+    D3DDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
+    pEffect->EndPass();
+  } while (++pass < passes);
 
   pEffect->End();
 
@@ -1365,7 +1829,7 @@ inline bool EffectRecord::Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue
 
   markerStop(D3DDevice);
 
-  Queue->End(pEffect);
+  Queue->End(h, pEffect);
 
   return true;
 }
@@ -1385,22 +1849,20 @@ inline void EffectRecord::Render(IDirect3DDevice9 *D3DDevice) {
 #endif
   ApplyUniqueConstants();
 
+  /* sampler-states have become increasingly complex, we really need to save some state from now on */
 #ifdef	OBGE_STATEBLOCKS
   UINT pass = 0;
-  UINT passes; pEffect->Begin(&passes, D3DXFX_DONOTSAVESTATE);
+  UINT passes; pEffect->Begin(&passes, D3DXFX_DONOTSAVESHADERSTATE | D3DXFX_DONOTSAVESAMPLERSTATE /*| D3DXFX_DONOTSAVESTATE*/);
 #else
   UINT pass = 0;
   UINT passes; pEffect->Begin(&passes, 0);
 #endif
 
-  while (true) {
+  do {
     pEffect->BeginPass(pass);
     D3DDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
     pEffect->EndPass();
-
-    if (++pass >= passes)
-      break;
-  }
+  } while (++pass < passes);
 
   pEffect->End();
 
@@ -1470,13 +1932,12 @@ inline void EffectRecord::SetPriority(int pri) {
   this->Priority = (this->Priority & (0xFF << 24)) | (pri & ~(0xFF << 24));
 }
 
-bool EffectRecord::GetEffectConstantHelps(std::map<std::string,std::string> &all) {
+bool EffectRecord::GetEffectConstantHelps(std::map<std::string,std::string> &all) const {
   if (!HasEffect()) return false;
   all.clear();
 
   D3DXEFFECT_DESC Description;
   pEffect->GetDesc(&Description);
-  Parameters = 0;
 
   /* extract parameter informations */
   for (int par = 0; par < Description.Parameters; par++) {
@@ -1503,13 +1964,12 @@ bool EffectRecord::GetEffectConstantHelps(std::map<std::string,std::string> &all
   return true;
 }
 
-bool EffectRecord::GetEffectConstantTypes(std::map<std::string,int> &all) {
+bool EffectRecord::GetEffectConstantTypes(std::map<std::string,int> &all) const {
   if (!HasEffect()) return false;
   all.clear();
 
   D3DXEFFECT_DESC Description;
   pEffect->GetDesc(&Description);
-  Parameters = 0;
 
   /* extract parameter informations */
   for (int par = 0; par < Description.Parameters; par++) {
@@ -1548,7 +2008,7 @@ bool EffectRecord::GetEffectConstantTypes(std::map<std::string,int> &all) {
   return true;
 }
 
-bool EffectRecord::GetEffectConstantHelp(const char *name, const char **help) {
+bool EffectRecord::GetEffectConstantHelp(const char *name, const char **help) const {
   D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
   if (hl) {
     D3DXPARAMETER_DESC desc;
@@ -1570,7 +2030,7 @@ bool EffectRecord::GetEffectConstantHelp(const char *name, const char **help) {
   return false;
 }
 
-bool EffectRecord::GetEffectConstantType(const char *name, int *type) {
+bool EffectRecord::GetEffectConstantType(const char *name, int *type) const {
   D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
   if (hl) {
     D3DXPARAMETER_DESC desc;
@@ -1602,46 +2062,53 @@ bool EffectRecord::GetEffectConstantType(const char *name, int *type) {
   return false;
 }
 
-bool EffectRecord::GetEffectConstantB(const char *name, bool *value) {
-  HRESULT hr = (HasEffect() ? pEffect->GetBool(name, (BOOL *)value) : -1);
+bool EffectRecord::GetEffectConstantB(const char *name, bool *value) const {
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  HRESULT hr = (hl ? pEffect->GetBool(hl, (BOOL *)value) : -1);
   return (hr == D3D_OK);
 }
 
-bool EffectRecord::GetEffectConstantI(const char *name, int *value) {
-  HRESULT hr = (HasEffect() ? pEffect->GetInt(name, value) : -1);
+bool EffectRecord::GetEffectConstantI(const char *name, int *value) const {
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  HRESULT hr = (hl ? pEffect->GetInt(hl, value) : -1);
   return (hr == D3D_OK);
 }
 
-bool EffectRecord::GetEffectConstantI(const char *name, int *values, int num) {
-  HRESULT hr = (HasEffect() ? pEffect->GetIntArray(name, values, num) : -1);
+bool EffectRecord::GetEffectConstantI(const char *name, int *values, int num) const {
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  HRESULT hr = (hl ? pEffect->GetIntArray(hl, values, num) : -1);
   return (hr == D3D_OK);
 }
 
-bool EffectRecord::GetEffectConstantF(const char *name, float *value) {
-  HRESULT hr = (HasEffect() ? pEffect->GetFloat(name, value) : -1);
+bool EffectRecord::GetEffectConstantF(const char *name, float *value) const {
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  HRESULT hr = (hl ? pEffect->GetFloat(hl, value) : -1);
   return (hr == D3D_OK);
 }
 
-bool EffectRecord::GetEffectConstantF(const char *name, float *values, int num) {
-  HRESULT hr = (HasEffect() ? pEffect->GetFloatArray(name, values, num) : -1);
+bool EffectRecord::GetEffectConstantF(const char *name, float *values, int num) const {
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  HRESULT hr = (hl ? pEffect->GetFloatArray(hl, values, num) : -1);
   return (hr == D3D_OK);
 }
 
-bool EffectRecord::GetEffectConstantV(const char *name, float *value) {
-  HRESULT hr = (HasEffect() ? pEffect->GetVector(name, (D3DXVECTOR4 *)value) : -1);
+bool EffectRecord::GetEffectConstantV(const char *name, float *value) const {
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  HRESULT hr = (hl ? pEffect->GetVector(hl, (D3DXVECTOR4 *)value) : -1);
   return (hr == D3D_OK);
 }
 
-bool EffectRecord::GetEffectSamplerTexture(const char *name, int *TextureNum) {
-  TextureManager *TexMan = TextureManager::GetSingleton();
-  if (!HasEffect()) return false;
+bool EffectRecord::GetEffectSamplerTexture(const char *name, int *TextureNum) const {
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  if (!hl) return false;
 
-  IDirect3DBaseTexture9 *OldTexture = NULL;
   /* get old one */
-  pEffect->GetTexture(name, (LPDIRECT3DBASETEXTURE9 *)&OldTexture);
+  IDirect3DBaseTexture9 *OldTexture = NULL;
+  pEffect->GetTexture(hl, (LPDIRECT3DBASETEXTURE9 *)&OldTexture);
 
   /* remove any trace of the texture from this effect */
   if (OldTexture) {
+    TextureManager *TexMan = TextureManager::GetSingleton();
     *TextureNum = TexMan->FindTexture(OldTexture);
     return true;
   }
@@ -1650,44 +2117,52 @@ bool EffectRecord::GetEffectSamplerTexture(const char *name, int *TextureNum) {
 }
 
 bool EffectRecord::SetEffectConstantB(const char *name, bool value) {
-  HRESULT hr = (HasEffect() ? pEffect->SetBool(name, value) : -1);
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  HRESULT hr = (hl ? pEffect->SetBool(hl, value) : -1);
   return (hr == D3D_OK);
 }
 
 bool EffectRecord::SetEffectConstantI(const char *name, int value) {
-  HRESULT hr = (HasEffect() ? pEffect->SetInt(name, value) : -1);
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  HRESULT hr = (hl ? pEffect->SetInt(hl, value) : -1);
   return (hr == D3D_OK);
 }
 
 bool EffectRecord::SetEffectConstantI(const char *name, int *values, int num) {
-  HRESULT hr = (HasEffect() ? pEffect->SetIntArray(name, values, num) : -1);
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  HRESULT hr = (hl ? pEffect->SetIntArray(hl, values, num) : -1);
   return (hr == D3D_OK);
 }
 
 bool EffectRecord::SetEffectConstantF(const char *name, float value) {
-  HRESULT hr = (HasEffect() ? pEffect->SetFloat(name, value) : -1);
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  HRESULT hr = (hl ? pEffect->SetFloat(hl, value) : -1);
   return (hr == D3D_OK);
 }
 
 bool EffectRecord::SetEffectConstantF(const char *name, float *values, int num) {
-  HRESULT hr = (HasEffect() ? pEffect->SetFloatArray(name, values, num) : -1);
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  HRESULT hr = (hl ? pEffect->SetFloatArray(hl, values, num) : -1);
   return (hr == D3D_OK);
 }
 
 bool EffectRecord::SetEffectConstantV(const char *name, v1_2_416::NiVector4 *value) {
-  HRESULT hr = (HasEffect() ? pEffect->SetVector(name, value) : -1);
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  HRESULT hr = (hl ? pEffect->SetVector(hl, value) : -1);
   return (hr == D3D_OK);
 }
 
 bool EffectRecord::SetEffectSamplerTexture(const char *name, int TextureNum) {
-  TextureManager *TexMan = TextureManager::GetSingleton();
-  if (!HasEffect()) return false;
+  D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
+  if (!hl) return false;
 
-  IDirect3DBaseTexture9 *OldTexture = NULL;
+  TextureManager *TexMan = TextureManager::GetSingleton();
+
   /* get old one */
-  pEffect->GetTexture(name, (LPDIRECT3DBASETEXTURE9 *)&OldTexture);
+  IDirect3DBaseTexture9 *OldTexture = NULL;
+  pEffect->GetTexture(hl, (LPDIRECT3DBASETEXTURE9 *)&OldTexture);
   /* and dereference */
-  pEffect->SetTexture(name, NULL);
+  pEffect->SetTexture(hl, NULL);
 
   /* remove any trace of the texture from this effect */
   if (OldTexture) {
@@ -1702,7 +2177,7 @@ bool EffectRecord::SetEffectSamplerTexture(const char *name, int TextureNum) {
   /* apply the new texture and remember it */
   TextureRecord *NewTexture = TexMan->GetTexture(TextureNum);
   if (NewTexture) {
-    HRESULT hr = pEffect->SetTexture(name, NewTexture->GetTexture());
+    HRESULT hr = pEffect->SetTexture(hl, NewTexture->GetTexture());
 
     /* add to vector */
     if (hr == D3D_OK)
@@ -2588,7 +3063,6 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
 
   RenderQueue.device = D3DDevice;
   RenderQueue.Init(
-    (RenderBuf & EFFECTBUF_PAST) ? &PastRT : NULL,
     (RenderBuf & EFFECTBUF_PREV) ? &PrevRT : NULL,
 				   &LastRT,
     (RenderOpt & EFFECTOPT_STENCIL) ? true : false
@@ -2627,11 +3101,29 @@ void EffectManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *Rende
 #endif
 
   RenderQueue.End(
+    (RenderBuf & EFFECTBUF_PAST) ? &PastRT : NULL,
 				   &TrgtRT
   );
 #endif
 
   markerStart(D3DDevice);
+}
+
+inline ManagedEffectQueue *EffectManager::RequestQueue(D3DFORMAT format) {
+  ManagedEffectQueue &q = CustomQueues[format];
+  if (q.AddRef() == 1) { q.SetCustom(true); } return &q;
+}
+
+void EffectManager::ReleaseQueue(D3DFORMAT format) {
+  ManagedEffectQueue &q = CustomQueues[format];
+  if (q.Release() == 0) { CustomQueues.erase(format); }
+}
+
+void EffectManager::ReleaseQueue(ManagedEffectQueue *queue) {
+  ManagedQueueList::iterator q;
+  for (q = CustomQueues.begin(); q != CustomQueues.end(); q++)
+    if (&q->second == queue)
+  if (q->second.Release() == 0) { CustomQueues.erase(q); break; }
 }
 
 void EffectManager::RenderRAWZfix(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo) {
@@ -2673,6 +3165,7 @@ int EffectManager::AddPrivateEffect(const char *Filename, UINT32 refID) {
 
   /* register */
   Effects[EffectIndex++] = NewEffect;
+  assert(Effects.size() == ManagedEffects.size());
 
   return EffectIndex - 1;
 }
@@ -2714,6 +3207,7 @@ int EffectManager::AddManagedEffect(const char *Filename, UINT32 refID) {
 
   /* register */
   Effects[EffectIndex++] = NewEffect;
+  assert(Effects.size() == ManagedEffects.size());
 
   return EffectIndex - 1;
 }
@@ -2753,12 +3247,13 @@ int EffectManager::AddDependtEffect(const char *Filename, UINT32 refID) {
 
   /* register */
   Effects[EffectIndex++] = NewEffect;
+  assert(Effects.size() == ManagedEffects.size());
 
   return EffectIndex - 1;
 }
 
-int EffectManager::FindEffect(const char *Filename) {
-  EffectRegistry::iterator SEffect = Effects.begin();
+int EffectManager::FindEffect(const char *Filename) const {
+  EffectRegistry::const_iterator SEffect = Effects.begin();
 
   /* search for a non-private effect */
   while (SEffect != Effects.end()) {
@@ -2845,14 +3340,19 @@ void EffectManager::LoadEffectList() {
 	    EffectBuffer[lastpos - 2] = 0;
           }
 
-	  /* TODO: don't count this as ref */
-          int EffectNum = AddManagedEffect(EffectBuffer, 0);
-	  if (EffectNum != -1) {
-	    ManagedEffectRecord *pEffect;
+	  /* allow comments and sections */
+	  if ((EffectBuffer[0] != '\0') &&
+	      (EffectBuffer[0] != ';') &&
+	      (EffectBuffer[0] != '[')) {
+	    /* TODO: don't count this as ref */
+	    int EffectNum = AddManagedEffect(EffectBuffer, 0);
+	    if (EffectNum != -1) {
+	      ManagedEffectRecord *pEffect;
 
-	    pEffect = GetEffect(EffectNum);
-            pEffect->Enable(enabled);
-	  //pEffect->ClrRef();
+	      pEffect = GetEffect(EffectNum);
+	      pEffect->Enable(enabled);
+	    //pEffect->ClrRef();
+	    }
 	  }
         }
       }
@@ -2889,7 +3389,7 @@ void EffectManager::NewGame() {
       /* disable, but have them cached */
       Effect->second->Enable(false);
       /* reset to initial state */
-      Effect->second->ApplyCompileDirectives();
+      Effect->second->ApplyCompileDirectives(this);
       /* TODO ClrRef clears enabled as well, logical, no? */
       Effect->second->ClrRef();
 
@@ -2957,7 +3457,7 @@ void EffectManager::SaveGame(OBSESerializationInterface *Interface) {
 
 void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
   UInt32 type, version, length;
-  int LoadShaderNum;
+  int LoadShaderNum, LoadEffectIndex;
   char LoadFilepath[260];
   bool LoadEnabled;
   UInt32 LoadRefID;
@@ -2966,8 +3466,8 @@ void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
   Interface->GetNextRecordInfo(&type, &version, &length);
 
   if (type == 'SIDX') {
-    Interface->ReadRecordData(&EffectIndex, length);
-    _MESSAGE("Save-game references to %i effects.", EffectIndex);
+    Interface->ReadRecordData(&LoadEffectIndex, length);
+    _MESSAGE("Save-game references to max. %i effects.", LoadEffectIndex);
   }
   else {
     _MESSAGE("No effect data in save-game.");
@@ -3078,12 +3578,21 @@ void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
 
       /* register */
       if (LoadShaderNum != EffectNum) {
-	Effects.erase(EffectNum);
-	Effects[LoadShaderNum] = NewEffect;
-      }
+	ManagedEffectRecord *
 
-      if (EffectIndex <= LoadShaderNum)
-	EffectIndex = LoadShaderNum + 1;
+	/* swap positions */
+	OldEffect = Effects[LoadShaderNum];
+	Effects[LoadShaderNum] = NewEffect;
+	if (OldEffect)
+	  Effects[EffectNum] = OldEffect;
+	else
+	  Effects.erase(EffectNum);
+
+	if (EffectIndex <= LoadShaderNum)
+	  EffectIndex = LoadShaderNum + 1;
+
+	assert(Effects.size() == ManagedEffects.size());
+      }
     }
 
     else {
@@ -3096,6 +3605,8 @@ void EffectManager::LoadGame(OBSESerializationInterface *Interface) {
 
     Interface->GetNextRecordInfo(&type, &version, &length);
   }
+
+  assert(Effects.size() == ManagedEffects.size());
 }
 
 bool EffectManager::EnableEffect(int EffectNum, bool State) {
@@ -3107,27 +3618,27 @@ bool EffectManager::EnableEffect(int EffectNum, bool State) {
   return false;
 }
 
-bool EffectManager::GetEffects(int which, std::map<std::string,int> &all) {
+bool EffectManager::GetEffects(int which, std::map<std::string,int> &all) const {
   all.clear();
 
-  ManagedEffectList::iterator pEffect = ManagedEffects.begin();
+  ManagedEffectList::const_iterator pEffect = ManagedEffects.begin();
 
   while (pEffect != ManagedEffects.end()) {
     if (!(*pEffect)->IsPrivate()) {
       if ((*pEffect)->GetEffect()) {
 	/**/ if (which < 0) {
-	  if ((*pEffect)->IsEnabled())
-	    continue;
+	  if ((*pEffect)->IsEnabled()) {
+	    pEffect++; continue; }
 	}
 	else if (which > 0) {
-	  if (!(*pEffect)->IsEnabled())
-	    continue;
+	  if (!(*pEffect)->IsEnabled()) {
+	    pEffect++; continue; }
 	}
 
 	/* this is very bad ... linear search */
 	int EffectNum = -1;
 
-	EffectRegistry::iterator IEffect = Effects.begin();
+	EffectRegistry::const_iterator IEffect = Effects.begin();
 	while (IEffect != Effects.end()) {
 	  if (IEffect->second == (*pEffect)) {
 	    EffectNum = IEffect->first;
@@ -3150,8 +3661,8 @@ bool EffectManager::GetEffects(int which, std::map<std::string,int> &all) {
   return true;
 }
 
-bool EffectManager::GetEffectConstantHelps(int EffectNum, std::map<std::string,std::string> &all) {
-  ManagedEffectRecord *pEffect;
+bool EffectManager::GetEffectConstantHelps(int EffectNum, std::map<std::string,std::string> &all) const {
+  const ManagedEffectRecord *pEffect;
 
   if ((pEffect = GetEffect(EffectNum)))
     return pEffect->GetEffectConstantHelps(all);
@@ -3159,8 +3670,8 @@ bool EffectManager::GetEffectConstantHelps(int EffectNum, std::map<std::string,s
   return false;
 }
 
-bool EffectManager::GetEffectConstantTypes(int EffectNum, std::map<std::string,int> &all) {
-  ManagedEffectRecord *pEffect;
+bool EffectManager::GetEffectConstantTypes(int EffectNum, std::map<std::string,int> &all) const {
+  const ManagedEffectRecord *pEffect;
 
   if ((pEffect = GetEffect(EffectNum)))
     return pEffect->GetEffectConstantTypes(all);
@@ -3168,8 +3679,8 @@ bool EffectManager::GetEffectConstantTypes(int EffectNum, std::map<std::string,i
   return false;
 }
 
-bool EffectManager::GetEffectConstantHelp(int EffectNum, char *name, const char **help) {
-  ManagedEffectRecord *pEffect;
+bool EffectManager::GetEffectConstantHelp(int EffectNum, char *name, const char **help) const {
+  const ManagedEffectRecord *pEffect;
 
   if ((pEffect = GetEffect(EffectNum)))
     return pEffect->GetEffectConstantHelp(name, help);
@@ -3177,8 +3688,8 @@ bool EffectManager::GetEffectConstantHelp(int EffectNum, char *name, const char 
   return false;
 }
 
-bool EffectManager::GetEffectConstantType(int EffectNum, char *name, int *type) {
-  ManagedEffectRecord *pEffect;
+bool EffectManager::GetEffectConstantType(int EffectNum, char *name, int *type) const {
+  const ManagedEffectRecord *pEffect;
 
   if ((pEffect = GetEffect(EffectNum)))
     return pEffect->GetEffectConstantType(name, type);
@@ -3186,8 +3697,8 @@ bool EffectManager::GetEffectConstantType(int EffectNum, char *name, int *type) 
   return false;
 }
 
-bool EffectManager::GetEffectConstantB(int EffectNum, char *name, bool *value) {
-  ManagedEffectRecord *pEffect;
+bool EffectManager::GetEffectConstantB(int EffectNum, char *name, bool *value) const {
+  const ManagedEffectRecord *pEffect;
 
   if ((pEffect = GetEffect(EffectNum)))
     return pEffect->GetEffectConstantB(name, value);
@@ -3195,8 +3706,8 @@ bool EffectManager::GetEffectConstantB(int EffectNum, char *name, bool *value) {
   return false;
 }
 
-bool EffectManager::GetEffectConstantI(int EffectNum, char *name, int *value) {
-  ManagedEffectRecord *pEffect;
+bool EffectManager::GetEffectConstantI(int EffectNum, char *name, int *value) const {
+  const ManagedEffectRecord *pEffect;
 
   if ((pEffect = GetEffect(EffectNum)))
     return pEffect->GetEffectConstantI(name, value);
@@ -3204,8 +3715,8 @@ bool EffectManager::GetEffectConstantI(int EffectNum, char *name, int *value) {
   return false;
 }
 
-bool EffectManager::GetEffectConstantF(int EffectNum, char *name, float *value) {
-  ManagedEffectRecord *pEffect;
+bool EffectManager::GetEffectConstantF(int EffectNum, char *name, float *value) const {
+  const ManagedEffectRecord *pEffect;
 
   if ((pEffect = GetEffect(EffectNum)))
     return pEffect->GetEffectConstantF(name, value);
@@ -3213,8 +3724,8 @@ bool EffectManager::GetEffectConstantF(int EffectNum, char *name, float *value) 
   return false;
 }
 
-bool EffectManager::GetEffectConstantV(int EffectNum, char *name, float *value) {
-  ManagedEffectRecord *pEffect;
+bool EffectManager::GetEffectConstantV(int EffectNum, char *name, float *value) const {
+  const ManagedEffectRecord *pEffect;
 
   if ((pEffect = GetEffect(EffectNum)))
     return pEffect->GetEffectConstantV(name, value);
@@ -3222,8 +3733,8 @@ bool EffectManager::GetEffectConstantV(int EffectNum, char *name, float *value) 
   return false;
 }
 
-bool EffectManager::GetEffectSamplerTexture(int EffectNum, char *name, int *TextureNum) {
-  ManagedEffectRecord *pEffect;
+bool EffectManager::GetEffectSamplerTexture(int EffectNum, char *name, int *TextureNum) const {
+  const ManagedEffectRecord *pEffect;
 
   if ((pEffect = GetEffect(EffectNum)))
     return pEffect->GetEffectSamplerTexture(name, TextureNum);
@@ -3276,7 +3787,7 @@ bool EffectManager::SetEffectSamplerTexture(int EffectNum, char *name, int Textu
   return false;
 }
 
-bool EffectManager::GetEffectState(int EffectNum) {
+bool EffectManager::GetEffectState(int EffectNum) const {
   ManagedEffectRecord *pEffect;
 
   if ((pEffect = GetEffect(EffectNum)))

@@ -102,7 +102,7 @@ bool frame_ntx = false;
 #if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
 bool frame_wre = false;
 bool frame_tes = false;
-bool shadr_tes = false;	// next vertex shader has tesselation support
+int  shadr_tes = 0;	// next vertex shader has tesselation support
 
 #ifndef	NDEBUG
 #pragma comment(lib,"ATITessellation/Lib/x86/ATITessellationD3D9_MT_d.lib")
@@ -1597,7 +1597,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawIndexedP
     }
 
     // Enable tessellation
-//  pATITessInterface->SetMaxLevel(1);
+    pATITessInterface->SetMaxLevel(shadr_tes);
     pATITessInterface->SetMode(TSMD_ENABLE_CONTINUOUS);
 //  pATITessInterface->ToggleIndicesRetrieval(true);
     res = pATITessInterface->DrawIndexed(TSPrimType, BaseVertexIndex, MinVertexIndex, NumVertices, startIndex, primCount);

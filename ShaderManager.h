@@ -38,6 +38,7 @@
 
 #ifndef	OBGE_NOSHADER
 
+#define D3DXFX_LARGEADDRESS_HANDLE
 #include <d3dx9.h>
 #include <d3dx9shader.h>
 
@@ -87,7 +88,7 @@ public:
 
 	bool						ConstructDX9Shader(char which);
 	DWORD *						GetDX9ShaderTexture(const char *sName, int *TexNum, int *SmpNum, DWORD *States);
-	DWORD *						GetDX9RenderStates(DWORD *States);
+	DWORD *						GetDX9RenderStates(DWORD *States, const char *func);
 	bool						DestroyDX9Shader();
 
 #if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
@@ -223,8 +224,8 @@ public:
 	ShaderRecord *			pAssociate;
 	bool				bActive, bMark;
 	void *				pCustomCT;
-	bool				bIO, bTess;
-	unsigned int			bMask;
+	bool				bIO;
+	unsigned int			iMask, iTess;
 
 	/* get a copy of the z-buffer right from before and pass it to the shader */
 	static struct Buffers {

@@ -38,8 +38,10 @@
 
 #include <vector>
 
+#define D3DXFX_LARGEADDRESS_HANDLE
+#include <d3dx9.h>
+
 #include "obse\PluginAPI.h"
-#include "d3dx9.h"
 #include "nodes\NiDX9Renderer.h"
 
 #include "DepthBufferHook.h"

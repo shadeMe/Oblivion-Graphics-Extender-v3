@@ -38,6 +38,8 @@
 #define	D3D9DEVICE_HPP
 
 #include <intrin.h>
+
+#define D3DXFX_LARGEADDRESS_HANDLE
 #include <d3d9.h>
 #include <d3dx9.h>
 
@@ -135,7 +137,7 @@ extern bool frame_ntx;
 #if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
 extern bool frame_wre;
 extern bool frame_tes;
-extern bool shadr_tes;
+extern int  shadr_tes;
 
 #include "ATITessellation\Include\D3D9\IATITessellationD3D9.h"
 #endif

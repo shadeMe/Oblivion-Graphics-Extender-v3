@@ -595,6 +595,19 @@ public:
 	  return "Incoming effects-zbuffer";
 	if (em->CurrDS.IsTexture(tex))
 	  return "Converted effects-zbuffer";
+
+	/* search shader render-targets */
+	ManagedQueueList::iterator RS = em->CustomQueues.begin();
+	while (RS != em->CustomQueues.end()) {
+	  if (RS->second.OrigRT.IsTexture(tex))
+	    return "Incoming effects-customtarget";
+	  if (RS->second.TrgtRT.IsTexture(tex))
+	    return "Outgoing effects-customtarget";
+	  if (RS->second.LastRT.IsTexture(tex))
+	    return "Alternating effects-customtarget";
+
+	  RS++;
+	}
       }
 
       /* search render targets */
@@ -681,9 +694,9 @@ public:
       }
 
       /* search managed texture files */
-      TextureManager *em = TextureManager::GetSingleton();
-      int TexNum = em->FindTexture(tex); ManagedTextureRecord *Tex;
-      if ((TexNum != -1) && (Tex = em->GetTexture(TexNum))) {
+      TextureManager *tm = TextureManager::GetSingleton();
+      int TexNum = tm->FindTexture(tex); ManagedTextureRecord *Tex;
+      if ((TexNum != -1) && (Tex = tm->GetTexture(TexNum))) {
 	const char *ptr = Tex->GetPath(), *ofs;
 
 	if ((ofs = strstr(ptr, "Textures\\")) ||
@@ -1726,6 +1739,19 @@ public:
 		      rgb[((hh * w) + ww) * 3 + 2] = (b >= 255 ? 255 : (b >= 0 ? b : 0));
 		    }
 		  }
+		  valid = true;
+		} break;
+		case D3DFMT_R16F: {
+		  half *_r = (half *)surf.pBits;
+		  for (int hh = 0; hh < h; hh++) {
+		    for (int ww = 0; ww < w; ww++) {
+		      int r = (int)((float)_r[((hh * w) + ww) * 1 + 0] * 255);
+		      rgb[((hh * w) + ww) * 3 + 0] = (r >= 255 ? 255 : (r >= 0 ? r : 0));
+		      rgb[((hh * w) + ww) * 3 + 1] = (r >= 255 ? 255 : (r >= 0 ? r : 0));
+		      rgb[((hh * w) + ww) * 3 + 2] = (r >= 255 ? 255 : (r >= 0 ? r : 0));
+		    }
+		  }
+		  im->ConvertToGreyscale();
 		  valid = true;
 		} break;
 		case D3DFMT_R32F: {
@@ -3483,6 +3509,12 @@ public:
 
     /* trace might have changed since last activation */
     if (currx) {
+      /* script may change this */
+      if (currx->IsEnabled())
+	SDEffectEnable->SetValue(wxCHK_CHECKED);
+      else
+	SDEffectEnable->SetValue(wxCHK_UNCHECKED);
+
       SetEffectConstSetTable(currx);
       SetEffectTextureTable(currx);
     }

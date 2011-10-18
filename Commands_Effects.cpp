@@ -63,7 +63,7 @@ static bool LoadEffect_Execute(COMMAND_ARGS) {
   }
 #endif
 
-  _MESSAGE("Effect (%s) - Script refID = %x %s", path, scriptObj->refID, (scriptObj->refID == 0) ? "(Error NULL refID)" : " ");
+  _MESSAGE("LoadEffect (%s) - Script refID = %x %s (%s)", path, scriptObj->refID, (scriptObj->refID == 0) ? "(Error NULL refID)" : " ", Private ? "Private" : "Managed");
 
   if (Private)
     *result = EffectManager::GetSingleton()->AddPrivateEffect(path, scriptObj->refID);
@@ -161,7 +161,7 @@ static bool GetEffects_Execute(COMMAND_ARGS) {
 
     for (std::map<std::string,int>::iterator it = all.begin(); it != all.end(); it++) {
       const std::string name = it->first;
-      int id = it->second;
+      const int id = it->second;
 
       obsem[name] = OBSEElement(id);
     }
@@ -873,7 +873,7 @@ static bool LoadShader_Execute(COMMAND_ARGS) {
   if (!IsEnabled())
     return true;
 
-  _MESSAGE("Shader (%s) - Script refID = %x %s", path, scriptObj->refID, (scriptObj->refID == 0) ? "(Error NULL refID)" : " ");
+  _MESSAGE("LoadShader (%s) - Script refID = %x %s", path, scriptObj->refID, (scriptObj->refID == 0) ? "(Error NULL refID)" : " ");
 
   if ((id = EffectManager::GetSingleton()->AddManagedEffect(path, scriptObj->refID)) != -1)
     EffectManager::GetSingleton()->EnableEffect(id, true);

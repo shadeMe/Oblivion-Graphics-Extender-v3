@@ -10,8 +10,10 @@
 
 #pragma once
 
+#define D3DXFX_LARGEADDRESS_HANDLE
+#include <d3d9.h>
+
 #include "nodes\NiRenderer.h"
-#include "D3D9.h"
 #include "GameTypes.h"
 #include "nodes\NiRenderTargetGroup.h"
 #include "nodes\NiPoint3.h"
