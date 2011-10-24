@@ -2004,9 +2004,12 @@ public:
 	buf[0] = '\0';
 	char pair[256]; pair[0] = '\0';
 	while (Pair != o->pAssociate->Paired.end()) {
-	  if (pair[0] != '\0')
-	    strcat(pair, ", ");
-	  strcat(pair, (*Pair)->pAssociate->Name);
+	  if ((*Pair)->pAssociate) {
+	    if (pair[0] != '\0')
+	      strcat(pair, ", ");
+	    strcat(pair, (*Pair)->pAssociate->Name);
+	  }
+
 	  Pair++;
 	}
 

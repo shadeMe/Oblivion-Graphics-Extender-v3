@@ -41,6 +41,7 @@
 #include "TextureManager.h"
 #include "ShaderManager.h"
 #include "EffectManager.h"
+#include "LODManager.h"
 #include "ScreenElements.h"
 #include "obse\pluginapi.h"
 #include "GlobalSettings.h"
@@ -227,16 +228,19 @@ bool TextureRecord::IsPrivate() const {
 void TextureRecord::Purge(int TexNum) {
   if (this->IsType(TR_PLANAR)) {
        HUDManager::GetSingleton()->PurgeTexture(this->textureP, TexNum);
+       LODManager::GetSingleton()->PurgeTexture(this->textureP, TexNum);
     EffectManager::GetSingleton()->PurgeTexture(this->textureP, TexNum);
     ShaderManager::GetSingleton()->PurgeTexture(this->textureP, TexNum);
   }
   else if (this->IsType(TR_CUBIC)) {
        HUDManager::GetSingleton()->PurgeTexture(this->textureC, TexNum);
+       LODManager::GetSingleton()->PurgeTexture(this->textureC, TexNum);
     EffectManager::GetSingleton()->PurgeTexture(this->textureC, TexNum);
     ShaderManager::GetSingleton()->PurgeTexture(this->textureC, TexNum);
   }
   else if (this->IsType(TR_VOLUMETRIC)) {
-    HUDManager::GetSingleton()->PurgeTexture(this->textureV, TexNum);
+       HUDManager::GetSingleton()->PurgeTexture(this->textureV, TexNum);
+       LODManager::GetSingleton()->PurgeTexture(this->textureV, TexNum);
     EffectManager::GetSingleton()->PurgeTexture(this->textureV, TexNum);
     ShaderManager::GetSingleton()->PurgeTexture(this->textureV, TexNum);
   }
@@ -348,7 +352,7 @@ void TextureManager::Clear() {
 
 int TextureManager::LoadPrivateTexture(const char *Filename, TextureRecordType type, bool NONPOW2) {
   if (strlen(Filename) > 240)
-    return NULL;
+    return -1;
 
   char NewPath[256];
   strcpy_s(NewPath, 256, "data\\textures\\");
@@ -377,7 +381,7 @@ int TextureManager::LoadPrivateTexture(const char *Filename, TextureRecordType t
 
 int TextureManager::LoadManagedTexture(const char *Filename, TextureRecordType type, bool NONPOW2) {
   if (strlen(Filename) > 240)
-    return NULL;
+    return -1;
 
   char NewPath[256];
   strcpy_s(NewPath, 256, "data\\textures\\");
@@ -422,7 +426,7 @@ int TextureManager::LoadManagedTexture(const char *Filename, TextureRecordType t
 
 int TextureManager::LoadDependtTexture(const char *Filename, TextureRecordType type, bool NONPOW2) {
   if (strlen(Filename) > 240)
-    return NULL;
+    return -1;
 
   char NewPath[256];
   strcpy_s(NewPath, 256, "data\\textures\\");
@@ -473,6 +477,7 @@ bool TextureManager::ReleaseTexture(int TextureNum) {
 
   /* reached zero */
   if (!OldTexture->Release()) {
+    /* purge from shader/effect contant-tables */
     OldTexture->Purge(TextureNum);
 
     /* remove from map */
@@ -692,7 +697,7 @@ void TextureManager::LoadGame(OBSESerializationInterface *Interface) {
 #ifdef	NO_DEPRECATED
       else {
 	Interface->GetNextRecordInfo(&type, &version, &length);
-	while (type != 'SEOD') {
+	while (type != 'TEOD') {
 	  Interface->ReadRecordData(TexturePath, length);
 	  Interface->GetNextRecordInfo(&type, &version, &length);
 	}

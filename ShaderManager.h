@@ -91,15 +91,24 @@ public:
 	DWORD *						GetDX9RenderStates(DWORD *States, const char *func);
 	bool						DestroyDX9Shader();
 
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
 	bool						IsTesselator() const;
 #endif
 
 public:
+	/* specialized variations of this shader (LOD, ...) */
+#if	defined(OBGE_LODSHADERS)
+	ShaderRecord *					pLODVariant;
+#endif
+
+	/* points to the runtime-replacement of this shader */
 	RuntimeShaderRecord *				pAssociate;
+
+	/* the data oblivion grabbed from disk */
 	const DWORD *					pOblivionBinary;
 	LPD3DXCONSTANTTABLE				pOblivionConTab;
 
+	/* identifiers */
 	char						Name[100];
 	char						Filepath[MAX_PATH];
 	bool						Replaced;
@@ -137,15 +146,19 @@ public:
 	LPD3DXBUFFER					pShaderOriginal;
 	LPD3DXBUFFER					pShaderReplaced;
 	LPD3DXBUFFER					pShaderRuntime;
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
 	LPD3DXBUFFER					pTssltrReplaced;
 	LPD3DXBUFFER					pTssltrRuntime;
+#endif
 
 	/* D3DXGetShaderConstantTableEx() */
 	LPD3DXCONSTANTTABLE				pConstsOriginal;
 	LPD3DXCONSTANTTABLE				pConstsReplaced;
 	LPD3DXCONSTANTTABLE				pConstsRuntime;
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
 	LPD3DXCONSTANTTABLE				pConsttReplaced;
 	LPD3DXCONSTANTTABLE				pConsttRuntime;
+#endif
 
 #define	SHADER_UNSET	-1
 #define	SHADER_ORIGINAL	 0
@@ -357,9 +370,6 @@ public:
 	ShaderRecord *					GetBuiltInShader(const DWORD *Function);
 	RuntimeShaderRecord *				GetRuntimeShader(const char *Name);
 	RuntimeShaderRecord *				SetRuntimeShader(const DWORD *Function, IUnknown *Shader);
-	inline RuntimeShaderRecord *			GetRuntimeShader(IUnknown *Shader) { return Shaders[Shader]; }
-	IDirect3DPixelShader9  *			GetShader(IDirect3DPixelShader9  *Shader);
-	IDirect3DVertexShader9 *			GetShader(IDirect3DVertexShader9 *Shader);
 
 	bool						SetShaderConstantB(const char *ShaderName, char *name, bool value);
 	bool						SetShaderConstantI(const char *ShaderName, char *name, int *values);
@@ -371,7 +381,18 @@ public:
 private:
 	BuiltInShaderList				BuiltInShaders;
 	RuntimeShaderList				RuntimeShaders;
-	ShaderList					Shaders;
+
+#define LUT_STD	0
+#define LUT_LOD	1
+#define LUT_NUM	2
+
+	/* built-in to runtime lookup */
+	ShaderList					Shaders[LUT_NUM];
+
+public:
+	inline RuntimeShaderRecord *			GetRuntimeShader(IUnknown *Shader, int ctx = LUT_STD) { return Shaders[ctx][Shader]; }
+	IDirect3DPixelShader9  *			GetShader(IDirect3DPixelShader9  *Shader, int ctx = LUT_STD);
+	IDirect3DVertexShader9 *			GetShader(IDirect3DVertexShader9 *Shader, int ctx = LUT_STD);
 
 public:
 	ShaderRecord *					idp;  // IDENTIFY.pso
@@ -484,11 +505,11 @@ public:
 	static ShaderManager*		GetSingleton(void);
 	static ShaderManager*		Singleton;
 
-	bool						SetTransferZ(long MaskZ) { return true; };
-	void						OnCreateDevice(void) {};
-	void						OnLostDevice(void) {};
-	void						OnResetDevice(void) {};
-	void						OnReleaseDevice(void) {};
-	void						PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum = -1) {};
+	static bool					SetTransferZ(long MaskZ) { return true; };
+	static void					OnCreateDevice(void) {};
+	static void					OnLostDevice(void) {};
+	static void					OnResetDevice(void) {};
+	static void					OnReleaseDevice(void) {};
+	static void					PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum = -1) {};
 };
 #endif

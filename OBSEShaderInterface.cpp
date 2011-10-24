@@ -48,6 +48,8 @@
 #include "ShaderManager.h"
 #include "EffectManager.h"
 #include "TextureManager.h"
+#include "MeshManager.h"
+#include "LODManager.h"
 
 #include "D3D9.hpp"
 #include "D3D9Device.hpp"
@@ -128,11 +130,17 @@ void OBSEShaderInterface::ShaderCode(IDirect3DDevice9 *D3DDevice, IDirect3DSurfa
 
 #ifndef	OBGE_NOSHADER
   enum OBGEPass previousPass = currentPass;
+  currentPass = OBGEPASS_CUSTOM;
+#endif
+
+  LODManager::GetSingleton()->Render(D3DDevice, RenderTo, RenderFrom);
+
+#ifndef	OBGE_NOSHADER
   currentPass = OBGEPASS_EFFECTS;
 #endif
 
   EffectManager::GetSingleton()->Render(D3DDevice, RenderTo, RenderFrom);
-  HUDManager::GetSingleton()->Render();
+  HUDManager::GetSingleton()->Render(D3DDevice);
 
 #ifndef	OBGE_NOSHADER
   currentPass = previousPass;
@@ -192,6 +200,7 @@ void OBSEShaderInterface::DeviceLost() {
   if (pFont ) pFont ->OnLostDevice();
   if (pFont2) pFont2->OnLostDevice();
 
+     LODManager::GetSingleton()->OnLostDevice();
   ShaderManager::GetSingleton()->OnLostDevice();
   EffectManager::GetSingleton()->OnLostDevice();
 }
@@ -202,6 +211,7 @@ void OBSEShaderInterface::DeviceReset() {
   if (pFont ) pFont ->OnResetDevice();
   if (pFont2) pFont2->OnResetDevice();
 
+     LODManager::GetSingleton()->OnResetDevice();
   ShaderManager::GetSingleton()->OnResetDevice();
   EffectManager::GetSingleton()->OnResetDevice();
 }
@@ -212,11 +222,15 @@ void OBSEShaderInterface::DeviceRelease() {
   if (pFont ) { while (pFont ->Release()) {} pFont  = NULL; }
   if (pFont2) { while (pFont2->Release()) {} pFont2 = NULL; }
 
+     LODManager::GetSingleton()->OnReleaseDevice();
   ShaderManager::GetSingleton()->OnReleaseDevice();
   EffectManager::GetSingleton()->OnReleaseDevice();
 //LostDepthBuffer(true,NULL);
 
-  delete EffectManager::GetSingleton();
+  delete     LODManager::GetSingleton();
+//delete  ShaderManager::GetSingleton();	// unsafe!
+  delete  EffectManager::GetSingleton();
+  delete    MeshManager::GetSingleton();
   delete TextureManager::GetSingleton();
 //delete MemoryDumpString;
 }
@@ -263,16 +277,22 @@ void OBSEShaderInterface::InitializeEffects(void) {
   EffectMan->InitializeFrameTextures();
   EffectMan->LoadEffectList();
 
+  LODManager *LODMan = LODManager::GetSingleton();
+
+  LODMan->InitializeBuffers();
+
 //MemoryDumpString=new TextBuffer(10000);
 
   return;
 }
 
 void OBSEShaderInterface::NewGame() {
-  TextureManager *TexMan = TextureManager::GetSingleton();
-  EffectManager *EffectMan = EffectManager::GetSingleton();
+  TextureManager *TexMan    = TextureManager::GetSingleton();
+  MeshManager    *MeshMan   =    MeshManager::GetSingleton();
+  EffectManager  *EffectMan =  EffectManager::GetSingleton();
 
   TexMan->NewGame();
+  MeshMan->NewGame();
   EffectMan->NewGame();
   EffectMan->LoadEffectList();
 }
@@ -283,7 +303,8 @@ void OBSEShaderInterface::LoadGame(OBSESerializationInterface *Interface) {
 
     if (UseLoad.data) {
       TextureManager::GetSingleton()->LoadGame(Interface);
-      EffectManager::GetSingleton()->LoadGame(Interface);
+         MeshManager::GetSingleton()->LoadGame(Interface);
+       EffectManager::GetSingleton()->LoadGame(Interface);
     }
     else {
       _MESSAGE("Loading disabled in INI file.");
@@ -294,7 +315,8 @@ void OBSEShaderInterface::LoadGame(OBSESerializationInterface *Interface) {
 void OBSEShaderInterface::SaveGame(OBSESerializationInterface *Interface) {
   if (UseSave.data) {
     TextureManager::GetSingleton()->SaveGame(Interface);
-    EffectManager::GetSingleton()->SaveGame(Interface);
+       MeshManager::GetSingleton()->SaveGame(Interface);
+     EffectManager::GetSingleton()->SaveGame(Interface);
   }
   else {
     _MESSAGE("Saving disabled in INI file.");

@@ -632,9 +632,8 @@ inline void EffectBuffer::SetTexture(const char *fmt, ID3DXEffect *pEffect) cons
 	pEffect->SetTexture(hl, Tex[rt]);
 #if	defined(OBGE_AUTOMIPMAP)
 	Tex[rt]->SetAutoGenFilterType(AMFilter);
-#endif
-
 	assert(Tex[rt]->GetAutoGenFilterType() == AMFilter);
+#endif
       }
     }
   }
@@ -646,9 +645,8 @@ inline void EffectBuffer::SetTexture(const D3DXHANDLE *hs, ID3DXEffect *pEffect)
       pEffect->SetTexture(hs[rt], Tex[rt]);
 #if	defined(OBGE_AUTOMIPMAP)
       Tex[rt]->SetAutoGenFilterType(AMFilter);
-#endif
-
       assert(Tex[rt]->GetAutoGenFilterType() == AMFilter);
+#endif
     }
   }
 }
@@ -659,9 +657,8 @@ inline void EffectBuffer::SetTexture(const D3DXHANDLE hs, ID3DXEffect *pEffect) 
       pEffect->SetTexture(hs, Tex[rt]);
 #if	defined(OBGE_AUTOMIPMAP)
       Tex[rt]->SetAutoGenFilterType(AMFilter);
-#endif
-
       assert(Tex[rt]->GetAutoGenFilterType() == AMFilter);
+#endif
     }
   }
 }
@@ -2062,7 +2059,7 @@ bool EffectRecord::GetEffectConstantType(const char *name, int *type) const {
   return false;
 }
 
-bool EffectRecord::GetEffectConstantB(const char *name, bool *value) const {
+bool EffectRecord::GetEffectConstantB(const char *name, BOOL *value) const {
   D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
   HRESULT hr = (hl ? pEffect->GetBool(hl, (BOOL *)value) : -1);
   return (hr == D3D_OK);
@@ -2116,7 +2113,7 @@ bool EffectRecord::GetEffectSamplerTexture(const char *name, int *TextureNum) co
   return false;
 }
 
-bool EffectRecord::SetEffectConstantB(const char *name, bool value) {
+bool EffectRecord::SetEffectConstantB(const char *name, BOOL value) {
   D3DXHANDLE hl = (HasEffect() ? pEffect->GetParameterByName(NULL, name) : NULL);
   HRESULT hr = (hl ? pEffect->SetBool(hl, value) : -1);
   return (hr == D3D_OK);
@@ -2170,8 +2167,13 @@ bool EffectRecord::SetEffectSamplerTexture(const char *name, int TextureNum) {
     TexMan->ReleaseTexture(OldTexture);
 
     /* remove from vector */
-    if (OldTextureNum != -1)
-      Textures.erase(std::find(Textures.begin(), Textures.end(), OldTextureNum));
+    if (OldTextureNum != -1) {
+      /* precaution (should always work) */
+      std::vector<int>::iterator OldPos;
+      OldPos = std::find(Textures.begin(), Textures.end(), OldTextureNum);
+      if (OldPos != Textures.end())
+	Textures.erase(OldPos);
+    }
   }
 
   /* apply the new texture and remember it */
@@ -2217,8 +2219,13 @@ void EffectRecord::PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum) {
 	  _DMESSAGE("Removing texture %s from effect %s", Description.Name, GetPath());
 
 	  /* remove from vector */
-	  if (TexNum != -1)
-	    Textures.erase(std::find(Textures.begin(), Textures.end(), TexNum));
+	  if (TexNum != -1) {
+	    /* this doesn't necessarily match */
+	    std::vector<int>::iterator Pos;
+	    Pos = std::find(Textures.begin(), Textures.end(), TexNum);
+	    if (Pos != Textures.end())
+	      Textures.erase(Pos);
+	  }
 	}
       }
     }
@@ -2894,11 +2901,13 @@ inline void EffectManager::UpdateFrameConstants(v1_2_416::NiDX9Renderer *Rendere
   Constants.UpdateProducts();
 
   // Sunrise is at 06:00, Sunset at 20:00
-  bool DayTime =
+  const bool DayTime =
     (Constants.iGameTime.x >= Constants.SunTiming.x) &&
     (Constants.iGameTime.x <= Constants.SunTiming.w);
-  bool SunHasBenCulled =
-    (Constants.SunDir.w == 0.0);
+  const bool SunExists =
+    (Constants.Exteriour && !Constants.Oblivion);
+  const bool Exteriour =
+    (Constants.Exteriour);
 
 #ifdef OBGE_CONSTANTPOOLS
   /* we use pooling, just this has to be set */
@@ -2906,11 +2915,13 @@ inline void EffectManager::UpdateFrameConstants(v1_2_416::NiDX9Renderer *Rendere
 #endif
 
   /* setup flags for effect-filtering */
-  RenderCnd = (RenderCnd & ~EFFECTCOND_ISDAY  ) | ( DayTime			    ? EFFECTCOND_ISDAY   : 0);
-  RenderCnd = (RenderCnd & ~EFFECTCOND_ISNIGHT) | (!DayTime			    ? EFFECTCOND_ISNIGHT : 0);
-  RenderCnd = (RenderCnd & ~EFFECTCOND_HASSUN ) | (!SunHasBenCulled                 ? EFFECTCOND_HASSUN  : 0);
+  RenderCnd = (RenderCnd & ~EFFECTCOND_ISDAY    ) | ( DayTime			      ? EFFECTCOND_ISDAY     : 0);
+  RenderCnd = (RenderCnd & ~EFFECTCOND_ISNIGHT  ) | (!DayTime			      ? EFFECTCOND_ISNIGHT   : 0);
+  RenderCnd = (RenderCnd & ~EFFECTCOND_HASSUN   ) | ( SunExists			      ? EFFECTCOND_HASSUN    : 0);
+  RenderCnd = (RenderCnd & ~EFFECTCOND_INTERIOUR) | (!Exteriour                       ? EFFECTCOND_INTERIOUR : 0);
+  RenderCnd = (RenderCnd & ~EFFECTCOND_EXTERIOUR) | ( Exteriour                       ? EFFECTCOND_EXTERIOUR : 0);
 #ifndef	OBGE_NOSHADER
-  RenderCnd = (RenderCnd & ~EFFECTCOND_HASREFL) | (passTexture[OBGEPASS_REFLECTION] ? EFFECTCOND_HASREFL : 0);
+  RenderCnd = (RenderCnd & ~EFFECTCOND_HASREFL  ) | (passTexture[OBGEPASS_REFLECTION] ? EFFECTCOND_HASREFL   : 0);
 #endif
 }
 
@@ -3697,7 +3708,7 @@ bool EffectManager::GetEffectConstantType(int EffectNum, char *name, int *type) 
   return false;
 }
 
-bool EffectManager::GetEffectConstantB(int EffectNum, char *name, bool *value) const {
+bool EffectManager::GetEffectConstantB(int EffectNum, char *name, BOOL *value) const {
   const ManagedEffectRecord *pEffect;
 
   if ((pEffect = GetEffect(EffectNum)))
@@ -3742,7 +3753,7 @@ bool EffectManager::GetEffectSamplerTexture(int EffectNum, char *name, int *Text
   return false;
 }
 
-bool EffectManager::SetEffectConstantB(int EffectNum, char *name, bool value) {
+bool EffectManager::SetEffectConstantB(int EffectNum, char *name, BOOL value) {
   ManagedEffectRecord *pEffect;
 
   if ((pEffect = GetEffect(EffectNum)))

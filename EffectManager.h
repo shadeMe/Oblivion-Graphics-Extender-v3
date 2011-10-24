@@ -212,7 +212,7 @@ public:
 	bool Render(IDirect3DDevice9 *D3DDevice, EffectQueue *Queue);
 	void Render(IDirect3DDevice9 *D3DDevice);
 
-	bool SetEffectConstantB(const char *name, bool value);
+	bool SetEffectConstantB(const char *name, BOOL value);
 	bool SetEffectConstantI(const char *name, int value);
 	bool SetEffectConstantI(const char *name, int *values, int num);
 	bool SetEffectConstantF(const char *name, float value);
@@ -224,7 +224,7 @@ public:
 	bool GetEffectConstantTypes(std::map<std::string,int> &all) const;
 	bool GetEffectConstantHelp(const char *name, const char **help) const;
 	bool GetEffectConstantType(const char *name, int *type) const;
-	bool GetEffectConstantB(const char *name, bool *value) const;
+	bool GetEffectConstantB(const char *name, BOOL *value) const;
 	bool GetEffectConstantI(const char *name, int *value) const;
 	bool GetEffectConstantI(const char *name, int *values, int num) const;
 	bool GetEffectConstantF(const char *name, float *value) const;
@@ -406,7 +406,7 @@ public:
 	int						FindEffect(const char *Filename) const;
 	bool						GetEffects(int which, std::map<std::string,int> &all) const;
 
-	bool						SetEffectConstantB(int EffectNum, char *name, bool value);
+	bool						SetEffectConstantB(int EffectNum, char *name, BOOL value);
 	bool						SetEffectConstantI(int EffectNum, char *name, int value);
 	bool						SetEffectConstantI(int EffectNum, char *name, int *values, int num);
 	bool						SetEffectConstantF(int EffectNum, char *name, float value);
@@ -418,7 +418,7 @@ public:
 	bool						GetEffectConstantTypes(int EffectNum, std::map<std::string,int> &all) const;
 	bool						GetEffectConstantHelp(int EffectNum, char *name, const char **help) const;
 	bool						GetEffectConstantType(int EffectNum, char *name, int *type) const;
-	bool						GetEffectConstantB(int EffectNum, char *name, bool *value) const;
+	bool						GetEffectConstantB(int EffectNum, char *name, BOOL *value) const;
 	bool						GetEffectConstantI(int EffectNum, char *name, int *value) const;
 	bool						GetEffectConstantI(int EffectNum, char *name, int *values, int num) const;
 	bool						GetEffectConstantF(int EffectNum, char *name, float *value) const;

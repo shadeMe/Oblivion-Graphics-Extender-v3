@@ -104,7 +104,7 @@ public:
 	int				AddScreenElement(Sprite *data);
 	Sprite				*index(int ind);
 	void				PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNum = -1);
-	void				Render(void);
+	void				Render(IDirect3DDevice9 *Device);
 	void				DeviceLost(void);
 	void				DeviceReset(void);
 	void				NewGame(void);

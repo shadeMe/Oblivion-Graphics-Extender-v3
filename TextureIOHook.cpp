@@ -112,21 +112,31 @@ bool Anonymous::TrackLoadTextureFile(const char *texture, void *renderer, void *
 	  textureFiles[texture] = lastOBGEDirect3DBaseTexture9;
 	  textureClass[lastOBGEDirect3DBaseTexture9] = texture;
 
-	  const char *textlwr = strlwr(strdup(texture));
+	  char *textlwr = strlwr(strdup(texture)), *slash;
+	  while ((slash = strchr(textlwr, '\\')))
+	    *slash = '/';
+	  char *filelwr = strrchr(textlwr, '/');
+	  if (filelwr) filelwr++;
+	  else filelwr = textlwr;
 
-	  if (!strchr(textlwr, '_g.'))
-	  if (!strchr(textlwr, '_n.'))
-	  if (!strchr(textlwr, '_d.')) {
+	  /* regular textures ------------------------------------ */
+	  if (!strstr(textlwr, "_g."))
+	  if (!strstr(textlwr, "_n."))
+	  if (!strstr(textlwr, "_d.")) {
 
-#ifdef OBGE_GAMMACORRECTION
+#if	defined(OBGE_GAMMACORRECTION)
 	    /* remember DeGamma for this kind of texture */
-//	    if (DeGamma) {
+	  //if (DeGamma) {
+	      char race[256]; int age;
+
 	      if (/* menus are on the backbuffer, no shader there */
-		  !strstr(textlwr, "menus\\") && !strstr(textlwr, "menus/") &&
+		  !strstr(textlwr, "menus/") &&
 		  /* faces contain blend-factors, no colors */
-		  !strstr(textlwr, "faces\\") && !strstr(textlwr, "faces/") &&
+		  !strstr(textlwr, "faces/") &&
 		  /* fires are emitter, no need for gamma */
-		  !strstr(textlwr, "fire\\" ) && !strstr(textlwr, "fire/" )) {
+		  !strstr(textlwr, "fire/" ) &&
+		  /* age-maps contain blend-factors, no colors */
+		  (sscanf(filelwr, "head%[a-z]%d.dds", race, &age) != 2)) {
 		static const bool PotDeGamma = true;
 
 		lastOBGEDirect3DBaseTexture9->SetPrivateData(GammaGUID, &PotDeGamma, sizeof(PotDeGamma), 0);
@@ -134,11 +144,17 @@ bool Anonymous::TrackLoadTextureFile(const char *texture, void *renderer, void *
 //	    }
 #endif
 
-#ifdef OBGE_LODSHADERS
+	  }
+
+	  /* LOD textures ---------------------------------------- */
+	  {
+
+#if	defined(OBGE_LODSHADERS)
 	    /* remember LOD for this kind of texture */
 //	    if (DoLODReplacement) {
-	      if (!strchr(textlwr, '_'))
-	      if (!strstr(textlwr, "lod")) {
+	      if (strstr(textlwr, "landscapelod") ||
+		  strstr(textlwr, "lowres") ||
+		  strstr(textlwr, "lodres")) {
 		static const bool PotLODtext = true;
 
 		lastOBGEDirect3DBaseTexture9->SetPrivateData(LODtxGUID, &PotLODtext, sizeof(PotLODtext), 0);

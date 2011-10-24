@@ -84,13 +84,13 @@ IDebugLog *frame_log = NULL;
 #endif
 
 /* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . */
-#if	defined(OBGE_DEVLING) || defined(OBGE_LOGGING)
+#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING)
 int frame_num = 0;	// Present()-counter
 int frame_bge = 0;	// Begin()-counter
 #endif
 
 /* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . */
-#if	defined(OBGE_DEVLING) && defined(OBGE_PROFILE)
+#if	defined(OBGE_PROFILE) && defined(OBGE_DEVLING)
 LARGE_INTEGER frame_bgn;
 LARGE_INTEGER frame_end;
 
@@ -99,16 +99,23 @@ bool frame_ntx = false;
 #endif
 
 /* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . */
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
 bool frame_wre = false;
 bool frame_tes = false;
-int  shadr_tes = 0;	// next vertex shader has tesselation support
+int  shadr_tes = 0;		// next vertex shader has tesselation support
 
 #ifndef	NDEBUG
 #pragma comment(lib,"ATITessellation/Lib/x86/ATITessellationD3D9_MT_d.lib")
 #else
 #pragma comment(lib,"ATITessellation/Lib/x86/ATITessellationD3D9_MT.lib")
 #endif
+#endif
+
+/* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . */
+#if	defined(OBGE_LODSHADERS)
+int  shadr_ctx = LUT_STD;	// next shader-pair is for rendering LOD
+#else
+#define shadr_ctx LUT_STD
 #endif
 
 /* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . */
@@ -176,7 +183,7 @@ OBGEDirect3DDevice9::OBGEDirect3DDevice9(IDirect3D9 *d3d, IDirect3DDevice9 *devi
   frame_log = NULL;
 #endif
 
-#if	defined(OBGE_DEVLING) || defined(OBGE_LOGGING)
+#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING)
   frame_num = 0;
   frame_bge = 0;
 
@@ -186,7 +193,7 @@ OBGEDirect3DDevice9::OBGEDirect3DDevice9(IDirect3D9 *d3d, IDirect3DDevice9 *devi
   pEvent = NULL;
 #endif
 
-#if	defined(OBGE_DEVLING) || defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   /* create the tesselator interface */
   frame_wre = false;
   frame_tes = false;
@@ -232,7 +239,7 @@ OBGEDirect3DDevice9::~OBGEDirect3DDevice9() {
 
   textureMaps.clear();
 
-#if	defined(OBGE_DEVLING) || defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   /* delete the tesselator interface */
   if (pATITessInterface)
     delete pATITessInterface;
@@ -338,7 +345,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::Present(CONS
   memset(passDepth  , 0, sizeof(passDepth  ));
   memset(passPasses , 0, sizeof(passPasses ));
 
-#if	defined(OBGE_DEVLING) && defined(OBGE_PROFILE)
+#if	defined(OBGE_PROFILE) && defined(OBGE_DEVLING)
   if (HasShaderManager) {
     int frame_wrp = m_shaders->frame_capt % OBGEFRAME_NUM;
 
@@ -368,7 +375,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::Present(CONS
   }
 #endif
 
-#if	defined(OBGE_DEVLING) || defined(OBGE_LOGGING)
+#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING)
   /* log just a single frame, otherwise it's too much data */
   frame_num++;
   frame_bge = 0;
@@ -919,7 +926,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::BeginScene(v
 #endif
   }
 
-#if	defined(OBGE_DEVLING) || defined(OBGE_LOGGING)
+#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING)
   passFrames[currentPass] = frame_num;
 #endif
 
@@ -928,7 +935,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::BeginScene(v
     frame_log->Indent();
   }
 
-#if	defined(OBGE_DEVLING) && defined(OBGE_PROFILE)
+#if	defined(OBGE_PROFILE) && defined(OBGE_DEVLING)
   if (frame_prf) {
     // 1. Create an event query from the current device
     CreateQuery(D3DQUERYTYPE_EVENT, &pEvent);
@@ -946,7 +953,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::BeginScene(v
   QueryPerformanceCounter(&frame_bgn);
 #endif
 
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   // Set max tessellation level
   if (pATITessInterface)
     pATITessInterface->SetMaxLevel(1);
@@ -955,7 +962,8 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::BeginScene(v
 #if	defined(OBGE_GAMMACORRECTION) && (OBGE_GAMMACORRECTION > 0)
   /* we have to experiment with this */
   if ((currentPass == OBGEPASS_REFLECTION) ||
-      (currentPass == OBGEPASS_MAIN)) {
+      (currentPass == OBGEPASS_MAIN) ||
+      (currentPass == OBGEPASS_CUSTOM)) {
     /* gamma-correction on read */
     for (int s = 0; s < 16; s++)
       m_device->SetSamplerState(s, D3DSAMP_SRGBTEXTURE, DeGamma);
@@ -979,7 +987,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::BeginScene(v
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::EndScene(void) {
   HRESULT res = m_device->EndScene();
 
-#if	defined(OBGE_DEVLING) && defined(OBGE_PROFILE)
+#if	defined(OBGE_PROFILE) && defined(OBGE_DEVLING)
   if (frame_prf || pEvent) {
     // 6. Add an end marker to the command buffer queue.
     pEvent->Issue(D3DISSUE_END);
@@ -1025,7 +1033,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::EndScene(voi
   }
 #endif
 
-#if	defined(OBGE_DEVLING) || defined(OBGE_LOGGING)
+#if	defined(OBGE_LOGGING) || defined(OBGE_DEVLING)
   /* track the number of sub-passes for a particular pass */
   passPasses[currentPass]++; frame_bge++;
 #endif
@@ -1276,9 +1284,9 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetRenderSta
     frame_log->Outdent();
   }
 
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   if (frame_wre /*&& (State == D3DRS_FILLMODE)*/) {
-    if (currentPass == OBGEPASS_MAIN)
+    if ((currentPass == OBGEPASS_MAIN) || (currentPass == OBGEPASS_CUSTOM))
       m_device->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
     else
       m_device->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
@@ -1317,21 +1325,15 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::GetTexture(D
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTexture(DWORD Sampler, IDirect3DBaseTexture9 *pTexture) {
-#if	defined(OBGE_DEVLING) && defined(OBGE_PROFILE)
+#if	defined(OBGE_PROFILE) && defined(OBGE_DEVLING)
   if (frame_ntx)
     pTexture = NULL;
 #endif
 
   if (pTexture) {
-#if 0
-    std::string ts = textureClass[pTexture];
-    if (strstr(ts.data(), "landscapelod")) {
-          fprintf(stderr, "check");
-    }
-#endif
-
 #if	defined(OBGE_ANISOTROPY)
-    if (currentPass == OBGEPASS_MAIN) {
+    if ((currentPass == OBGEPASS_MAIN) ||
+        (currentPass == OBGEPASS_CUSTOM)) {
       // stablelize AF override, SetTexture is called before any SetSamplerState
       if (AFilters) {
 	m_device->SetSamplerState(Sampler, D3DSAMP_MINFILTER, D3DTEXF_ANISOTROPIC);
@@ -1340,18 +1342,33 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTexture(D
     }
 #endif
 
-#if	defined(OBGE_GAMMACORRECTION)
     /* we have to experiment with this */
     if ((currentPass == OBGEPASS_REFLECTION) ||
-	(currentPass == OBGEPASS_MAIN)) {
+	(currentPass == OBGEPASS_MAIN) ||
+	(currentPass == OBGEPASS_CUSTOM)) {
+#if	defined(OBGE_GAMMACORRECTION)
       /* gamma-correction on read (the texture-tracker flagged them) */
       bool _DeGamma; DWORD _DGs;
       if (DeGamma && (pTexture->GetPrivateData(GammaGUID, &_DeGamma, &_DGs) == D3D_OK))
         m_device->SetSamplerState(Sampler, D3DSAMP_SRGBTEXTURE, DeGamma);
       else
         m_device->SetSamplerState(Sampler, D3DSAMP_SRGBTEXTURE, false);
-    }
 #endif
+
+#if	defined(OBGE_LODSHADERS)
+      if (Sampler == 0) {
+	/* LOD-detection via "s0"-samper, we hope that it will be set for every
+	 * shader, so the deactivation works ...
+	 * it's a pretty weak conditional ...
+	 */
+	bool _LODtext; DWORD _LTs;
+	if (1 && (pTexture->GetPrivateData(LODtxGUID, &_LODtext, &_LTs) == D3D_OK))
+	  shadr_ctx = LUT_LOD;
+	else
+	  shadr_ctx = LUT_STD;
+      }
+#endif
+    }
   }
 
   if (HasShaderManager) {
@@ -1378,6 +1395,31 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTexture(D
 
 #ifdef	OBGE_DEVLING
     m_shaders->traced[currentPass].values_s[tSampler] = pTexture;
+
+    if (pTexture) {
+#if	defined(OBGE_ANISOTROPY)
+      if ((currentPass == OBGEPASS_MAIN) ||
+	  (currentPass == OBGEPASS_CUSTOM)) {
+	if (AFilters) {
+	  m_shaders->traced[currentPass].states_s[tSampler][D3DSAMP_MINFILTER] = D3DTEXF_ANISOTROPIC;
+	  m_shaders->traced[currentPass].states_s[tSampler][D3DSAMP_MAXANISOTROPY] = *((DWORD *)&Anisotropy);
+	}
+      }
+#endif
+
+      /* we have to experiment with this */
+      if ((currentPass == OBGEPASS_REFLECTION) ||
+	  (currentPass == OBGEPASS_MAIN) ||
+	  (currentPass == OBGEPASS_CUSTOM)) {
+#if	defined(OBGE_GAMMACORRECTION)
+	bool _DeGamma; DWORD _DGs;
+	if (DeGamma && (pTexture->GetPrivateData(GammaGUID, &_DeGamma, &_DGs) == D3D_OK))
+	  m_shaders->traced[currentPass].states_s[tSampler][D3DSAMP_SRGBTEXTURE] = DeGamma;
+	else
+	  m_shaders->traced[currentPass].states_s[tSampler][D3DSAMP_SRGBTEXTURE] = false;
+#endif
+      }
+    }
 #endif
   }
 
@@ -1386,10 +1428,16 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetTexture(D
     frame_log->Indent();
     frame_log->FormattedMessage("Address: 0x%08x", pTexture);
 
+    if (pTexture) {
 #if	defined(OBGE_LOGGING)
-    if (pTexture)
       frame_log->FormattedMessage("Path: %s", findTexture(pTexture));
 #endif
+
+#if	defined(OBGE_ANISOTROPY)
+      if (((currentPass == OBGEPASS_MAIN) || (currentPass == OBGEPASS_CUSTOM)) && AFilters)
+	frame_log->FormattedMessage("Anisotropy: %d", *((DWORD *)&Anisotropy));
+#endif
+    }
 
     bool ok = false;
 
@@ -1446,7 +1494,8 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::GetSamplerSt
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetSamplerState(DWORD Sampler, D3DSAMPLERSTATETYPE Type, DWORD Value) {
 #if	defined(OBGE_ANISOTROPY)
-  if (currentPass == OBGEPASS_MAIN) {
+  if ((currentPass == OBGEPASS_MAIN) ||
+      (currentPass == OBGEPASS_CUSTOM)) {
     // MIP
     if (((1 << Type) & ALODs   ) && (Value >= D3DTEXF_LINEAR))
       m_device->SetSamplerState(Sampler, D3DSAMP_MIPMAPLODBIAS, *((DWORD *)&LODBias));
@@ -1587,7 +1636,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::DrawIndexedP
 
   HRESULT res;
 
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   if (shadr_tes) {
     TSPrimitiveType TSPrimType = TSPT_TRIANGLESTRIP;
 
@@ -1742,7 +1791,8 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetVertexSha
   HRESULT res = 0;
   m_shadercv = NULL;
 
-  if (HasShaderManager && pShader && (m_shadercv = m_shaders->GetRuntimeShader(pShader))) {
+  /* assign based on context, shader assignment will last until next "s0" reassignment */
+  if (HasShaderManager && pShader && (m_shadercv = m_shaders->GetRuntimeShader(pShader, shadr_ctx))) {
 #if	!defined(OBGE_DEVLING)
     /* set shader first before constants */
     res = m_device->SetVertexShader(pShader);
@@ -1928,7 +1978,8 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE OBGEDirect3DDevice9::SetPixelShad
   HRESULT res = 0;
   m_shadercp = NULL;
 
-  if (HasShaderManager && pShader && (m_shadercp = m_shaders->GetRuntimeShader(pShader))) {
+  /* assign based on context, shader assignment will last until next "s0" reassignment */
+  if (HasShaderManager && pShader && (m_shadercp = m_shaders->GetRuntimeShader(pShader, shadr_ctx))) {
 #if	!defined(OBGE_DEVLING)
     /* set shader first before constants */
     res = m_device->SetPixelShader(pShader);

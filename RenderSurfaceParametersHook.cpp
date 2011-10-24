@@ -60,13 +60,16 @@ static global<bool> UseWaterReflectionsTrees(0, "Oblivion.ini", "Water", "bUseWa
 static global<bool> UseWaterReflectionsActors(0, "Oblivion.ini", "Water", "bUseWaterReflectionsActors");
 static global<int> SurfaceTextureSize(128, "Oblivion.ini", "Water", "uSurfaceTextureSize");
 static global<bool> UseWaterHiRes(0, "Oblivion.ini", "Water", "bUseWaterHiRes");
+static global<float> FarDistance(283840.0f, "Oblivion.ini", "Display", "fFarDistance");
 
 /* ------------------------------------------------------------------------------------------------- */
 
 class Anonymous {
 
 public:
-  void TrackCamera(float *kWorldLoc, float *kWorldDir, float *kWorldUp, float *kWorldRight, void *kFrustum, void *kPort);
+  float TrackFarPlane();
+  void TrackFrustum(NiFrustum *kFrustum);
+  void TrackCamera(float *kWorldLoc, float *kWorldDir, float *kWorldUp, float *kWorldRight, NiFrustum *kFrustum, void *kPort);
   void TrackCombinerPass(int unk1);
 
 #ifndef	OBGE_NOSHADER
@@ -100,7 +103,11 @@ public:
   void *TrackRenderedSurface(v1_2_416::NiDX9Renderer *renderer, int Width, int Height, int Flags, D3DFORMAT Format, enum SurfaceIDs SurfaceTypeID);
 };
 
-void (__thiscall Anonymous::* SetCamera)(float *, float *, float *, float *, void *, void *)/* =
+float (__thiscall Anonymous::* GetFarPlane)()/* =
+	(void (__thiscall TES::*)(int, int))00410EE0*/;
+void (__thiscall Anonymous::* SetFrustum)(NiFrustum *)/* =
+	(void (__thiscall TES::*)(int, int))0070C190*/;
+void (__thiscall Anonymous::* SetCamera)(float *, float *, float *, float *, NiFrustum *, void *)/* =
 	(void (__thiscall TES::*)(int, int))00762640*/;
 void (__thiscall Anonymous::* CombinerPass)(int)/* =
 	(void (__thiscall TES::*)(int, int))0040C830*/;
@@ -148,7 +155,11 @@ bool (__cdecl * IsRunning)(int, int)/* =
 	(void (__thiscall TES::*)(int, int))0x004F8DB0*/;
 #endif
 
-void (__thiscall Anonymous::* TrackCamera)(float *, float *, float *, float *, void *, void *)/* =
+float (__thiscall Anonymous::* TrackFarPlane)()/* =
+	(void (__thiscall TES::*)(int, int))00410EE0*/;
+void (__thiscall Anonymous::* TrackFrustum)(NiFrustum *)/* =
+	(void (__thiscall TES::*)(int, int))0070C190*/;
+void (__thiscall Anonymous::* TrackCamera)(float *, float *, float *, float *, NiFrustum *, void *)/* =
 	(void (__thiscall TES::*)(int, int))00762640*/;
 void (__thiscall Anonymous::* TrackCombinerPass)(int)/* =
 	(void (__thiscall TES::*)(int, int))0040C830*/;
@@ -192,7 +203,25 @@ void (__thiscall Anonymous::* TrackMiscPass)(int)/* =
 #endif
 
 
-void Anonymous::TrackCamera(float *kWorldLoc, float *kWorldDir, float *kWorldUp, float *kWorldRight, void *kFrustum, void *kPort) {
+float Anonymous::TrackFarPlane() {
+	float fz = (this->*GetFarPlane)();
+
+	if (fz == 283840.0f) {
+	  float fd = FarDistance.Get();
+	  if (fz < fd)
+	    fz = fd;
+	}
+
+	return fz;
+}
+
+void Anonymous::TrackFrustum(NiFrustum *kFrustum) {
+	NiCamera *cam = (NiCamera *)this;
+
+	(this->*SetFrustum)(kFrustum);
+}
+
+void Anonymous::TrackCamera(float *kWorldLoc, float *kWorldDir, float *kWorldUp, float *kWorldRight, NiFrustum *kFrustum, void *kPort) {
 	Constants.UpdateCamera(kWorldLoc, kWorldDir, kWorldUp, kWorldRight);
 
 	(this->*SetCamera)(kWorldLoc, kWorldDir, kWorldUp, kWorldRight, kFrustum, kPort);
@@ -850,6 +879,8 @@ void CreateRenderSurfaceHook(void) {
 	/* combined reflection and water passes: 0049E880 */
 	/* combined hdr related: 0049E880 */
 
+	*((int *)&GetFarPlane)           = 0x00410EE0;
+	*((int *)&SetFrustum)            = 0x0070C190;
 	*((int *)&SetCamera)             = 0x00762640;
 	*((int *)&CombinerPass)          = 0x0040C830;
 #ifndef	OBGE_NOSHADER
@@ -878,6 +909,8 @@ void CreateRenderSurfaceHook(void) {
 #endif
 
 
+	TrackFarPlane              = &Anonymous::TrackFarPlane;
+	TrackFrustum               = &Anonymous::TrackFrustum;
 	TrackCamera                = &Anonymous::TrackCamera;
 	TrackCombinerPass          = &Anonymous::TrackCombinerPass;
 #ifndef	OBGE_NOSHADER
@@ -916,6 +949,8 @@ void CreateRenderSurfaceHook(void) {
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
 
+	DetourAttach(&(PVOID&)GetFarPlane,           *((PVOID *)&TrackFarPlane));
+	DetourAttach(&(PVOID&)SetFrustum,            *((PVOID *)&TrackFrustum));
 	DetourAttach(&(PVOID&)SetCamera,             *((PVOID *)&TrackCamera));
 	DetourAttach(&(PVOID&)CombinerPass,          *((PVOID *)&TrackCombinerPass));
 #ifndef	OBGE_NOSHADER

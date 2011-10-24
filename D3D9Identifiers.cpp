@@ -51,7 +51,8 @@ const char *passNames[OBGEPASS_NUM] = {
   "3. Water heightmap pass (off-screen)",
   "4. Water displacement pass (off-screen)",
   "5. Shadow pass (off-screen)",
-  "6. Main pass (screen-space)",
+  "6. Main pass (world-space)",
+//"6. Custom pass (world-space)",
   "7. Effects pass (screen-space)",
   "8. HDR pass (screen-space)",
   "9. Post pass (screen-space)",
@@ -76,6 +77,8 @@ const char *passScens[OBGEPASS_NUM][16] = {
   {},
   /* OBGEPASS_MAIN		*/
   {},
+  /* OBGEPASS_CUSTOM		*/
+//{},
   /* OBGEPASS_EFFECTS		*/
   {},
   /* OBGEPASS_HDR		*/
@@ -1155,6 +1158,9 @@ const char *findSamplerState(D3DSAMPLERSTATETYPE sstate) {
   return "unknown";
 }
 
+#define GET4  (DWORD)MAKEFOURCC('G','E','T','4')
+#define GET1  (DWORD)MAKEFOURCC('G','E','T','1')
+
 const char *findSamplerStateValue(D3DSAMPLERSTATETYPE sstate, DWORD svalue) {
   static char buf[256];
 
@@ -1190,8 +1196,15 @@ const char *findSamplerStateValue(D3DSAMPLERSTATETYPE sstate, DWORD svalue) {
 	      	  break;
 	      	// float
 	      	case D3DSAMP_MIPMAPLODBIAS:	// deviation <>1.0
+		  if (*((DWORD *)&svalue) == GET4)
+		    sprintf(buf, "%s", "enable FETCH4");
+		  else if (*((DWORD *)&svalue) == GET1)
+		    sprintf(buf, "%s", "disable FETCH4");
+		  else
+		    sprintf(buf, "%f", *((float *)&svalue));
+		  break;
 	      	case D3DSAMP_SRGBTEXTURE:	// gamma <>1.0
-	          sprintf(buf, "%f", *((float *)&svalue));
+		  sprintf(buf, "%s", *((bool *)&svalue) ? "true" : "false");
 	      	  break;
 	      	// int
 	      	case D3DSAMP_MAXMIPLEVEL:

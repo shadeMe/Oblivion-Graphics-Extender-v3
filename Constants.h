@@ -49,6 +49,7 @@
 #include "obse/GameObjects.h"
 #include "obse/GameData.h"
 #include "obse/NiProperties.h"
+#include "obse/NiObjects.h"
 
 extern struct sConstants
 {
@@ -84,6 +85,10 @@ extern struct sConstants
 	v1_2_416::NiVector4		SunCoEffs;
 	v1_2_416::NiVector4		SunColor;
 
+	v1_2_416::NiVector4		LightDir;
+	v1_2_416::NiVector4		LightColor;
+	v1_2_416::NiVector4		AmbientColor;
+
 	v1_2_416::NiVector4		FogRange;
 	v1_2_416::NiVector4		FogColor;
 
@@ -103,6 +108,12 @@ extern struct sConstants
 
 	// DeGamma, strength, Gamma, strength
 	v1_2_416::NiVector4		Gamma;
+
+	/* internal variables */
+	UInt32				WorldSpace; // 60 == Tamriel, 40728 == Shivering Isles
+	bool				Oblivion;
+	v1_2_416::NiVector4		Coordinates;
+	bool				Exteriour;
 
 	/* deprecated */
 #ifndef	NO_DEPRECATED

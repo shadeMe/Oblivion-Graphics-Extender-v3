@@ -316,7 +316,7 @@ static bool GetEffectConstantB_Execute(COMMAND_ARGS) {
   }
 #endif
 
-  bool value;
+  BOOL value;
   if (EffectManager::GetSingleton()->GetEffectConstantB(id, var, &value))
     *result = value;
 

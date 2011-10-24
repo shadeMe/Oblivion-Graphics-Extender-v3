@@ -58,6 +58,7 @@
 #define	OBGE_CONSTANTPOOLS	0	// 0 = just hint
 #define	OBGE_GAMMACORRECTION	0	// 0 = just hint, 1 = apply globally
 #define	OBGE_LODSHADERS		0	// 0 = just hint, 1 = apply globally
+#define	OBGE_CUSTOMPASS		0	// 0 = just hint, 1 = apply globally
 #define	OBGE_ANISOTROPY		0	// 0 = just hint
 #define	OBGE_AUTOMIPMAP		0	// 0 = just hint, 1 = call GenerateMipSubLevels
 #define	OBGE_TRACKER		0	// replace by OBGE-implementation, 0 = only rendertargets, 1 = all
@@ -79,6 +80,7 @@ enum OBGEPass {
   OBGEPASS_WATERDISPLACEMENT 	= 0x4,	// off screen-space
   OBGEPASS_SHADOW		= 0x5,	// off screen-space
   OBGEPASS_MAIN			= 0x6,	// missing
+  OBGEPASS_CUSTOM		= 0x6,	// missing
   OBGEPASS_EFFECTS		= 0x7,	// on screen-space
   OBGEPASS_HDR			= 0x8,	// on screen-space, hdr
   OBGEPASS_POST			= 0x9,	// on screen-space, blur, hit, menu, etc.

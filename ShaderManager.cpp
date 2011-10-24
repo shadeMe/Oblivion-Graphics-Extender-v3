@@ -221,7 +221,11 @@ ShaderRecord::ShaderRecord() {
   Filepath[0] = '\0';
   Name[0] = '\0';
 
+#if	defined(OBGE_LODSHADERS)
+  pLODVariant = NULL;
+#endif
   pAssociate = NULL;
+
   pOblivionBinary = NULL;
   pOblivionConTab = NULL;
 
@@ -233,7 +237,7 @@ ShaderRecord::ShaderRecord() {
   pSrcPrcReplaced = NULL;
   pConstsReplaced = NULL;
   pShaderReplaced = NULL;
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   pConsttReplaced = NULL;
   pTssltrReplaced = NULL;
 #endif
@@ -242,7 +246,7 @@ ShaderRecord::ShaderRecord() {
   pSrcPrcRuntime = NULL;
   pConstsRuntime = NULL;
   pShaderRuntime = NULL;
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   pConsttRuntime = NULL;
   pTssltrRuntime = NULL;
 #endif
@@ -270,7 +274,7 @@ ShaderRecord::~ShaderRecord() {
   if (pSrcPrcReplaced) pSrcPrcReplaced->Release();
   if (pConstsReplaced) pConstsReplaced->Release();
   if (pShaderReplaced) pShaderReplaced->Release();
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   if (pConsttReplaced) pConsttReplaced->Release();
   if (pTssltrReplaced) pTssltrReplaced->Release();
 #endif
@@ -280,7 +284,7 @@ ShaderRecord::~ShaderRecord() {
   if (pSrcPrcRuntime) pSrcPrcRuntime->Release();
   if (pConstsRuntime) pConstsRuntime->Release();
   if (pShaderRuntime) pShaderRuntime->Release();
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   if (pConsttRuntime) pConsttRuntime->Release();
   if (pTssltrRuntime) pTssltrRuntime->Release();
 #endif
@@ -471,7 +475,7 @@ bool ShaderRecord::LoadShader(const char *Filename) {
       if (pSrcPrcReplaced) pSrcPrcReplaced->Release();
       if (pConstsReplaced) pConstsReplaced->Release();
       if (pShaderReplaced) pShaderReplaced->Release();
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
       if (pConsttReplaced) pConsttReplaced->Release();
       if (pTssltrReplaced) pTssltrReplaced->Release();
 #endif
@@ -479,7 +483,7 @@ bool ShaderRecord::LoadShader(const char *Filename) {
       pSrcPrcReplaced = NULL;
       pConstsReplaced = NULL;
       pShaderReplaced = NULL;
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
       pConsttReplaced = NULL;
       pTssltrReplaced = NULL;
 #endif
@@ -524,7 +528,7 @@ bool ShaderRecord::LoadShader(const char *Filename) {
       if (pSrcPrcReplaced) pSrcPrcReplaced->Release();
       if (pConstsReplaced) pConstsReplaced->Release();
       if (pShaderReplaced) pShaderReplaced->Release();
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
       if (pConsttReplaced) pConsttReplaced->Release();
       if (pTssltrReplaced) pTssltrReplaced->Release();
 #endif
@@ -532,7 +536,7 @@ bool ShaderRecord::LoadShader(const char *Filename) {
       pSrcPrcReplaced = NULL;
       pConstsReplaced = NULL;
       pShaderReplaced = NULL;
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
       pConsttReplaced = NULL;
       pTssltrReplaced = NULL;
 #endif
@@ -570,7 +574,7 @@ bool ShaderRecord::LoadShader(const char *Filename) {
     );
   }
 
-  return true;
+  return (pShaderReplaced || pAsmblyReplaced || pSourceReplaced);
 }
 
 bool ShaderRecord::RuntimeFlush() {
@@ -578,7 +582,7 @@ bool ShaderRecord::RuntimeFlush() {
   if (pSrcPrcRuntime) pSrcPrcRuntime->Release();
   if (pConstsRuntime) pConstsRuntime->Release();
   if (pShaderRuntime) pShaderRuntime->Release();
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   if (pConsttRuntime) pConsttRuntime->Release();
   if (pTssltrRuntime) pTssltrRuntime->Release();
 #endif
@@ -589,7 +593,7 @@ bool ShaderRecord::RuntimeFlush() {
   pSrcPrcRuntime = NULL;
   pConstsRuntime = NULL;
   pShaderRuntime = NULL;
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   pConsttRuntime = NULL;
   pTssltrRuntime = NULL;
 #endif
@@ -601,7 +605,7 @@ bool ShaderRecord::RuntimeFlush() {
 }
 
 bool ShaderRecord::CompareShader(const DWORD *Function) const {
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   /* lookup if the given function is the on-disk shader binary */
   if (pTssltrReplaced) {
     const DWORD *f = (const DWORD *)pTssltrReplaced->GetBufferPointer();
@@ -663,7 +667,7 @@ bool ShaderRecord::ConstructDX9Shader(char which) {
   char choosen = SHADER_UNSET;
 
   /* cascade, the highest possible is selected */
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   /**/ if (pTssltrRuntime  && (which >= SHADER_RUNTIME))
     p = pTssltrRuntime , ct = pConsttRuntime , choosen = SHADER_RUNTIME;
   else
@@ -672,7 +676,7 @@ bool ShaderRecord::ConstructDX9Shader(char which) {
     p = pShaderRuntime , ct = pConstsRuntime , choosen = SHADER_RUNTIME;
 
   /* cascade, the highest possible is selected */
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   else if (pTssltrReplaced && (which >= SHADER_REPLACED))
     p = pTssltrReplaced, ct = pConsttReplaced, choosen = SHADER_REPLACED;
 #endif
@@ -716,7 +720,12 @@ bool ShaderRecord::ConstructDX9Shader(char which) {
   pDX9ShaderClss = NULL;
   pDX9ShaderType = choosen;
 
+  /* create the run-time shaders, but prevent that the Create*-functions
+   * register a new runtime-class every time
+   */
   if (pFunction && lastOBGEDirect3DDevice9) {
+    bool trk = frame_trk; frame_trk = !pAssociate;
+
     /**/ if (iType == SHADER_VERTEX) {
       if (lastOBGEDirect3DDevice9->CreateVertexShader(pFunction, &pDX9VertexShader) != D3D_OK)
         pDX9ShaderClss = NULL;
@@ -725,6 +734,8 @@ bool ShaderRecord::ConstructDX9Shader(char which) {
       if (lastOBGEDirect3DDevice9->CreatePixelShader(pFunction, &pDX9PixelShader) != D3D_OK)
         pDX9ShaderClss = NULL;
     }
+
+    frame_trk = trk;
   }
 
   return (pDX9ShaderClss != NULL);
@@ -740,7 +751,7 @@ DWORD *ShaderRecord::GetDX9ShaderTexture(const char *sName, int *TexNum, int *Sm
   else if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_ORIGINAL))
     src = NULL;
 
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   else if (pTssltrRuntime  && (pOblivionBinary == (const DWORD *)pTssltrRuntime->GetBufferPointer()))
     src = (const char *)pSrcPrcRuntime->GetBufferPointer();
   else if (pTssltrReplaced && (pOblivionBinary == (const DWORD *)pTssltrReplaced->GetBufferPointer()))
@@ -953,7 +964,7 @@ DWORD *ShaderRecord::GetDX9RenderStates(DWORD *States, const char *func) {
   else if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_ORIGINAL))
     src = NULL;
 
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   else if (pTssltrRuntime  && (pOblivionBinary == (const DWORD *)pTssltrRuntime->GetBufferPointer()))
     src = (const char *)pSrcPrcRuntime->GetBufferPointer();
   else if (pTssltrReplaced && (pOblivionBinary == (const DWORD *)pTssltrReplaced->GetBufferPointer()))
@@ -1161,7 +1172,7 @@ bool ShaderRecord::CompileShader(bool forced) {
   LPD3DXBUFFER s = NULL;
   LPD3DXCONSTANTTABLE c = NULL;
   LPD3DXBUFFER p = NULL;
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   LPD3DXCONSTANTTABLE d = NULL;
   LPD3DXBUFFER t = NULL;
 #endif
@@ -1176,7 +1187,7 @@ bool ShaderRecord::CompileShader(bool forced) {
     s = pSrcPrcRuntime;
     c = pConstsRuntime;
     p = pShaderRuntime;
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
     d = pConsttRuntime;
     t = pTssltrRuntime;
 #endif
@@ -1188,7 +1199,7 @@ bool ShaderRecord::CompileShader(bool forced) {
     s = pSrcPrcReplaced;
     c = pConstsReplaced;
     p = pShaderReplaced;
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
     d = pConsttReplaced;
     t = pTssltrReplaced;
 #endif
@@ -1257,7 +1268,7 @@ bool ShaderRecord::CompileShader(bool forced) {
       save = true;
   }
 
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   /* recompile only, if there is one already, just ignore */
   if (!t && s && strstr((char *)s->GetBufferPointer(), "tess")) {
     LPD3DXBUFFER pErrorMsgt = NULL;
@@ -1316,7 +1327,7 @@ bool ShaderRecord::CompileShader(bool forced) {
     pSrcPrcRuntime = s;
     pConstsRuntime = c;
     pShaderRuntime = p;
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
     pConsttRuntime = d;
     pTssltrRuntime = t;
 #endif
@@ -1325,7 +1336,7 @@ bool ShaderRecord::CompileShader(bool forced) {
     pSrcPrcReplaced = s;
     pConstsReplaced = c;
     pShaderReplaced = p;
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
     pConsttReplaced = d;
     pTssltrReplaced = t;
 #endif
@@ -1355,7 +1366,7 @@ bool ShaderRecord::DisassembleShader(bool forced) {
 
     /* cascade, the highest possible is selected */
     if (pSourceRuntime) {
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
       if (pTssltrRuntime)
         D3DXDisassembleShader(
 	  (const DWORD *)pTssltrRuntime->GetBufferPointer(),
@@ -1374,7 +1385,7 @@ bool ShaderRecord::DisassembleShader(bool forced) {
         );
     }
     else if (pSourceReplaced) {
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
       if (pTssltrReplaced)
         D3DXDisassembleShader(
 	  (const DWORD *)pTssltrReplaced->GetBufferPointer(),
@@ -1424,6 +1435,12 @@ void ShaderRecord::SetBinary(int len, const DWORD *org) {
       pConstsOriginal = NULL;
     }
   }
+
+#if	defined(OBGE_LODSHADERS)
+  /* take are of the LOD-variant as well */
+  if (pLODVariant)
+    pLODVariant->SetBinary(len, org);
+#endif
 }
 
 const DWORD *ShaderRecord::GetBinary() {
@@ -1436,7 +1453,7 @@ const DWORD *ShaderRecord::GetBinary() {
   else if (pSourceReplaced)
     succ = CompileShader();
 
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   /* cascade, the highest possible is selected */
   /**/ if (pTssltrReplaced) {
     pOblivionBinary = (const DWORD *)pTssltrReplaced->GetBufferPointer();
@@ -1460,10 +1477,16 @@ const DWORD *ShaderRecord::GetBinary() {
     pOblivionConTab = NULL;
   }
 
+#if	defined(OBGE_LODSHADERS)
+  /* take are of the LOD-variant as well */
+  if (pLODVariant)
+    pLODVariant->GetBinary();
+#endif
+
   return pOblivionBinary;
 }
 
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
 bool ShaderRecord::IsTesselator() const {
   /* check if the current active shader is a tesselator */
   /**/ if (pDX9ShaderClss && (pDX9ShaderType >= SHADER_RUNTIME))
@@ -1993,6 +2016,12 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.rcpresh;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_ReciprocalResolution_WATERDISPLACEMENTPASS"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.rcpresd;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_LightDirection"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.LightDir;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_LightColor"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.LightColor;
+	      else if (cnst.Name == strstr(cnst.Name, "oblv_AmbientColor"))
+		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.AmbientColor;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_SunDirection"))
 		pFloat4[cnts[D3DXRS_FLOAT4]].vals.floating = (RuntimeVariable::mem::fv *)&Constants.SunDir;
 	      else if (cnst.Name == strstr(cnst.Name, "oblv_SunTiming"))
@@ -2121,7 +2150,7 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 		assert(sts < 16);
 
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].vals.state = tvs; tvs += sts + 1;
-		pSampler[cnts[D3DXRS_SAMPLER + 1]].offset = cnst.RegisterIndex;
+		pSampler[cnts[D3DXRS_SAMPLER + 1]].offset = cnst.RegisterIndex + (this->iType == SHADER_VERTEX ? D3DVERTEXTEXTURESAMPLER0 : 0);
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].length = cnst.RegisterCount;
 		pSampler[cnts[D3DXRS_SAMPLER + 1]].name = cnst.Name;
 			 cnts[D3DXRS_SAMPLER + 1]++;
@@ -2137,7 +2166,7 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
 	      }
 	    }
 
-	    pTexture[cnts[D3DXRS_SAMPLER]].offset = cnst.RegisterIndex;
+	    pTexture[cnts[D3DXRS_SAMPLER]].offset = cnst.RegisterIndex + (this->iType == SHADER_VERTEX ? D3DVERTEXTEXTURESAMPLER0 : 0);
 	    pTexture[cnts[D3DXRS_SAMPLER]].length = cnst.RegisterCount;
 	    pTexture[cnts[D3DXRS_SAMPLER]].name = cnst.Name;
 		     cnts[D3DXRS_SAMPLER]++;
@@ -2187,7 +2216,7 @@ void RuntimeShaderRecord::CreateRuntimeParams(LPD3DXCONSTANTTABLE CoTa) {
     }
   }
 
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   /* prepare tesselation (TODO: that information should be in the CoTa) */
   if ((iTess = (pAssociate && pAssociate->IsTesselator()) ? 1 : 0)) {
     DWORD States[16], *SBegin, *SEnd;
@@ -2224,7 +2253,7 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
     StateDevice->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
   }
 
-#if	defined(OBGE_DEVLING) && defined(OBGE_TESSELATION)
+#if	defined(OBGE_TESSELATION) && defined(OBGE_DEVLING)
   /* trigger and untrigger tesselation (every shader passes here) */
   if (iType == SHADER_VERTEX)
     shadr_tes = iTess;
@@ -2264,7 +2293,7 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
 	  // 0 must be reserved for NULL
 	  if ((DWORD)(tX = rV->vals.texture) < (512 + 1))
 	    StateDevice->GetTexture((DWORD)tX - 1, &tX);
-	  StateDevice->SetTexture(rV->offset + D3DVERTEXTEXTURESAMPLER0, tX);
+	  StateDevice->SetTexture(rV->offset, tX);
 	} while ((++rV)->length);
       if ((rV = pSampler)) {
 	DWORD bak = AFilters; AFilters = 0;
@@ -2272,7 +2301,7 @@ void RuntimeShaderRecord::SetRuntimeParams(IDirect3DDevice9 *StateDevice, IDirec
 	  RuntimeVariable::mem::tv *rT;
 	  if ((rT = rV->vals.state))
 	    do {
-	      StateDevice->SetSamplerState(rV->offset + D3DVERTEXTEXTURESAMPLER0, rT->Type, rT->Value);
+	      StateDevice->SetSamplerState(rV->offset, rT->Type, rT->Value);
 	    } while ((++rT)->Type);
 	} while ((++rV)->length);
 	AFilters = bak;
@@ -2389,8 +2418,13 @@ bool RuntimeShaderRecord::SetShaderSamplerTexture(const char *name, int TextureN
 	  TexMan->ReleaseTexture(OldTexture);
 
 	  /* remove from vector */
-	  if (OldTextureNum != -1)
-	    Textures.erase(std::find(Textures.begin(), Textures.end(), OldTextureNum));
+	  if (OldTextureNum != -1) {
+	    /* precaution (should always work) */
+	    std::vector<int>::iterator OldPos;
+	    OldPos = std::find(Textures.begin(), Textures.end(), OldTextureNum);
+	    if (OldPos != Textures.end())
+	      Textures.erase(OldPos);
+	  }
 	}
 
 	/* apply the new texture and remember it */
@@ -2419,8 +2453,13 @@ void RuntimeShaderRecord::PurgeTexture(IDirect3DBaseTexture9 *texture, int TexNu
 	rV->vals.texture = NULL;
 
 	/* remove from vector */
-	if (TexNum != -1)
-	  Textures.erase(std::find(Textures.begin(), Textures.end(), TexNum));
+	if (TexNum != -1) {
+	  /* this doesn't necessarily match */
+	  std::vector<int>::iterator Pos;
+	  Pos = std::find(Textures.begin(), Textures.end(), TexNum);
+	  if (Pos != Textures.end())
+	    Textures.erase(Pos);
+	}
       }
     } while ((++rV)->length);
 }
@@ -2556,7 +2595,9 @@ ShaderManager *ShaderManager::GetSingleton() {
 void ShaderManager::Reset() {
   BuiltInShaders.clear();
   RuntimeShaders.clear();
-  Shaders.clear();
+
+  Shaders[LUT_STD].clear();
+  Shaders[LUT_LOD].clear();
 
 #ifdef	OBGE_DEVLING
   Clear();
@@ -2691,16 +2732,34 @@ ShaderRecord *ShaderManager::GetBuiltInShader(const char *Name) {
     BShader++;
   }
 
-  /* request a new class, load and prepare */
+  /* request a new built-in class, load and prepare */
   ShaderRecord *NewShader = NULL;
   NewShader = new ShaderRecord();
 
-  if (!NewShader->LoadShader(Name)) {
+  if (!NewShader->LoadShader(Name)) {/*
     delete NewShader;
     return NULL;
-  }
+*/}
 
   BuiltInShaders.push_back(NewShader);
+
+#if	defined(OBGE_LODSHADERS)
+  /* request a new variation class, load and prepare */
+  ShaderRecord *LODShader = NULL;
+  LODShader = new ShaderRecord();
+
+  char LODN[256]; strcpy(LODN, Name);
+  strcpy(strrchr(LODN, '.'), "-LOD");
+  strcat(LODN, strrchr(Name, '.'));
+
+  if (!LODShader->LoadShader(LODN))
+    delete LODShader;
+  else {
+    BuiltInShaders.push_back(LODShader);
+    NewShader->pLODVariant = LODShader;
+  }
+#endif
+
   return NewShader;
 }
 
@@ -2733,7 +2792,11 @@ RuntimeShaderRecord *ShaderManager::SetRuntimeShader(const DWORD *Function, IUnk
     /* identify by the same binary Oblivions got into it's hands */
     if ((*RShader)->pAssociate && ((*RShader)->pAssociate->pOblivionBinary == Function)) {
       /* put into the fast LUT for inside the pipeline */
-      Shaders[Shader] = (*RShader);
+      Shaders[LUT_STD][Shader] = (*RShader);
+#if	defined(OBGE_LODSHADERS)
+//    Shaders[LUT_LOD][Shader] = (*RShader);
+#endif
+
       return (*RShader);
     }
 
@@ -2752,8 +2815,29 @@ RuntimeShaderRecord *ShaderManager::SetRuntimeShader(const DWORD *Function, IUnk
    */
   NewShader->AssignShader(Shader, AscShader);
   RuntimeShaders.push_back(NewShader);
-  Shaders[Shader] = NewShader;
-  return NewShader;
+
+#if	defined(OBGE_LODSHADERS)
+  if (AscShader && (AscShader = AscShader->pLODVariant)) {
+    RuntimeShaderRecord *LODShader = NULL;
+    LODShader = new RuntimeShaderRecord();
+
+    /* as it's not Oblivion which will call Create*Shader, we have to do it
+     * and in a way that the resources get freed, we can use the same
+     * mechanism the ShaderDeveloper uses to inject Replacement-shaders
+     */
+    AscShader->ConstructDX9Shader(SHADER_REPLACED);
+    LODShader->AssignShader(AscShader->pDX9ShaderClss, AscShader);
+    RuntimeShaders.push_back(LODShader);
+
+    /* we still have to make it be fetched via the original address though  */
+    Shaders[LUT_LOD][Shader] = LODShader;
+  }
+  else
+    Shaders[LUT_LOD][Shader] = NewShader;
+#endif
+
+  return
+    Shaders[LUT_STD][Shader] = NewShader;
 }
 
 RuntimeShaderRecord *ShaderManager::GetRuntimeShader(const char *Name) {
@@ -2778,13 +2862,13 @@ RuntimeShaderRecord *ShaderManager::GetRuntimeShader(const char *Name) {
 /* -------------------------------------------------------------------------------------------------
  */
 
-IDirect3DPixelShader9 *ShaderManager::GetShader(IDirect3DPixelShader9 *Shader) {
+IDirect3DPixelShader9 *ShaderManager::GetShader(IDirect3DPixelShader9 *Shader, int ctx) {
   /* for now we don't want any replacement (return Oblivion's own shader class) */
   if (!::RuntimeSources.Get())
     return Shader;
 
   /* we have some replacement resource directly from the LUT, and we're going to pass that */
-  RuntimeShaderRecord *hit = Shaders[(IUnknown *)Shader];
+  RuntimeShaderRecord *hit = Shaders[ctx][(IUnknown *)Shader];
   if (hit)
     return hit->GetShader(Shader);
 
@@ -2792,13 +2876,13 @@ IDirect3DPixelShader9 *ShaderManager::GetShader(IDirect3DPixelShader9 *Shader) {
   return Shader;
 }
 
-IDirect3DVertexShader9 *ShaderManager::GetShader(IDirect3DVertexShader9 *Shader) {
+IDirect3DVertexShader9 *ShaderManager::GetShader(IDirect3DVertexShader9 *Shader, int ctx) {
   /* for now we don't want any replacement (return Oblivion's own shader class) */
   if (!::RuntimeSources.Get())
     return Shader;
 
   /* we have some replacement resource directly from the LUT, and we're going to pass that */
-  RuntimeShaderRecord *hit = Shaders[(IUnknown *)Shader];
+  RuntimeShaderRecord *hit = Shaders[ctx][(IUnknown *)Shader];
   if (hit)
     return hit->GetShader(Shader);
 

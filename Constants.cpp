@@ -35,11 +35,14 @@
  */
 
 #include "Constants.h"
+#include "GlobalSettings.h"
 
-struct sConstants Constants;
+static global<float> SunlightDimmer(1.0, "Oblivion.ini", "BlurShaderHDR", "fSunlightDimmer");
 
 /* -----------------------------------------------------------------------------
  */
+
+struct sConstants Constants;
 
 void sConstants::Update() {
   Update(v1_2_416::GetRenderer());
@@ -91,10 +94,53 @@ void sConstants::Update(v1_2_416::NiDX9Renderer *Renderer) {
   FogRange.y = tes->fogProperty->fogEnd;
   FogRange.z = FogRange.y - FogRange.x;
   FogRange.w = FogRange.y + FogRange.x;
+
   // colorF
   FogColor.x = tes->fogProperty->color.r;
   FogColor.y = tes->fogProperty->color.g;
   FogColor.z = tes->fogProperty->color.b;
+
+  if (tes->niDirectionalLight) {
+    float dim = SunlightDimmer.Get();
+
+    LightDir.x = -tes->niDirectionalLight->m_direction.x;
+    LightDir.y = -tes->niDirectionalLight->m_direction.y;
+    LightDir.z = -tes->niDirectionalLight->m_direction.z;
+    LightDir.Normalize3();
+
+    LightColor.x = tes->niDirectionalLight->m_kDiff.r * dim;
+    LightColor.y = tes->niDirectionalLight->m_kDiff.g * dim;
+    LightColor.z = tes->niDirectionalLight->m_kDiff.b * dim;
+
+    AmbientColor.x = tes->niDirectionalLight->m_kAmb.r;
+    AmbientColor.y = tes->niDirectionalLight->m_kAmb.g;
+    AmbientColor.z = tes->niDirectionalLight->m_kAmb.b;
+  }
+
+  // worldspace
+  WorldSpace = 0;
+  Oblivion = false;
+  if (tes->currentWorldSpace) {
+    WorldSpace = tes->currentWorldSpace->refID;
+    Oblivion   = tes->currentWorldSpace->IsOblivionWorld();
+  }
+
+  // location
+  Coordinates.x = 0;
+  Coordinates.y = 0;
+  if (tes->currentExteriorCell && tes->currentExteriorCell->coords) {
+    Coordinates.x = tes->currentExteriorCell->coords->x;
+    Coordinates.y = tes->currentExteriorCell->coords->y;
+  }
+
+  Coordinates.z = 0;
+  Coordinates.w = 0;
+  if (tes->currentInteriorCell && tes->currentInteriorCell->coords) {
+    Coordinates.z = tes->currentInteriorCell->coords->x;
+    Coordinates.w = tes->currentInteriorCell->coords->y;
+  }
+
+  Exteriour = !tes->currentInteriorCell;
 }
 
 void sConstants::UpdateSun() {
