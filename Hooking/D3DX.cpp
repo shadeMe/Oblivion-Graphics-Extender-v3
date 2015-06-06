@@ -34,7 +34,7 @@
 #define	HOOKING_D3DX_CPP
 
 #include <sys/stat.h>
-
+#include <assert.h>
 #include "D3DX.hpp"
 #include "../D3DX.hpp"
 

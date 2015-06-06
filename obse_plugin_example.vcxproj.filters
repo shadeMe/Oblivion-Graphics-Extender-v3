@@ -1,0 +1,325 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="obse">
+      <UniqueIdentifier>{7c47e5db-43d4-471b-8d72-96cb7efced99}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Hooking">
+      <UniqueIdentifier>{e6296199-07bb-4660-9a76-96c4c7a54508}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Nodes">
+      <UniqueIdentifier>{159a0708-3075-42f3-b5ab-06276be4131b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Hooking\detours">
+      <UniqueIdentifier>{e0a4a202-f872-43ed-94cc-9764c4dd92cd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="OBGE fork">
+      <UniqueIdentifier>{d2433413-a586-48be-bff6-a28865124400}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\obse\obse\GameActorValues.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameAPI.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameBSExtraData.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameData.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameExtraData.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameForms.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameObjects.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameTasks.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameTypes.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\NiAPI.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\NiNodes.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\NiRTTI.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\Script.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\Utilities.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="Commands_Effects.cpp" />
+    <ClCompile Include="Commands_HUD.cpp" />
+    <ClCompile Include="Commands_Misc.cpp" />
+    <ClCompile Include="Commands_Shaders.cpp" />
+    <ClCompile Include="Commands_Textures.cpp" />
+    <ClCompile Include="Constants.cpp" />
+    <ClCompile Include="D3D9.cpp" />
+    <ClCompile Include="D3D9Device.cpp" />
+    <ClCompile Include="D3D9Identifiers.cpp" />
+    <ClCompile Include="DepthBufferHook.cpp" />
+    <ClCompile Include="EffectManager.cpp" />
+    <ClCompile Include="GlobalSettings.cpp" />
+    <ClCompile Include="GUIs_DebugWindow.cpp" />
+    <ClCompile Include="LODManager.cpp" />
+    <ClCompile Include="MeshManager.cpp" />
+    <ClCompile Include="OBSEShaderInterface.cpp" />
+    <ClCompile Include="Rendering.cpp" />
+    <ClCompile Include="RenderStateManagerHooks.cpp" />
+    <ClCompile Include="RenderSurfaceParametersHook.cpp" />
+    <ClCompile Include="ScreenElements.cpp" />
+    <ClCompile Include="ShaderIOHook.cpp" />
+    <ClCompile Include="ShaderManager.cpp" />
+    <ClCompile Include="SpoofShader.cpp" />
+    <ClCompile Include="TextureIOHook.cpp" />
+    <ClCompile Include="TextureManager.cpp" />
+    <ClCompile Include="Nodes\NiAVObject.cpp">
+      <Filter>Nodes</Filter>
+    </ClCompile>
+    <ClCompile Include="Nodes\NiDX9Renderer.cpp">
+      <Filter>Nodes</Filter>
+    </ClCompile>
+    <ClCompile Include="Nodes\NiMatrix33.cpp">
+      <Filter>Nodes</Filter>
+    </ClCompile>
+    <ClCompile Include="Nodes\NiRefObject.cpp">
+      <Filter>Nodes</Filter>
+    </ClCompile>
+    <ClCompile Include="Nodes\NiVector3.cpp">
+      <Filter>Nodes</Filter>
+    </ClCompile>
+    <ClCompile Include="Nodes\NiVector4.cpp">
+      <Filter>Nodes</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooking\detours\detoured.cpp">
+      <Filter>Hooking\detours</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooking\detours\detours.cpp">
+      <Filter>Hooking\detours</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooking\detours\disasm.cpp">
+      <Filter>Hooking\detours</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse_common\SafeWrite.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="OBGE fork\Sky.cpp">
+      <Filter>OBGE fork</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\obse\obse\GameActorValues.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameAPI.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameBSExtraData.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameData.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameExtraData.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameForms.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameObjects.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameTasks.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameTypes.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\NiAPI.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\NiNodes.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\NiRTTI.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\ParamInfos.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\PluginAPI.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\Script.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\Utilities.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="Commands_Effects.h" />
+    <ClInclude Include="Commands_HUD.h" />
+    <ClInclude Include="Commands_Misc.h" />
+    <ClInclude Include="Commands_Params.h" />
+    <ClInclude Include="Commands_Shaders.h" />
+    <ClInclude Include="Commands_Textures.h" />
+    <ClInclude Include="Constants.h" />
+    <ClInclude Include="D3D9.hpp" />
+    <ClInclude Include="D3D9Device.hpp" />
+    <ClInclude Include="D3D9Identifiers.hpp" />
+    <ClInclude Include="DepthBufferHook.h" />
+    <ClInclude Include="EffectManager.h" />
+    <ClInclude Include="GlobalSettings.h" />
+    <ClInclude Include="GUIs_DebugWindow.hpp" />
+    <ClInclude Include="LODManager.h" />
+    <ClInclude Include="MeshManager.h" />
+    <ClInclude Include="OBSEShaderInterface.h" />
+    <ClInclude Include="Rendering.h" />
+    <ClInclude Include="RenderStateManagerHooks.h" />
+    <ClInclude Include="RenderSurfaceParametersHook.hpp" />
+    <ClInclude Include="ScreenElements.h" />
+    <ClInclude Include="ShaderIOHook.hpp" />
+    <ClInclude Include="ShaderManager.h" />
+    <ClInclude Include="SpoofShader.h" />
+    <ClInclude Include="TextureIOHook.hpp" />
+    <ClInclude Include="TextureManager.h" />
+    <ClInclude Include="Nodes\BSRenderedTexture.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\MiscNiDataTypes.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\Ni2DBuffer.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiAccumulator.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiAlphaAccumulator.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiAVObject.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiBackToFrontAccumulator.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiBillboardNode.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiCamera.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiCriticalSection.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiD3DRenderState.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiDX9ImplicitDepthStencilBufferData.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiDX9Renderer.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiDX9RenderState.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiDX9TextureBufferData.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiDX92DBufferData.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiFogProperty.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiMatrix33.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiNode.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiObject.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiObjectNET.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiPoint3.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiProperty.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiRect.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiRefObject.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiRenderer.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiRenderTargetGroup.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiShader.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiVector3.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiVector4.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\NiViewPort.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Nodes\Template.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Hooking\detours\detoured.h">
+      <Filter>Hooking\detours</Filter>
+    </ClInclude>
+    <ClInclude Include="Hooking\detours\detours.h">
+      <Filter>Hooking\detours</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse_common\SafeWrite.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="OBGE fork\Sky.h">
+      <Filter>OBGE fork</Filter>
+    </ClInclude>
+    <ClInclude Include="OBGE fork\SkyObject.h">
+      <Filter>OBGE fork</Filter>
+    </ClInclude>
+    <ClInclude Include="OBGE fork\Sun.h">
+      <Filter>OBGE fork</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\obse\obse\GameRTTI_1_1.inl">
+      <Filter>obse</Filter>
+    </None>
+    <None Include="..\obse\obse\GameRTTI_1_2.inl">
+      <Filter>obse</Filter>
+    </None>
+    <None Include="..\obse\obse\GameRTTI_1_2_416.inl">
+      <Filter>obse</Filter>
+    </None>
+    <None Include="exports.def" />
+  </ItemGroup>
+</Project>

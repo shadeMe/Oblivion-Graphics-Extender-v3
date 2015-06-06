@@ -457,9 +457,9 @@ void LODManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo
      * far  283408....	^= sqrt(2 * ((half-tile + full-tile) ^ 2))
      *			^= pytagoras of 1.5 tiles radius or 3 tile diameter
      */
-//  D3DDevice->SetTransform(D3DTS_PROJECTION, &Constants.proj);
-//  D3DDevice->SetTransform(D3DTS_VIEW, &Constants.view);
-//  D3DDevice->SetTransform(D3DTS_WORLD, &Constants.wrld);
+ // D3DDevice->SetTransform(D3DTS_PROJECTION, &Constants.proj);
+ // D3DDevice->SetTransform(D3DTS_VIEW, &Constants.view);
+ // D3DDevice->SetTransform(D3DTS_WORLD, &Constants.wrld);
 
     D3DDevice->SetRenderState(D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_ALPHA | D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_RED);
 //  D3DDevice->SetRenderState(D3DRS_ALPHATESTENABLE, false);
@@ -469,7 +469,7 @@ void LODManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo
     D3DDevice->SetRenderState(D3DRS_ZENABLE, D3DZB_TRUE);
 //  D3DDevice->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESS);	// works much better
     D3DDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW);	// because geometry is CCW
-//  D3DDevice->SetRenderState(D3DRS_CLIPPING, FALSE);
+  //D3DDevice->SetRenderState(D3DRS_CLIPPING, FALSE);
 
     /* don't change anything in the reflection-pass */
     if (currentPass == OBGEPASS_MAIN) {
@@ -489,8 +489,8 @@ void LODManager::Render(IDirect3DDevice9 *D3DDevice, IDirect3DSurface9 *RenderTo
     Render<FARNEAR, FARFAR,  GRID_FARFAR >(D3DDevice);
     Render<FARFAR,  FARINF,  GRID_FARINF >(D3DDevice);
 
-    D3DDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, true);	// menus come after
-    D3DDevice->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+ //   D3DDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, true);	// menus come after
+ //   D3DDevice->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
 //  D3DDevice->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
 
     if ((currentPass == OBGEPASS_MAIN) && 0)

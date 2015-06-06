@@ -1,0 +1,257 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{D4DDA734-7E93-4581-8F82-32BB738F69FE}</ProjectGuid>
+    <RootNamespace>obse_plugin_example</RootNamespace>
+    <SccProjectName>
+    </SccProjectName>
+    <SccLocalPath>
+    </SccLocalPath>
+    <SccProvider>
+    </SccProvider>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.40219.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)$(Configuration)\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(Configuration)\</IntDir>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</LinkIncremental>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)$(Configuration)\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(Configuration)\</IntDir>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkIncremental>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Include;$(IncludePath)</IncludePath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Lib\x86;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\..;$(SolutionDir)\..\obse\obse;$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;OBLIVION_VERSION=0x010201A0;OBLIVION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <ForcedIncludeFiles>obse_common/obse_prefix.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <Link>
+      <ModuleDefinitionFile>exports.def</ModuleDefinitionFile>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <TargetMachine>MachineX86</TargetMachine>
+      <AdditionalDependencies>d3d9.lib;d3dx9.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Message>
+      </Message>
+      <Command>copy "$(TargetPath)" "C:\Bethesda Softworks\Oblivion\Data\OBSE\Plugins\OBGETest.dll"</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\..;$(SolutionDir)\..\obse\obse;$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;OBLIVION_VERSION=0x010201A0;OBLIVION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ForcedIncludeFiles>obse_common/obse_prefix.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <Link>
+      <ModuleDefinitionFile>exports.def</ModuleDefinitionFile>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <TargetMachine>MachineX86</TargetMachine>
+    </Link>
+    <PostBuildEvent>
+      <Message>Installing DLL...</Message>
+      <Command>copy "$(TargetPath)" "$(OblivionPath)\data\obse\plugins\$(TargetFileName)"</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\common\common.vcxproj">
+      <Project>{20c6411c-596f-4b85-be4e-8bc91f59d8a6}</Project>
+      <CopyLocalSatelliteAssemblies>true</CopyLocalSatelliteAssemblies>
+      <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\obse\obse\GameActorValues.cpp" />
+    <ClCompile Include="..\obse\obse\GameAPI.cpp" />
+    <ClCompile Include="..\obse\obse\GameBSExtraData.cpp" />
+    <ClCompile Include="..\obse\obse\GameData.cpp" />
+    <ClCompile Include="..\obse\obse\GameExtraData.cpp" />
+    <ClCompile Include="..\obse\obse\GameForms.cpp" />
+    <ClCompile Include="..\obse\obse\GameObjects.cpp" />
+    <ClCompile Include="..\obse\obse\GameTasks.cpp" />
+    <ClCompile Include="..\obse\obse\GameTypes.cpp" />
+    <ClCompile Include="..\obse\obse\NiAPI.cpp" />
+    <ClCompile Include="..\obse\obse\NiNodes.cpp" />
+    <ClCompile Include="..\obse\obse\NiRTTI.cpp" />
+    <ClCompile Include="..\obse\obse\Script.cpp" />
+    <ClCompile Include="..\obse\obse\Utilities.cpp" />
+    <ClCompile Include="..\obse\obse_common\SafeWrite.cpp" />
+    <ClCompile Include="Commands_Effects.cpp" />
+    <ClCompile Include="Commands_HUD.cpp" />
+    <ClCompile Include="Commands_Misc.cpp" />
+    <ClCompile Include="Commands_Shaders.cpp" />
+    <ClCompile Include="Commands_Textures.cpp" />
+    <ClCompile Include="Constants.cpp" />
+    <ClCompile Include="D3D9.cpp" />
+    <ClCompile Include="D3D9Device.cpp" />
+    <ClCompile Include="D3D9Identifiers.cpp" />
+    <ClCompile Include="DepthBufferHook.cpp" />
+    <ClCompile Include="EffectManager.cpp" />
+    <ClCompile Include="GlobalSettings.cpp" />
+    <ClCompile Include="GUIs_DebugWindow.cpp" />
+    <ClCompile Include="Hooking\detours\detoured.cpp" />
+    <ClCompile Include="Hooking\detours\detours.cpp" />
+    <ClCompile Include="Hooking\detours\disasm.cpp" />
+    <ClCompile Include="LODManager.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="MeshManager.cpp" />
+    <ClCompile Include="Nodes\NiAVObject.cpp" />
+    <ClCompile Include="Nodes\NiDX9Renderer.cpp" />
+    <ClCompile Include="Nodes\NiMatrix33.cpp" />
+    <ClCompile Include="Nodes\NiRefObject.cpp" />
+    <ClCompile Include="Nodes\NiVector3.cpp" />
+    <ClCompile Include="Nodes\NiVector4.cpp" />
+    <ClCompile Include="OBGE fork\Sky.cpp" />
+    <ClCompile Include="OBSEShaderInterface.cpp" />
+    <ClCompile Include="Rendering.cpp" />
+    <ClCompile Include="RenderStateManagerHooks.cpp" />
+    <ClCompile Include="RenderSurfaceParametersHook.cpp" />
+    <ClCompile Include="ScreenElements.cpp" />
+    <ClCompile Include="ShaderIOHook.cpp" />
+    <ClCompile Include="ShaderManager.cpp" />
+    <ClCompile Include="SpoofShader.cpp" />
+    <ClCompile Include="TextureIOHook.cpp" />
+    <ClCompile Include="TextureManager.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\obse\obse\GameActorValues.h" />
+    <ClInclude Include="..\obse\obse\GameAPI.h" />
+    <ClInclude Include="..\obse\obse\GameBSExtraData.h" />
+    <ClInclude Include="..\obse\obse\GameData.h" />
+    <ClInclude Include="..\obse\obse\GameExtraData.h" />
+    <ClInclude Include="..\obse\obse\GameForms.h" />
+    <ClInclude Include="..\obse\obse\GameObjects.h" />
+    <ClInclude Include="..\obse\obse\GameTasks.h" />
+    <ClInclude Include="..\obse\obse\GameTypes.h" />
+    <ClInclude Include="..\obse\obse\NiAPI.h" />
+    <ClInclude Include="..\obse\obse\NiNodes.h" />
+    <ClInclude Include="..\obse\obse\NiRTTI.h" />
+    <ClInclude Include="..\obse\obse\ParamInfos.h" />
+    <ClInclude Include="..\obse\obse\PluginAPI.h" />
+    <ClInclude Include="..\obse\obse\Script.h" />
+    <ClInclude Include="..\obse\obse\Utilities.h" />
+    <ClInclude Include="..\obse\obse_common\SafeWrite.h" />
+    <ClInclude Include="Commands_Effects.h" />
+    <ClInclude Include="Commands_HUD.h" />
+    <ClInclude Include="Commands_Misc.h" />
+    <ClInclude Include="Commands_Params.h" />
+    <ClInclude Include="Commands_Shaders.h" />
+    <ClInclude Include="Commands_Textures.h" />
+    <ClInclude Include="Constants.h" />
+    <ClInclude Include="D3D9.hpp" />
+    <ClInclude Include="D3D9Device.hpp" />
+    <ClInclude Include="D3D9Identifiers.hpp" />
+    <ClInclude Include="DepthBufferHook.h" />
+    <ClInclude Include="EffectManager.h" />
+    <ClInclude Include="GlobalSettings.h" />
+    <ClInclude Include="GUIs_DebugWindow.hpp" />
+    <ClInclude Include="Hooking\detours\detoured.h" />
+    <ClInclude Include="Hooking\detours\detours.h" />
+    <ClInclude Include="LODManager.h" />
+    <ClInclude Include="MeshManager.h" />
+    <ClInclude Include="Nodes\BSRenderedTexture.h" />
+    <ClInclude Include="Nodes\MiscNiDataTypes.h" />
+    <ClInclude Include="Nodes\Ni2DBuffer.h" />
+    <ClInclude Include="Nodes\NiAccumulator.h" />
+    <ClInclude Include="Nodes\NiAlphaAccumulator.h" />
+    <ClInclude Include="Nodes\NiAVObject.h" />
+    <ClInclude Include="Nodes\NiBackToFrontAccumulator.h" />
+    <ClInclude Include="Nodes\NiBillboardNode.h" />
+    <ClInclude Include="Nodes\NiCamera.h" />
+    <ClInclude Include="Nodes\NiCriticalSection.h" />
+    <ClInclude Include="Nodes\NiD3DRenderState.h" />
+    <ClInclude Include="Nodes\NiDX92DBufferData.h" />
+    <ClInclude Include="Nodes\NiDX9ImplicitDepthStencilBufferData.h" />
+    <ClInclude Include="Nodes\NiDX9Renderer.h" />
+    <ClInclude Include="Nodes\NiDX9RenderState.h" />
+    <ClInclude Include="Nodes\NiDX9TextureBufferData.h" />
+    <ClInclude Include="Nodes\NiFogProperty.h" />
+    <ClInclude Include="Nodes\NiMatrix33.h" />
+    <ClInclude Include="Nodes\NiNode.h" />
+    <ClInclude Include="Nodes\NiObject.h" />
+    <ClInclude Include="Nodes\NiObjectNET.h" />
+    <ClInclude Include="Nodes\NiPoint3.h" />
+    <ClInclude Include="Nodes\NiProperty.h" />
+    <ClInclude Include="Nodes\NiRect.h" />
+    <ClInclude Include="Nodes\NiRefObject.h" />
+    <ClInclude Include="Nodes\NiRenderer.h" />
+    <ClInclude Include="Nodes\NiRenderTargetGroup.h" />
+    <ClInclude Include="Nodes\NiShader.h" />
+    <ClInclude Include="Nodes\NiVector3.h" />
+    <ClInclude Include="Nodes\NiVector4.h" />
+    <ClInclude Include="Nodes\NiViewPort.h" />
+    <ClInclude Include="Nodes\Template.h" />
+    <ClInclude Include="OBGE fork\Sky.h" />
+    <ClInclude Include="OBGE fork\SkyObject.h" />
+    <ClInclude Include="OBGE fork\Sun.h" />
+    <ClInclude Include="OBSEShaderInterface.h" />
+    <ClInclude Include="Rendering.h" />
+    <ClInclude Include="RenderStateManagerHooks.h" />
+    <ClInclude Include="RenderSurfaceParametersHook.hpp" />
+    <ClInclude Include="ScreenElements.h" />
+    <ClInclude Include="ShaderIOHook.hpp" />
+    <ClInclude Include="ShaderManager.h" />
+    <ClInclude Include="SpoofShader.h" />
+    <ClInclude Include="TextureIOHook.hpp" />
+    <ClInclude Include="TextureManager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\obse\obse\GameRTTI_1_1.inl" />
+    <None Include="..\obse\obse\GameRTTI_1_2.inl" />
+    <None Include="..\obse\obse\GameRTTI_1_2_416.inl" />
+    <None Include="exports.def" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

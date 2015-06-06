@@ -39,7 +39,7 @@
 #include <string>
 #include <map>
 #include <algorithm>
-
+#include <assert.h>
 #include "EffectManager.h"
 #include "TextureManager.h"
 #include "GlobalSettings.h"

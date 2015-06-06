@@ -35,7 +35,7 @@
  */
 
 #ifndef	OBGE_NOSHADER
-
+#include <assert.h>
 #include "D3D9.hpp"
 #include "D3D9Device.hpp"
 #include "Constants.h"
